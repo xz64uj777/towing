@@ -1,26 +1,14 @@
 # Towing & Recovery Simulator
 
-A 3D mobile-first towing and vehicle recovery simulator.
+A mobile-first 3D towing and recovery simulator. The browser build follows the same architecture as Slingline: Three.js for the 3D world and simulation, React for the interface, Vite for fast builds, and GitHub Actions for browser deployment.
 
-## Engine decision
-The production target is **Godot 4.7.2 stable**. Unreal Engine 5.8 was evaluated for maximum visual fidelity, but its licensed engine distribution and large Android toolchain make reliable builds on the available free cloud runner impractical. Godot provides a reproducible Android export path without Epic source access.
+## Play
+https://xz64uj777.github.io/towing/
 
 ## Current prototype
-- 3D roadside recovery scene
-- Medium-duty wrecker with physics-based vehicle chassis and suspension wheels
-- Heavy stuck pickup target
-- Winch cable with spring/damper tension, winch-in, and overload release
-- Touch buttons and keyboard fallback
-- Third-person chase camera
+- 3D medium-duty wrecker and disabled pickup in a roadside ditch
+- Live driving, steering, braking, and basic vehicle inertia
+- Winch cable with spring/damper tension, hook/unhook, and overload release
+- Touch controls, keyboard controls, orbit camera, and pinch zoom
 
-## Build
-Pushes to `main` run the Android APK workflow. The APK is uploaded as a GitHub Actions artifact.
-
-## Next milestones
-1. Verify APK build and install on a real Android device.
-2. Improve tire/terrain interaction and vehicle handling.
-3. Add hookup points, cable slack, rated rigging and pulley mechanics.
-4. Add rollback and wheel-lift equipment.
-5. Add dispatch, jobs, fleet progression and maintenance.
-
-This repository is independent of other simulator projects.
+This is an early physics prototype. Suspension, tire-ground contact, terrain-dependent traction, detailed rigging, and recovery scenarios are still being developed. The Android/Godot experiment is retained while the browser prototype becomes the main development target.
