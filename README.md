@@ -1,20 +1,26 @@
 # Towing & Recovery Simulator
 
-A realism-first, mobile-targeted 3D towing and vehicle recovery simulator.
+A 3D mobile-first towing and vehicle recovery simulator.
 
-## Engine
-**Unreal Engine 5.8 stable** is the production baseline. We are not targeting the 5.9 Preview. UE5 gives this project the strongest combination of high-fidelity 3D rendering, Chaos vehicle physics, and Android deployment support.
+## Engine decision
+The production target is **Godot 4.7.2 stable**. Unreal Engine 5.8 was evaluated for maximum visual fidelity, but its licensed engine distribution and large Android toolchain make reliable builds on the available free cloud runner impractical. Godot provides a reproducible Android export path without Epic source access.
 
-## First playable
-A roadside ditch recovery: drive a wrecker to a stuck pickup, inspect the scene, select a rated recovery point, rig the winch, manage cable slack and tension, recover safely, and tow the vehicle away.
+## Current prototype
+- 3D roadside recovery scene
+- Medium-duty wrecker with physics-based vehicle chassis and suspension wheels
+- Heavy stuck pickup target
+- Winch cable with spring/damper tension, winch-in, and overload release
+- Touch buttons and keyboard fallback
+- Third-person chase camera
 
-## Simulation priorities
-- Vehicle mass, suspension, tire grip, steering, braking, and load transfer
-- Cable length, slack, stretch, tension, winch speed, and overload failure
-- Mud, gravel, grass, snow, pavement, slopes, and soft shoulders
-- Rated chains, straps, shackles, snatch blocks, and recovery anchors
-- Wheel-lift, rollback, medium-duty wrecker, heavy wrecker, and rotator progression
-- Mobile touch controls, pinch zoom, camera modes, and scalable graphics
+## Build
+Pushes to `main` run the Android APK workflow. The APK is uploaded as a GitHub Actions artifact.
 
-## Repository status
-This is the initial Unreal C++ project scaffold. It is not yet a playable 3D build and no APK has been compiled. See [engine and physics architecture](Docs/ENGINE_AND_PHYSICS.md).
+## Next milestones
+1. Verify APK build and install on a real Android device.
+2. Improve tire/terrain interaction and vehicle handling.
+3. Add hookup points, cable slack, rated rigging and pulley mechanics.
+4. Add rollback and wheel-lift equipment.
+5. Add dispatch, jobs, fleet progression and maintenance.
+
+This repository is independent of other simulator projects.

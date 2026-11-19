@@ -1,0 +1,73 @@
+name: Android APK Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform and build tools
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018"
+
+      - name: Download Godot 4.7.2 and export templates
+        run: |
+          mkdir -p "$HOME/.local/share/godot/export_templates/4.7.2.stable"
+          curl -L --fail -o godot.zip https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          unzip -q godot.zip
+          curl -L --fail -o templates.tpz https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz
+          unzip -q templates.tpz -d templates
+          cp templates/templates/* "$HOME/.local/share/godot/export_templates/4.7.2.stable/" || cp templates/* "$HOME/.local/share/godot/export_templates/4.7.2.stable/"
+          chmod +x Godot_v4.7.2-stable_linux.x86_64
+
+      - name: Configure Android paths
+        run: |
+          mkdir -p "$HOME/.config/godot"
+          cat > "$HOME/.config/godot/editor_settings-4.tres" <<EOF
+          [gd_resource type="EditorSettings" format=3]
+          [resource]
+          export/android/java_sdk_path = "$JAVA_HOME"
+          export/android/android_sdk_path = "$ANDROID_HOME"
+          EOF
+
+      - name: Import and validate project
+        run: ./Godot_v4.7.2-stable_linux.x86_64 --headless --editor --path . --quit
+
+      - name: Export Android APK
+        run: |
+          mkdir -p build
+          ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --export-debug Android build/TowingRecovery-debug.apk
+
+      - name: Verify APK
+        run: |
+          test -s build/TowingRecovery-debug.apk
+          file build/TowingRecovery-debug.apk
+          unzip -l build/TowingRecovery-debug.apk | grep -E 'lib/arm64-v8a|AndroidManifest.xml'
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TowingRecovery-Android-debug
+          path: build/TowingRecovery-debug.apk
+          if-no-files-found: error
+          retention-days: 14
