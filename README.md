@@ -1,20 +1,20 @@
 # Towing & Recovery Simulator
 
-A mobile-first, realism-focused towing and vehicle recovery simulator.
+A realism-first, mobile-targeted 3D towing and vehicle recovery simulator.
 
-## Prototype 01
-- Roadside pickup recovery scenario
-- Drive controls and steering
-- Hook/cable interaction
-- Winch-in toggle and tension HUD
-- Overload release
-- Recovery reset
+## Engine
+**Unreal Engine 5.8 stable** is the production baseline. We are not targeting the 5.9 Preview. UE5 gives this project the strongest combination of high-fidelity 3D rendering, Chaos vehicle physics, and Android deployment support.
 
-## Roadmap
-1. Recovery physics and winching
-2. Terrain traction and vehicle mass
-3. Tow truck / rollback / wheel-lift rigs
-4. Rigging: chains, straps, snatch blocks
-5. Career, dispatch, fleet and maintenance
+## First playable
+A roadside ditch recovery: drive a wrecker to a stuck pickup, inspect the scene, select a rated recovery point, rig the winch, manage cable slack and tension, recover safely, and tow the vehicle away.
 
-This project is independent from the user's other simulator projects.
+## Simulation priorities
+- Vehicle mass, suspension, tire grip, steering, braking, and load transfer
+- Cable length, slack, stretch, tension, winch speed, and overload failure
+- Mud, gravel, grass, snow, pavement, slopes, and soft shoulders
+- Rated chains, straps, shackles, snatch blocks, and recovery anchors
+- Wheel-lift, rollback, medium-duty wrecker, heavy wrecker, and rotator progression
+- Mobile touch controls, pinch zoom, camera modes, and scalable graphics
+
+## Repository status
+This is the initial Unreal C++ project scaffold. It is not yet a playable 3D build and no APK has been compiled. See [engine and physics architecture](Docs/ENGINE_AND_PHYSICS.md).
