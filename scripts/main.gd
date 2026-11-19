@@ -224,13 +224,8 @@ func _physics_process(delta: float) -> void:
         steer = -1.0
     if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
         steer = 1.0
-    if Input.is_key_pressed(KEY_SPACE):
-        braking = true
-    elif not Input.is_key_pressed(KEY_SPACE):
-        if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-            braking = false
     truck.engine_force = drive * 11500.0
-    truck.brake = 8500.0 if braking else 0.0
+    truck.brake = 8500.0 if (braking or Input.is_key_pressed(KEY_SPACE)) else 0.0
     truck.steering = steer * 0.42
 
     if hooked:
