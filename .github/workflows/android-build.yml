@@ -24,6 +24,8 @@ jobs:
 
       - name: Install Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
 
       - name: Install Android platform and build tools
         run: |
@@ -33,9 +35,9 @@ jobs:
       - name: Download Godot 4.7.2 and export templates
         run: |
           mkdir -p "$HOME/.local/share/godot/export_templates/4.7.2.stable"
-          curl -L --fail -o godot.zip https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          curl -L --fail -o godot.zip https://godot-releases.nbg1.your-objectstorage.com/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
           unzip -q godot.zip
-          curl -L --fail -o templates.tpz https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz
+          curl -L --fail -o templates.tpz https://godot-releases.nbg1.your-objectstorage.com/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz
           unzip -q templates.tpz -d templates
           cp templates/templates/* "$HOME/.local/share/godot/export_templates/4.7.2.stable/" || cp templates/* "$HOME/.local/share/godot/export_templates/4.7.2.stable/"
           chmod +x Godot_v4.7.2-stable_linux.x86_64
