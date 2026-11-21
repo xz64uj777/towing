@@ -59,13 +59,13 @@ export default function TowingGame(){
    const dt=Math.min(.033,(now-last)/1000);last=now;const steps=Math.max(1,Math.ceil(dt/(1/120)));const h=dt/steps;
    for(let n=0;n<steps;n++){
     const forward=V(Math.sin(s.yaw),0,-Math.cos(s.yaw));const right=V(Math.cos(s.yaw),0,Math.sin(s.yaw));
-    const speed=s.vel.dot(forward);const steerTarget=s.steer*.48;s.truck.userData.body.rotation.y=0;
-    const accel=s.throttle*7.4-(s.brake?Math.sign(speed)*10:0)-speed*0.13;
+    const speed=s.vel.dot(forward);const steerAngle=s.steer*(.48-.28*clamp(Math.abs(speed)/22,0,1));s.truck.userData.body.rotation.y=0;
+    const accel=s.throttle*5.8-(s.brake?Math.sign(speed)*13:0)-speed*0.22;
     s.vel.addScaledVector(forward,accel*h);
     const side=s.vel.dot(right);s.vel.addScaledVector(right,-side*Math.min(1,12.5*h));
     s.vel.multiplyScalar(Math.pow(.985,h*60));
-    const yawRate=(speed/3.1)*Math.tan(steerTarget);s.yaw+=yawRate*h;
-    const max=25;const sp=s.vel.length();if(sp>max)s.vel.setLength(max);
+    const yawRate=clamp((speed/3.4)*Math.tan(steerAngle),-1.25,1.25);s.yaw+=yawRate*h;
+    const max=20;const sp=s.vel.length();if(sp>max)s.vel.setLength(max);
     s.pos.addScaledVector(s.vel,h);s.pos.y=0;
     // Truck wheel spin and steering articulation.
     for(let i=0;i<s.truck.userData.wheels.length;i++){const w=s.truck.userData.wheels[i];w.rotation.x+=speed*h/0.48;if(i<2)w.rotation.y=s.steer*.28;}
