@@ -1,2 +1,38 @@
 <!doctype html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/><meta name="theme-color" content="#10151b"/><title>Towing & Recovery Simulator</title></head><body><div id="root"></div><script type="module" src="/src/main.jsx"></script></body></html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta name="theme-color" content="#10151b"/>
+<title>Towing & Recovery Simulator</title>
+<style>
+  body{margin:0;background:#10151b;color:#fff;font:16px system-ui,sans-serif}
+  #startup{padding:28px;text-align:center}
+  #startup-error{display:none;position:fixed;z-index:99999;left:12px;right:12px;top:12px;padding:16px;background:#451c1c;color:white;border:2px solid #ffb46a;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
+</style>
+<script>
+(function(){
+ var failed=false;
+ function report(message){
+   if(failed)return;failed=true;
+   var pane=document.getElementById('startup-error');
+   if(pane){pane.textContent='Towing Simulator .13 startup error:\n'+message+'\n\nPlease send a screenshot of this message.';pane.style.display='block';}
+ }
+ window.addEventListener('error',function(event){
+   var target=event.target;
+   if(target && target!==window && (target.src || target.href)){report('Asset failed to load: '+(target.src||target.href));return;}
+   report(event.message||'A JavaScript error prevented startup.');
+ },true);
+ window.addEventListener('unhandledrejection',function(event){report(String(event.reason?.message||event.reason||'Unknown startup rejection'));});
+ window.addEventListener('DOMContentLoaded',function(){
+   setTimeout(function(){if(!failed && document.getElementById('startup'))report('Game did not finish loading. Check your connection or reload in Chrome.');},12000);
+ });
+})();
+</script>
+</head>
+<body>
+<div id="root"><div id="startup">Loading Towing Simulator .13…</div></div>
+<div id="startup-error" role="alert"></div>
+<script type="module" src="/src/main.jsx"></script>
+</body>
+</html>
