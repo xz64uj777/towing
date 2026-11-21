@@ -103,7 +103,8 @@ export default function TowingGame(){
       s.jobDone=true;s.winch=false;s.hook=false;
       const reward=JOBS[s.jobIndex%JOBS.length].pay;
       saveCareer(p=>({...p,cash:p.cash+reward,completed:p.completed+1,job:p.job+1}));
-      setNotice('JOB COMPLETE +
+      setNotice('JOB COMPLETE +$'+reward+'! Tap NEXT JOB.');
+    }
     if(s.hook){cable.visible=true;cable.geometry.setFromPoints([pa,pb]);}else cable.visible=false;
    }
    // Orbit follow camera, pinch zoom is handled by pointer distance.
@@ -130,7 +131,8 @@ export default function TowingGame(){
  const togglePark=()=>{const s=sim.current;if(!s)return;if(s.riggersDeployed&&s.parkingBrake){setNotice('Retract riggers before releasing parking brake.');return;}s.parkingBrake=!s.parkingBrake;};
  const toggleHook=()=>{const s=sim.current;if(!s)return;if(!s.hook&&!s.boomDeployed){setNotice('Deploy the boom before hooking.');return;}if(!s.hook&&s.pos.distanceTo(s.pickPos)>24){setNotice('Move within 24 m to hook the vehicle.');return;}s.hook=!s.hook;if(s.hook){const f=V(Math.sin(s.yaw),0,-Math.cos(s.yaw));const a=s.pos.clone().add(f.multiplyScalar(-2.3));s.cableLength=clamp(a.distanceTo(s.pickPos),4,25);}};
  const reset=()=>{const s=sim.current;if(!s)return;s.pos.set(0,0,7);s.vel.set(0,0,0);s.yaw=0;const job=JOBS[careerRef.current.job%JOBS.length];s.pickPos.set(job.x,0,job.z);s.jobIndex=careerRef.current.job;s.jobDone=false;s.heavyRecovery=careerRef.current.job%JOBS.length===3;s.pickVel.set(0,0,0);s.hook=false;s.winch=false;s.winchOut=false;s.parkingBrake=false;s.boomDeployed=false;s.liftDeployed=false;s.riggersDeployed=false;s.cableLength=14;};
- const upgrade=type=>{const lvl=careerRef.current[type],price=(lvl+1)*500;if(lvl>=3||careerRef.current.cash<price){setNotice(lvl>=3?'Fully upgraded':'Not enough cash: =><button className={wide?'control wide':'control'} onPointerDown={onDown} onPointerUp={onUp} onPointerLeave={onUp} onContextMenu={e=>e.preventDefault()}>{label}</button>;
+ const upgrade=type=>{const lvl=careerRef.current[type],price=(lvl+1)*500;if(lvl>=3||careerRef.current.cash<price){setNotice(lvl>=3?'Fully upgraded':'Not enough cash: $'+price);return;}saveCareer(p=>({...p,cash:p.cash-price,[type]:p[type]+1}));setNotice(type.toUpperCase()+' upgraded!');};
+ const Hold=({label,onDown,onUp,wide=false})=><button className={wide?'control wide':'control'} onPointerDown={onDown} onPointerUp={onUp} onPointerCancel={onUp} onPointerLeave={onUp} onContextMenu={e=>e.preventDefault()}>{label}</button>;
  return <main className="game-shell"><div className="scene" ref={mount}/>
   <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • RECOVERY OPERATOR</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
   <section className="mission"><div className="eyebrow">DISPATCH #{career.completed+1} · ${career.completed} COMPLETED</div><b>{JOBS[career.job%JOBS.length].name}</b><span>Recover the pickup into the green roadside zone. Reward: ${JOBS[career.job%JOBS.length].pay}</span><div className="stats"><span>CASH ${career.cash}</span><span>ENGINE {career.engine}/3 · WINCH {career.winch}/3</span></div><div className="stats"><span>{hud.hook?'CABLE CONNECTED':'CABLE DISCONNECTED'}</span><span>{hud.tension.toFixed(1)} kN · {hud.range?.toFixed(0)} m</span></div></section>
