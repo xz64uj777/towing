@@ -3,6 +3,8 @@ import * as THREE from 'three';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const V=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
+const JOBS=[{name:'Ditch Recovery',x:10.2,z:-18,pay:450},{name:'Forest Extraction',x:-14,z:-42,pay:700},{name:'Highway Rescue',x:12,z:-55,pay:950},{name:'Heavy Recovery',x:-18,z:-63,pay:1300}];
+const loadCareer=()=>{try{return JSON.parse(localStorage.getItem('towing-career')||'{}')}catch{return {}}};
 
 function box(parent,name,size,pos,color,opts={}) {
   const mesh=new THREE.Mesh(new THREE.BoxGeometry(...size),new THREE.MeshStandardMaterial({color,roughness:opts.roughness??.78,metalness:opts.metalness??.08}));
@@ -33,6 +35,10 @@ function makeVehicle(scene,{name,color,pos,scale=1}) {
 }
 
 export default function TowingGame(){
+ const [career,setCareer]=useState(()=>({job:0,cash:0,completed:0,engine:0,winch:0,...loadCareer()}));
+ const careerRef=useRef(career);careerRef.current=career;
+ const [garage,setGarage]=useState(false),[notice,setNotice]=useState('');
+ const saveCareer=fn=>setCareer(old=>{const next=fn(old);careerRef.current=next;try{localStorage.setItem('towing-career',JSON.stringify(next))}catch{}return next;});
  const mount=useRef(null),sim=useRef(null),[hud,setHud]=useState({speed:0,gear:'D',hook:false,tension:0,winch:'IDLE'}),[help,setHelp]=useState(true),[steerVisual,setSteerVisual]=useState(0);
  useEffect(()=>{
   const host=mount.current;if(!host)return;
@@ -47,11 +53,14 @@ export default function TowingGame(){
   for(let i=0;i<30;i++){const x=(i%2?1:-1)*(14+Math.random()*28),z=-70+i*5;const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.18,.3,2.8,7),new THREE.MeshStandardMaterial({color:0x59432e}));trunk.position.set(x,1.3,z);scene.add(trunk);const crown=new THREE.Mesh(new THREE.ConeGeometry(1.5+Math.random(),4.4,7),new THREE.MeshStandardMaterial({color:0x344d38}));crown.position.set(x,4.1,z);crown.castShadow=true;scene.add(crown);}
   for(let z=-75;z<40;z+=8){const dash=new THREE.Mesh(new THREE.BoxGeometry(.13,.025,3.4),new THREE.MeshBasicMaterial({color:0xe4dfc6}));dash.position.set(0,.06,z);scene.add(dash);}
   const truck=makeVehicle(scene,{name:'wrecker',color:0xc83b2c,pos:V(0,0,7)});
-  const pickup=makeVehicle(scene,{name:'pickup',color:0x315c83,pos:V(10.2,0,-18),scale:.92});
+  const firstJob=JOBS[careerRef.current.job%JOBS.length];
+  const pickup=makeVehicle(scene,{name:'pickup',color:0x315c83,pos:V(firstJob.x,0,firstJob.z),scale:.92});
+  const zone=new THREE.Mesh(new THREE.RingGeometry(3.5,3.85,48),new THREE.MeshBasicMaterial({color:0x46ef9c,side:THREE.DoubleSide}));
+  zone.rotation.x=-Math.PI/2;zone.position.set(2,.12,firstJob.z);scene.add(zone);
   pickup.rotation.y=.18;
   // Pickup starts low in the soft ditch with a little yaw.
   const cableMat=new THREE.LineBasicMaterial({color:0xf3bd43});const cableGeo=new THREE.BufferGeometry().setFromPoints([V(),V()]);const cable=new THREE.Line(cableGeo,cableMat);scene.add(cable);cable.visible=false;
-  const s={truck,pickup,pos:V(0,0,7),vel:V(),yaw:0,steer:0,throttle:0,brake:0,hook:false,winch:false,winchOut:false,parkingBrake:false,boomDeployed:false,liftDeployed:false,cableLength:14,tension:0,pickPos:V(10.2,0,-18),pickVel:V(),pickYaw:-.18,cameraYaw:0,cameraPitch:.24,zoom:13,drag:null,pointers:new Map(),lastHud:0};
+  const s={truck,pickup,pos:V(0,0,7),vel:V(),yaw:0,steer:0,throttle:0,brake:0,hook:false,winch:false,winchOut:false,parkingBrake:false,boomDeployed:false,liftDeployed:false,cableLength:14,tension:0,pickPos:V(firstJob.x,0,firstJob.z),pickVel:V(),pickYaw:-.18,cameraYaw:0,cameraPitch:.24,zoom:13,drag:null,pointers:new Map(),lastHud:0,jobIndex:careerRef.current.job,jobDone:false};
   sim.current=s;
   const resize=()=>{const w=host.clientWidth,h=host.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);};const ro=new ResizeObserver(resize);ro.observe(host);resize();
   let last=performance.now(),raf=0;
@@ -60,7 +69,7 @@ export default function TowingGame(){
    for(let n=0;n<steps;n++){
     const forward=V(Math.sin(s.yaw),0,-Math.cos(s.yaw));const right=V(Math.cos(s.yaw),0,Math.sin(s.yaw));
     const speed=s.vel.dot(forward);const steerAngle=s.steer*(.48-.28*clamp(Math.abs(speed)/22,0,1));s.truck.userData.body.rotation.y=0;
-    const parked=s.winch||s.winchOut||s.parkingBrake;const accel=parked?-Math.sign(speed)*18:s.brake?-Math.sign(speed)*18:s.throttle*5.8-speed*0.22;
+    const parked=s.winch||s.winchOut||s.parkingBrake;const accel=parked?-Math.sign(speed)*18:s.brake?-Math.sign(speed)*18:s.throttle*(5.8+careerRef.current.engine*1.2)-speed*0.22;
     s.vel.addScaledVector(forward,accel*h);
     const side=s.vel.dot(right);s.vel.addScaledVector(right,-side*Math.min(1,12.5*h));
     s.vel.multiplyScalar(Math.pow(.985,h*60));
@@ -77,7 +86,7 @@ export default function TowingGame(){
     const pb=s.pickPos.clone().add(V(0,1,0)).add(pickForward.clone().multiplyScalar(2.0));
     const delta=pb.clone().sub(pa);const dist=delta.length();const dir=delta.normalize();
     if(s.hook){
-      if(s.winch)s.cableLength=Math.max(3.2,s.cableLength-2.4*h);if(s.winchOut)s.cableLength=Math.min(26,s.cableLength+3.2*h);
+      if(s.winch)s.cableLength=Math.max(3.2,s.cableLength-(2.4+careerRef.current.winch*.8)*h);if(s.winchOut)s.cableLength=Math.min(26,s.cableLength+3.2*h);
       const rel=s.pickVel.clone().sub(s.vel).dot(dir);s.tension=Math.max(0,(dist-s.cableLength)*6200+rel*780);
       if(s.tension>32000){s.hook=false;s.tension=0;}
       else if(dist>s.cableLength){const f=Math.min(s.tension,32000);s.pickVel.addScaledVector(dir,-f/2350*h);s.vel.addScaledVector(dir,f/6200*h);}
@@ -89,6 +98,95 @@ export default function TowingGame(){
     if(s.pickPos.z>6)s.pickVel.z*=Math.pow(.85,h*60);
     s.pickYaw+=clamp(s.pickVel.x*.018,-.35,.35)*h;
     s.pickup.position.copy(s.pickPos);s.pickup.rotation.y=-s.pickYaw;
+    if(!s.jobDone&&s.hook&&s.pickPos.distanceTo(V(2,0,JOBS[s.jobIndex%JOBS.length].z))<4.2){
+      s.jobDone=true;s.winch=false;s.hook=false;
+      const reward=JOBS[s.jobIndex%JOBS.length].pay;
+      saveCareer(p=>({...p,cash:p.cash+reward,completed:p.completed+1,job:p.job+1}));
+      setNotice('JOB COMPLETE +
+    if(s.hook){cable.visible=true;cable.geometry.setFromPoints([pa,pb]);}else cable.visible=false;
+   }
+   // Orbit follow camera, pinch zoom is handled by pointer distance.
+   const focus=s.pos.clone().add(V(0,1.2,0));const distance=s.zoom;const cy=Math.cos(s.cameraPitch),sy=Math.sin(s.cameraPitch);
+   const offset=V(Math.sin(s.cameraYaw)*cy*distance,sy*distance,Math.cos(s.cameraYaw)*cy*distance);
+   camera.position.copy(focus).add(offset);camera.lookAt(focus.clone().add(V(0,0,-2)));
+   if(now-s.lastHud>120){const sp=s.vel.length()*3.6;setHud({speed:sp,gear:s.throttle<-.1?'R':'D',hook:s.hook,tension:s.tension/1000,winch:s.winch?'REELING':'IDLE',parking:s.winch||s.winchOut||s.parkingBrake,range:s.pos.distanceTo(s.pickPos)});s.lastHud=now;}
+   renderer.render(scene,camera);raf=requestAnimationFrame(update);
+  };raf=requestAnimationFrame(update);
+  const onKey=(e)=>{const down=e.type==='keydown';if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();if(e.key==='w'||e.key==='ArrowUp')s.throttle=down?1:0;if(e.key==='s'||e.key==='ArrowDown')s.brake=down;if(e.key==='a'||e.key==='ArrowLeft')s.steer=down?-1:0;if(e.key==='d'||e.key==='ArrowRight')s.steer=down?1:0;if(e.key.toLowerCase()==='r')s.winch=down;if(down&&e.key.toLowerCase()==='h')s.hook=!s.hook;};
+  window.addEventListener('keydown',onKey);window.addEventListener('keyup',onKey);
+  const onPointerDown=e=>{renderer.domElement.setPointerCapture(e.pointerId);s.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(s.pointers.size===1)s.drag={x:e.clientX,y:e.clientY,yaw:s.cameraYaw,pitch:s.cameraPitch};};
+  const onPointerMove=e=>{if(!s.pointers.has(e.pointerId))return;s.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(s.pointers.size===1&&s.drag){s.cameraYaw=s.drag.yaw-(e.clientX-s.drag.x)*.006;s.cameraPitch=clamp(s.drag.pitch+(e.clientY-s.drag.y)*.004,-.05,.85);}if(s.pointers.size===2){const p=[...s.pointers.values()];const d=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);if(s.pinch)s.zoom=clamp(s.pinch.zoom*s.pinch.d/Math.max(20,d),6,26);else s.pinch={d,zoom:s.zoom};}};
+  const onPointerUp=e=>{s.pointers.delete(e.pointerId);s.drag=null;if(s.pointers.size<2)s.pinch=null;};
+  renderer.domElement.addEventListener('pointerdown',onPointerDown);renderer.domElement.addEventListener('pointermove',onPointerMove);renderer.domElement.addEventListener('pointerup',onPointerUp);renderer.domElement.addEventListener('pointercancel',onPointerUp);
+  return()=>{cancelAnimationFrame(raf);ro.disconnect();window.removeEventListener('keydown',onKey);window.removeEventListener('keyup',onKey);renderer.dispose();host.removeChild(renderer.domElement);scene.traverse(o=>{o.geometry?.dispose?.();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}});};
+ },[]);
+ const s=sim.current;const press=(key,val)=>e=>{e.preventDefault();if(sim.current)sim.current[key]=val;};
+ const joystickMove=e=>{const el=e.currentTarget,rect=el.getBoundingClientRect(),dx=(e.clientX-(rect.left+rect.width/2))/(rect.width*.42);const steer=clamp(dx,-1,1);setSteerVisual(steer);if(sim.current)sim.current.steer=steer;};
+ const joystickStop=e=>{e.preventDefault();setSteerVisual(0);if(sim.current)sim.current.steer=0;};
+ const toggleBoom=()=>{const s=sim.current;if(s)s.boomDeployed=!s.boomDeployed;};
+ const toggleLift=()=>{const s=sim.current;if(s)s.liftDeployed=!s.liftDeployed;};
+ const togglePark=()=>{const s=sim.current;if(s&&!s.winch&&!s.winchOut)s.parkingBrake=!s.parkingBrake;};
+ const toggleHook=()=>{const s=sim.current;if(!s)return;if(!s.hook&&s.pos.distanceTo(s.pickPos)>24){setNotice('Move within 24 m to hook the vehicle.');return;}s.hook=!s.hook;if(s.hook){const f=V(Math.sin(s.yaw),0,-Math.cos(s.yaw));const a=s.pos.clone().add(f.multiplyScalar(-2.3));s.cableLength=clamp(a.distanceTo(s.pickPos),4,25);}};
+ const reset=()=>{const s=sim.current;if(!s)return;s.pos.set(0,0,7);s.vel.set(0,0,0);s.yaw=0;const job=JOBS[careerRef.current.job%JOBS.length];s.pickPos.set(job.x,0,job.z);s.jobIndex=careerRef.current.job;s.jobDone=false;s.pickVel.set(0,0,0);s.hook=false;s.winch=false;s.winchOut=false;s.parkingBrake=false;s.boomDeployed=false;s.liftDeployed=false;s.cableLength=14;};
+ const upgrade=type=>{const lvl=careerRef.current[type],price=(lvl+1)*500;if(lvl>=3||careerRef.current.cash<price){setNotice(lvl>=3?'Fully upgraded':'Not enough cash: =><button className={wide?'control wide':'control'} onPointerDown={onDown} onPointerUp={onUp} onPointerLeave={onUp} onContextMenu={e=>e.preventDefault()}>{label}</button>;
+ return <main className="game-shell"><div className="scene" ref={mount}/>
+  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • RECOVERY OPERATOR</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
+  <section className="mission"><div className="eyebrow">DISPATCH #{career.completed+1} · ${career.completed} COMPLETED</div><b>{JOBS[career.job%JOBS.length].name}</b><span>Recover the pickup into the green roadside zone. Reward: ${JOBS[career.job%JOBS.length].pay}</span><div className="stats"><span>CASH ${career.cash}</span><span>ENGINE {career.engine}/3 · WINCH {career.winch}/3</span></div><div className="stats"><span>{hud.hook?'CABLE CONNECTED':'CABLE DISCONNECTED'}</span><span>{hud.tension.toFixed(1)} kN · {hud.range?.toFixed(0)} m</span></div></section>
+  <div className="bottom-ui"><div className="joystick" onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);joystickMove(e);}} onPointerMove={joystickMove} onPointerUp={joystickStop} onPointerCancel={joystickStop}><div className="stick-knob" style={{transform:`translateX(${steerVisual*23}px)`}}>●</div><span>STEER</span></div><div className="recovery"><button className={'action '+(hud.parking?'active':'')} onClick={togglePark}>PARK BRAKE</button><button className={'action '+(s?.boomDeployed?'active':'')} onClick={toggleBoom}>BOOM {s?.boomDeployed?'FOLD':'DEPLOY'}</button><button className={'action '+(s?.liftDeployed?'active':'')} onClick={toggleLift}>LIFT {s?.liftDeployed?'FOLD':'DEPLOY'}</button><button className={'action '+(hud.hook?'active':'')} onClick={toggleHook}>{hud.hook?'UNHOOK':'HOOK'}</button><Hold label="WINCH IN" onDown={press('winch',true)} onUp={press('winch',false)}/><Hold label="WINCH OUT" onDown={press('winchOut',true)} onUp={press('winchOut',false)}/></div><div className="drive"><Hold label="REV" onDown={press('throttle',-.55)} onUp={press('throttle',0)}/><Hold label="BRAKE" onDown={press('brake',true)} onUp={press('brake',false)}/><Hold label="GAS" wide onDown={press('throttle',1)} onUp={press('throttle',0)}/></div></div>
+  <div className="toolbar"><button onClick={()=>{reset();setNotice('Dispatch: '+JOBS[careerRef.current.job%JOBS.length].name);}}>NEXT JOB</button><button onClick={()=>setGarage(v=>!v)}>GARAGE</button><button onClick={reset}>RESET</button><button onClick={()=>{const s=sim.current;if(s){s.cameraYaw=0;s.cameraPitch=.24;s.zoom=13;}}}>RESET CAMERA</button><button onClick={()=>setHelp(v=>!v)}>CONTROLS</button></div>
+  {notice&&<div className="game-notice" onClick={()=>setNotice('')}>{notice} ✕</div>}
+  {garage&&<aside className="help garage"><button onClick={()=>setGarage(false)}>×</button><b>RECOVERY GARAGE</b><span>Complete jobs to earn cash and upgrade your equipment.</span><span>Balance: ${career.cash}</span><button className="garage-buy" onClick={()=>upgrade('engine')}>ENGINE LV {career.engine}/3 · ${(career.engine+1)*500}</button><button className="garage-buy" onClick={()=>upgrade('winch')}>WINCH LV {career.winch}/3 · ${(career.winch+1)*500}</button><small>Progress saves on this device.</small></aside>}
+  {help&&<aside className="help"><button onClick={()=>setHelp(false)}>×</button><b>HOW TO OPERATE</b><span>Use the left joystick to steer. Reverse, brake, and gas are on the right. Winching automatically applies the parking brake. Drag the scene to orbit; pinch to zoom. Drive within 24 m to hook the pickup. Winch it into the green recovery zone, earn cash, and buy upgrades in GARAGE.</span><small>Keyboard: W/S drive & brake · A/D steer · H hook · R winch</small></aside>}
+ </main>;
+}
++reward+'! Tap NEXT JOB.');
+    }
+    if(s.hook){cable.visible=true;cable.geometry.setFromPoints([pa,pb]);}else cable.visible=false;
+   }
+   // Orbit follow camera, pinch zoom is handled by pointer distance.
+   const focus=s.pos.clone().add(V(0,1.2,0));const distance=s.zoom;const cy=Math.cos(s.cameraPitch),sy=Math.sin(s.cameraPitch);
+   const offset=V(Math.sin(s.cameraYaw)*cy*distance,sy*distance,Math.cos(s.cameraYaw)*cy*distance);
+   camera.position.copy(focus).add(offset);camera.lookAt(focus.clone().add(V(0,0,-2)));
+   if(now-s.lastHud>120){const sp=s.vel.length()*3.6;setHud({speed:sp,gear:s.throttle<-.1?'R':'D',hook:s.hook,tension:s.tension/1000,winch:s.winch?'REELING':'IDLE',parking:s.winch||s.parkingBrake});s.lastHud=now;}
+   renderer.render(scene,camera);raf=requestAnimationFrame(update);
+  };raf=requestAnimationFrame(update);
+  const onKey=(e)=>{const down=e.type==='keydown';if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();if(e.key==='w'||e.key==='ArrowUp')s.throttle=down?1:0;if(e.key==='s'||e.key==='ArrowDown')s.brake=down;if(e.key==='a'||e.key==='ArrowLeft')s.steer=down?-1:0;if(e.key==='d'||e.key==='ArrowRight')s.steer=down?1:0;if(e.key.toLowerCase()==='r')s.winch=down;if(down&&e.key.toLowerCase()==='h')s.hook=!s.hook;};
+  window.addEventListener('keydown',onKey);window.addEventListener('keyup',onKey);
+  const onPointerDown=e=>{renderer.domElement.setPointerCapture(e.pointerId);s.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(s.pointers.size===1)s.drag={x:e.clientX,y:e.clientY,yaw:s.cameraYaw,pitch:s.cameraPitch};};
+  const onPointerMove=e=>{if(!s.pointers.has(e.pointerId))return;s.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(s.pointers.size===1&&s.drag){s.cameraYaw=s.drag.yaw-(e.clientX-s.drag.x)*.006;s.cameraPitch=clamp(s.drag.pitch+(e.clientY-s.drag.y)*.004,-.05,.85);}if(s.pointers.size===2){const p=[...s.pointers.values()];const d=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);if(s.pinch)s.zoom=clamp(s.pinch.zoom*s.pinch.d/Math.max(20,d),6,26);else s.pinch={d,zoom:s.zoom};}};
+  const onPointerUp=e=>{s.pointers.delete(e.pointerId);s.drag=null;if(s.pointers.size<2)s.pinch=null;};
+  renderer.domElement.addEventListener('pointerdown',onPointerDown);renderer.domElement.addEventListener('pointermove',onPointerMove);renderer.domElement.addEventListener('pointerup',onPointerUp);renderer.domElement.addEventListener('pointercancel',onPointerUp);
+  return()=>{cancelAnimationFrame(raf);ro.disconnect();window.removeEventListener('keydown',onKey);window.removeEventListener('keyup',onKey);renderer.dispose();host.removeChild(renderer.domElement);scene.traverse(o=>{o.geometry?.dispose?.();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}});};
+ },[]);
+ const s=sim.current;const press=(key,val)=>e=>{e.preventDefault();if(sim.current)sim.current[key]=val;};
+ const joystickMove=e=>{const el=e.currentTarget,rect=el.getBoundingClientRect(),dx=(e.clientX-(rect.left+rect.width/2))/(rect.width*.42);const steer=clamp(dx,-1,1);setSteerVisual(steer);if(sim.current)sim.current.steer=steer;};
+ const joystickStop=e=>{e.preventDefault();setSteerVisual(0);if(sim.current)sim.current.steer=0;};
+ const toggleBoom=()=>{const s=sim.current;if(s)s.boomDeployed=!s.boomDeployed;};
+ const toggleLift=()=>{const s=sim.current;if(s)s.liftDeployed=!s.liftDeployed;};
+ const togglePark=()=>{const s=sim.current;if(s&&!s.winch&&!s.winchOut)s.parkingBrake=!s.parkingBrake;};
+ const toggleHook=()=>{const s=sim.current;if(!s)return;s.hook=!s.hook;if(s.hook){const f=V(Math.sin(s.yaw),0,-Math.cos(s.yaw));const a=s.pos.clone().add(f.multiplyScalar(-2.3));s.cableLength=clamp(a.distanceTo(s.pickPos),4,25);}};
+ const reset=()=>{const s=sim.current;if(!s)return;s.pos.set(0,0,7);s.vel.set(0,0,0);s.yaw=0;s.pickPos.set(10.2,0,-18);s.pickVel.set(0,0,0);s.hook=false;s.winch=false;s.winchOut=false;s.parkingBrake=false;s.boomDeployed=false;s.liftDeployed=false;s.cableLength=14;};
+ const Hold=({label,onDown,onUp,wide=false})=><button className={wide?'control wide':'control'} onPointerDown={onDown} onPointerUp={onUp} onPointerLeave={onUp} onContextMenu={e=>e.preventDefault()}>{label}</button>;
+ return <main className="game-shell"><div className="scene" ref={mount}/>
+  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>FIELD TEST • MEDIUM DUTY WRECKER</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
+  <section className="mission"><div className="eyebrow">ACTIVE CALL · 01</div><b>Pickup in the ditch</b><span>Hook the disabled truck and recover it to the roadway.</span><div className="stats"><span>{hud.hook?'CABLE CONNECTED':'CABLE DISCONNECTED'}</span><span>{hud.tension.toFixed(1)} kN</span></div></section>
+  <div className="bottom-ui"><div className="joystick" onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);joystickMove(e);}} onPointerMove={joystickMove} onPointerUp={joystickStop} onPointerCancel={joystickStop}><div className="stick-knob" style={{transform:`translateX(${steerVisual*23}px)`}}>●</div><span>STEER</span></div><div className="recovery"><button className={'action '+(hud.parking?'active':'')} onClick={togglePark}>PARK BRAKE</button><button className={'action '+(s?.boomDeployed?'active':'')} onClick={toggleBoom}>BOOM {s?.boomDeployed?'FOLD':'DEPLOY'}</button><button className={'action '+(s?.liftDeployed?'active':'')} onClick={toggleLift}>LIFT {s?.liftDeployed?'FOLD':'DEPLOY'}</button><button className={'action '+(hud.hook?'active':'')} onClick={toggleHook}>{hud.hook?'UNHOOK':'HOOK'}</button><Hold label="WINCH IN" onDown={press('winch',true)} onUp={press('winch',false)}/><Hold label="WINCH OUT" onDown={press('winchOut',true)} onUp={press('winchOut',false)}/></div><div className="drive"><Hold label="REV" onDown={press('throttle',-.55)} onUp={press('throttle',0)}/><Hold label="BRAKE" onDown={press('brake',true)} onUp={press('brake',false)}/><Hold label="GAS" wide onDown={press('throttle',1)} onUp={press('throttle',0)}/></div></div>
+  <div className="toolbar"><button onClick={reset}>RESET</button><button onClick={()=>{const s=sim.current;if(s){s.cameraYaw=0;s.cameraPitch=.24;s.zoom=13;}}}>RESET CAMERA</button><button onClick={()=>setHelp(v=>!v)}>CONTROLS</button></div>
+  {help&&<aside className="help"><button onClick={()=>setHelp(false)}>×</button><b>HOW TO OPERATE</b><span>Use the left joystick to steer. Reverse, brake, and gas are on the right. Winching automatically applies the parking brake. Drag the scene to orbit; pinch to zoom. Hook the pickup, then hold WINCH IN to shorten the line.</span><small>Keyboard: W/S drive & brake · A/D steer · H hook · R winch</small></aside>}
+ </main>;
+}
++price);return;}saveCareer(p=>({...p,cash:p.cash-price,[type]:p[type]+1}));setNotice(type.toUpperCase()+' upgraded!');};
+ const Hold=({label,onDown,onUp,wide=false})=><button className={wide?'control wide':'control'} onPointerDown={onDown} onPointerUp={onUp} onPointerLeave={onUp} onContextMenu={e=>e.preventDefault()}>{label}</button>;
+ return <main className="game-shell"><div className="scene" ref={mount}/>
+  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>FIELD TEST • MEDIUM DUTY WRECKER</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
+  <section className="mission"><div className="eyebrow">ACTIVE CALL · 01</div><b>Pickup in the ditch</b><span>Hook the disabled truck and recover it to the roadway.</span><div className="stats"><span>{hud.hook?'CABLE CONNECTED':'CABLE DISCONNECTED'}</span><span>{hud.tension.toFixed(1)} kN</span></div></section>
+  <div className="bottom-ui"><div className="joystick" onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);joystickMove(e);}} onPointerMove={joystickMove} onPointerUp={joystickStop} onPointerCancel={joystickStop}><div className="stick-knob" style={{transform:`translateX(${steerVisual*23}px)`}}>●</div><span>STEER</span></div><div className="recovery"><button className={'action '+(hud.parking?'active':'')} onClick={togglePark}>PARK BRAKE</button><button className={'action '+(s?.boomDeployed?'active':'')} onClick={toggleBoom}>BOOM {s?.boomDeployed?'FOLD':'DEPLOY'}</button><button className={'action '+(s?.liftDeployed?'active':'')} onClick={toggleLift}>LIFT {s?.liftDeployed?'FOLD':'DEPLOY'}</button><button className={'action '+(hud.hook?'active':'')} onClick={toggleHook}>{hud.hook?'UNHOOK':'HOOK'}</button><Hold label="WINCH IN" onDown={press('winch',true)} onUp={press('winch',false)}/><Hold label="WINCH OUT" onDown={press('winchOut',true)} onUp={press('winchOut',false)}/></div><div className="drive"><Hold label="REV" onDown={press('throttle',-.55)} onUp={press('throttle',0)}/><Hold label="BRAKE" onDown={press('brake',true)} onUp={press('brake',false)}/><Hold label="GAS" wide onDown={press('throttle',1)} onUp={press('throttle',0)}/></div></div>
+  <div className="toolbar"><button onClick={reset}>RESET</button><button onClick={()=>{const s=sim.current;if(s){s.cameraYaw=0;s.cameraPitch=.24;s.zoom=13;}}}>RESET CAMERA</button><button onClick={()=>setHelp(v=>!v)}>CONTROLS</button></div>
+  {help&&<aside className="help"><button onClick={()=>setHelp(false)}>×</button><b>HOW TO OPERATE</b><span>Use the left joystick to steer. Reverse, brake, and gas are on the right. Winching automatically applies the parking brake. Drag the scene to orbit; pinch to zoom. Hook the pickup, then hold WINCH IN to shorten the line.</span><small>Keyboard: W/S drive & brake · A/D steer · H hook · R winch</small></aside>}
+ </main>;
+}
++reward+'! Tap NEXT JOB.');
+    }
     if(s.hook){cable.visible=true;cable.geometry.setFromPoints([pa,pb]);}else cable.visible=false;
    }
    // Orbit follow camera, pinch zoom is handled by pointer distance.
