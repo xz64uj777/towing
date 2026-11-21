@@ -36,18 +36,63 @@ function makeVehicle(scene,{name,color,pos,scale=1}) {
     const hub=new THREE.Mesh(new THREE.CylinderGeometry(.2*scale,.2*scale,.335*scale,16),new THREE.MeshStandardMaterial({color:0x8b9297,metalness:.7,roughness:.35}));
     hub.rotation.z=Math.PI/2; hub.position.copy(tire.position); tire.add(hub); hub.position.set(0,0,0);
   }
-  const forks=[];
+  const forks=[],outriggers=[],boomCylinders=[],liftCylinders=[];
+  let recoveryStructure=null,boomPivot=null,boomTilt=null,boomSleeve=null,boomTip=null;
+  let underliftPivot=null,underliftInner=null,underliftHead=null,liftCross=null;
   if(name==='wrecker') {
-    box(body,'boom base',[1.55,.42,1.1],[0,1.45,1.75],0x24282c);for(const side of [-1,1]){box(body,'light-duty cabinet',[.27,.75,1.9],[side*.96,1.55,1.0],color);box(body,'light-duty handle',[.06,.08,.25],[side*1.11,1.66,1],0xb9c2c8);}box(body,'light-duty deck',[2.1,.12,2.4],[0,1.97,1.1],0x343b3f);
-    const boom=box(body,'recovery boom',[.42,.38,3.1],[0,2.35,2.5],0xd4a326); boom.rotation.x=1.35;
-    const outriggers=[];for(const x of [-1,1]){const arm=box(body,'outrigger arm',[1.15,.22,.28],[x*1.45,1.05,1.6],0x4c555a);const foot=box(body,'outrigger foot',[.48,.14,.6],[x*2.05,.55,1.6],0xe0b340);outriggers.push({arm,foot,x});}
-    const underlift=box(body,'telescoping wheel-lift stinger',[.42,.22,2.8],[0,1.2,3.15],0x30383e);box(body,'wheel-lift receiver',[.62,.37,1.25],[0,.95,2.35],0x1d2529);box(body,'wheel-lift pivot',[.82,.35,.42],[0,.86,2.25],0x68747b);
-    const liftCross=box(body,'wheel lift crossbar',[2.25,.18,.3],[0,1.65,3.65],0x444b50);
-    for(const side of [-1,1]) {const grid=new THREE.Group();grid.name='wheel grid';body.add(grid);const cradle=box(grid,'tire cradle',[.42,.12,.95],[0,0,0],0x747e85);const lArm=box(grid,'L-arm tire restraint',[.17,.16,1.05],[side*.14,0,.68],0xc1c5c8);const stop=box(grid,'front tire stop',[.45,.22,.13],[0,.08,-.42],0xe2b54b);forks.push({grid,cradle,lArm,stop,side});}
+    // Fixed recovery boom with a separate articulated underlift. The rotator alone can slew.
+    for(const side of [-1,1]) {
+      box(body,'light-duty cabinet',[.27,.75,1.9],[side*.96,1.55,1.0],color);
+      box(body,'light-duty handle',[.06,.08,.25],[side*1.11,1.66,1],0xb9c2c8);
+    }
+    box(body,'light-duty deck',[2.1,.12,2.4],[0,1.97,1.1],0x343b3f);
+    recoveryStructure=new THREE.Group();recoveryStructure.name='fixed recovery assembly';body.add(recoveryStructure);
+    box(recoveryStructure,'wrecker tool cabinet',[1.85,.67,2.2],[0,1.68,1.15],color);
+    for(const side of [-1,1]){
+      box(recoveryStructure,'side locker door',[.055,.43,1.58],[side*.945,1.62,1.13],0x354048);
+      box(recoveryStructure,'locker latch',[.065,.085,.18],[side*.98,1.64,1.32],0xc1c7ca,{metalness:.65});
+      const drum=new THREE.Mesh(new THREE.CylinderGeometry(.31,.31,.52,18),new THREE.MeshStandardMaterial({color:0x343b40,metalness:.48,roughness:.45}));
+      drum.rotation.z=Math.PI/2;drum.position.set(side*.40,2.13,.6);drum.castShadow=true;recoveryStructure.add(drum);
+    }
+    box(recoveryStructure,'recovery boom hinge',[1.12,.43,.55],[0,2.12,1.1],0x222c31);
+    boomPivot=new THREE.Group();boomPivot.name='recovery yaw pivot';boomPivot.position.set(0,2.16,1.13);recoveryStructure.add(boomPivot);
+    boomTilt=new THREE.Group();boomTilt.name='recovery pitch hinge';boomPivot.add(boomTilt);
+    box(boomTilt,'recovery boom outer',[.72,.53,2.65],[0,.05,1.38],0x34414a,{metalness:.5});
+    boomSleeve=box(boomTilt,'recovery boom telescoping sleeve',[.52,.38,1.62],[0,.055,2.49],0xd2a42e,{metalness:.38});
+    boomTip=new THREE.Group();boomTip.position.set(0,.05,3.25);boomTilt.add(boomTip);
+    box(boomTip,'cable sheave',[.66,.62,.34],[0,0,0],0x252e35,{metalness:.55});
+    box(boomTip,'recovery hook',[.19,.46,.16],[0,-.46,.08],0xd9a72d,{metalness:.55});
+    for(const side of [-1,1]){
+      const mesh=new THREE.Mesh(new THREE.CylinderGeometry(.09,.11,1,12),new THREE.MeshStandardMaterial({color:0xaab2b9,metalness:.7,roughness:.3}));
+      mesh.castShadow=true;recoveryStructure.add(mesh);boomCylinders.push({mesh,side});
+    }
+    for(const side of [-1,1]) {
+      const arm=box(body,'outrigger arm',[1.15,.22,.28],[side*1.45,1.05,1.6],0x4c555a);
+      const foot=box(body,'outrigger foot',[.48,.14,.6],[side*2.05,.55,1.6],0xe0b340);
+      outriggers.push(arm,foot);
+    }
+    box(body,'underlift hinge housing',[.85,.49,.7],[0,1.12,2.37],0x252f35);
+    underliftPivot=new THREE.Group();underliftPivot.name='underlift raise-lower hinge';underliftPivot.position.set(0,1.18,2.40);body.add(underliftPivot);
+    box(underliftPivot,'underlift outer stinger',[.57,.32,2.53],[0,0,1.23],0x303a43,{metalness:.45});
+    underliftInner=box(underliftPivot,'underlift sliding inner tube',[.42,.25,1.25],[0,0,2.08],0xb9a04f,{metalness:.48});
+    underliftHead=new THREE.Group();underliftHead.name='leveling tire crossbar';underliftPivot.add(underliftHead);
+    liftCross=box(underliftHead,'wheel lift crossbar',[2.30,.20,.36],[0,0,0],0x535e66,{metalness:.43});
+    for(const side of [-1,1]){
+      const grid=new THREE.Group();grid.name='wheel grid';underliftHead.add(grid);
+      const cradle=box(grid,'tire cradle',[.44,.13,.95],[0,0,0],0x747e85);
+      const lArm=box(grid,'L-arm tire restraint',[.17,.16,1.05],[side*.14,0,.68],0xc1c5c8);
+      const stop=box(grid,'front tire stop',[.45,.22,.13],[0,.08,-.42],0xe2b54b);
+      forks.push({grid,cradle,lArm,stop,side});
+    }
+    for(const side of [-1,1]){
+      const mesh=new THREE.Mesh(new THREE.CylinderGeometry(.075,.095,1,12),new THREE.MeshStandardMaterial({color:0xb1b9c1,metalness:.65,roughness:.32}));
+      mesh.castShadow=true;body.add(mesh);liftCylinders.push({mesh,side});
+    }
   }
   const bed=box(body,'rollback bed',[2.15,.22,5.3],[0,1.45,1],0x606a71);bed.visible=false;
   const straps=[];for(const x of [-.8,.8]){const strap=box(body,'tire strap',[.22,.12,.55],[x,1.1,4.4],0xe3b13e);strap.visible=false;straps.push(strap);}
-  root.userData={body,wheels,scale,bed,straps,boom: name==='wrecker'?body.children.find(o=>o.name==='recovery boom'):null,liftCross: name==='wrecker'?body.children.find(o=>o.name==='wheel lift crossbar'):null,underlift:name==='wrecker'?body.children.find(o=>o.name==='telescoping wheel-lift stinger'):null,forks: name==='wrecker'?forks:[],outriggers:name==='wrecker'?body.children.filter(o=>o.name==='outrigger arm'||o.name==='outrigger foot'):[]}; return root;
+  root.userData={body,wheels,scale,bed,straps,recoveryStructure,boomPivot,boomTilt,boomSleeve,boomTip,boomCylinders,underliftPivot,underliftInner,underliftHead,liftCross,liftCylinders,forks,outriggers};
+  return root;
 }
 
 export default function TowingGame(){
@@ -72,7 +117,7 @@ export default function TowingGame(){
   const type=FLEET.find(t=>t.id===careerRef.current.selected)||FLEET[0];
   const truck=makeVehicle(scene,{name:'wrecker',color:type.color,pos:V(0,0,7),scale:type.id==='rotator'?1.13:1});
   const tools=type.tools;truck.userData.bed.visible=tools.includes('bed');
-  for(const o of truck.userData.body.children){if(o.name==='recovery boom'||o.name==='boom base')o.visible=tools.includes('boom');if(o.name.startsWith('light-duty'))o.visible=type.id==='light';if(o.name.startsWith('wheel lift'))o.visible=tools.includes('lift');if(o.name.startsWith('outrigger'))o.visible=tools.includes('riggers');if(o.name==='wheel-lift receiver'||o.name==='wheel-lift pivot')o.visible=tools.includes('lift');}
+  truck.userData.recoveryStructure.visible=tools.includes('boom');truck.userData.underliftPivot.visible=tools.includes('lift');for(const o of truck.userData.body.children){if(o.name.startsWith('light-duty'))o.visible=type.id==='light';if(o.name.startsWith('outrigger'))o.visible=tools.includes('riggers');if(o.name==='underlift hinge housing')o.visible=tools.includes('lift');}
   const firstJob=JOBS[careerRef.current.job%JOBS.length];
   const pickup=makeVehicle(scene,{name:'pickup',color:0x315c83,pos:V(firstJob.x,0,firstJob.z),scale:.92});
   const zone=new THREE.Mesh(new THREE.RingGeometry(3.5,3.85,48),new THREE.MeshBasicMaterial({color:0x46ef9c,side:THREE.DoubleSide}));
@@ -80,7 +125,7 @@ export default function TowingGame(){
   pickup.rotation.y=.18;
   // Pickup starts low in the soft ditch with a little yaw.
   const cableMat=new THREE.LineBasicMaterial({color:0xf3bd43});const cableGeo=new THREE.BufferGeometry().setFromPoints([V(),V()]);const cable=new THREE.Line(cableGeo,cableMat);scene.add(cable);cable.visible=false;
-  const s={truck,pickup,zone,pos:V(0,0,7),vel:V(),yaw:0,steer:0,throttle:0,brake:0,hook:false,winch:false,winchOut:false,parkingBrake:false,boomDeployed:false,boomAngle:0,boomSwing:0,boomExtension:0,liftDeployed:false,liftHeight:0,liftExtension:0,gridWidth:0,armsClosed:false,riggersDeployed:false,cableLength:14,tension:0,pickPos:V(firstJob.x,0,firstJob.z),pickVel:V(),pickYaw:-.18,cameraYaw:0,cameraPitch:.24,zoom:13,drag:null,pointers:new Map(),lastHud:0,jobIndex:careerRef.current.job,jobDone:false,heavyRecovery:careerRef.current.job%JOBS.length===3,loaded:false,strapsOn:false,bedTilt:false,type,tools};
+  const s={truck,pickup,zone,pos:V(0,0,7),vel:V(),yaw:0,steer:0,throttle:0,brake:0,hook:false,winch:false,winchOut:false,parkingBrake:false,boomDeployed:false,boomAngle:.36,boomSwing:0,boomExtension:0,boomControl:0,boomExtendControl:0,liftDeployed:false,liftHeight:0,liftExtension:0,liftControl:0,liftExtendControl:0,liftHydraulicX:0,liftHydraulicY:0,gridWidth:0,armsClosed:false,riggersDeployed:false,cableLength:14,tension:0,pickPos:V(firstJob.x,0,firstJob.z),pickVel:V(),pickYaw:-.18,cameraYaw:0,cameraPitch:.24,zoom:13,drag:null,pointers:new Map(),lastHud:0,jobIndex:careerRef.current.job,jobDone:false,heavyRecovery:careerRef.current.job%JOBS.length===3,loaded:false,strapsOn:false,bedTilt:false,type,tools};
   sim.current=s;
   const resize=()=>{const w=host.clientWidth,h=host.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);};const ro=new ResizeObserver(resize);ro.observe(host);resize();
   let last=performance.now(),raf=0;
@@ -100,15 +145,74 @@ export default function TowingGame(){
     for(let i=0;i<s.truck.userData.wheels.length;i++){const w=s.truck.userData.wheels[i];w.rotation.y=0;w.rotation.order='YXZ';w.rotation.y=i<2?steerAngle*.45:0;w.rotation.x+=speed*h/0.48;}
     s.truck.position.copy(s.pos);s.truck.rotation.y=-s.yaw;
     const equip=s.truck.userData;
-    // Light-duty wheel-lift trucks have a low stinger and tire grid, not a rotator boom.
-    if(equip.boom) equip.boom.visible=s.tools.includes('boom');
-    if(equip.outriggers) for(const part of equip.outriggers)part.visible=s.tools.includes('riggers');
-    if(equip.underlift) equip.underlift.visible=s.tools.includes('lift');
-    equip.bed.rotation.x=s.bedTilt?-.18:0;equip.bed.position.z=s.bedTilt?1.8:1;for(const strap of equip.straps)strap.visible=s.strapsOn&&s.tools.includes('lift');if(equip.outriggers){for(const part of equip.outriggers){const sign=Math.sign(part.position.x);part.position.x=sign*(s.riggersDeployed?(part.name==='outrigger arm'?1.75:2.5):(part.name==='outrigger arm'?1.45:2.05));part.position.y=s.riggersDeployed?(part.name==='outrigger arm'?.88:.13):(part.name==='outrigger arm'?1.05:.55);}}if(equip.boom){const heavy=s.type.id==='rotator';equip.boom.rotation.x=s.boomDeployed?(heavy?-.28:-.18)-s.boomAngle:1.35;equip.boom.rotation.y=heavy&&s.boomDeployed?s.boomSwing:0;equip.boom.position.y=s.boomDeployed?1.9:2.35;equip.boom.position.z=s.boomDeployed?(heavy?3.0+s.boomExtension:3.0):2.5;equip.boom.scale.z=heavy&&s.boomDeployed?1+s.boomExtension/3.1:1;}if(equip.liftCross){equip.liftCross.visible=s.tools.includes('lift');equip.liftCross.position.y=s.liftDeployed?.28+s.liftHeight:1.65;equip.liftCross.position.z=s.liftDeployed?4.55+s.liftExtension:3.65;
-    if(equip.underlift){equip.underlift.position.y=s.liftDeployed?.48+s.liftHeight:1.2;equip.underlift.position.z=s.liftDeployed?3.3+s.liftExtension*.5:3.15;equip.underlift.scale.z=s.liftDeployed?1+s.liftExtension/2.8:1;}for(const fork of equip.forks){fork.grid.visible=s.liftDeployed;fork.grid.position.set(fork.side*(.78+s.gridWidth),.18+s.liftHeight,5.05+s.liftExtension);fork.grid.rotation.y=s.armsClosed?0:fork.side*.28;fork.lArm.position.z=s.armsClosed?.55:1.05;}}
+    // Held hydraulic controls integrate over time, even without pointer-move events.
+    if(s.parkingBrake&&s.vel.length()<.25){
+      if(s.boomDeployed){
+        s.boomAngle=clamp(s.boomAngle+s.boomControl*h*.80*settingsRef.current.boom,0,1.08);
+        s.boomExtension=clamp(s.boomExtension+s.boomExtendControl*h*1.15*settingsRef.current.boom,0,2.2);
+      }
+      if(s.liftDeployed){
+        s.liftHeight=clamp(s.liftHeight+(s.liftControl+s.liftHydraulicY)*h*.70*settingsRef.current.boom,0,1.25);
+        s.liftExtension=clamp(s.liftExtension+(s.liftExtendControl+s.liftHydraulicX)*h*.90*settingsRef.current.boom,0,1.5);
+      }
+    }
+    equip.bed.rotation.x=s.bedTilt?-.18:0;equip.bed.position.z=s.bedTilt?1.8:1;
+    for(const part of equip.outriggers){
+      const sign=Math.sign(part.position.x);
+      part.position.x=sign*(s.riggersDeployed?(part.name==='outrigger arm'?1.75:2.5):(part.name==='outrigger arm'?1.45:2.05));
+      part.position.y=s.riggersDeployed?(part.name==='outrigger arm'?.88:.13):(part.name==='outrigger arm'?1.05:.55);
+    }
+    if(equip.boomPivot){
+      // Medium wrecker: fixed vertical plane. Heavy rotator: slewing turntable.
+      equip.boomPivot.rotation.y=s.type.id==='rotator'&&s.boomDeployed?s.boomSwing:0;
+      equip.boomTilt.rotation.x=s.boomDeployed?-(.12+s.boomAngle):-.10;
+      equip.boomSleeve.position.z=2.49+s.boomExtension*.5;
+      equip.boomSleeve.scale.z=1+s.boomExtension/1.62;
+      equip.boomTip.position.z=3.25+s.boomExtension;
+      equip.recoveryStructure.updateWorldMatrix(true,true);
+      for(const {mesh,side} of equip.boomCylinders){
+        const a=V(side*.48,1.86,1.71);
+        const b=equip.recoveryStructure.worldToLocal(equip.boomTilt.localToWorld(V(side*.25,-.10,1.19)));
+        const d=b.clone().sub(a);
+        mesh.position.copy(a).addScaledVector(d,.5);
+        mesh.quaternion.setFromUnitVectors(V(0,1,0),d.clone().normalize());
+        mesh.scale.y=d.length();
+      }
+    }
+    if(equip.underliftPivot){
+      const pitch=s.liftDeployed?.35-.36*s.liftHeight:-1.30;
+      equip.underliftPivot.rotation.x=pitch;
+      equip.underliftInner.position.z=2.08+s.liftExtension*.5;
+      equip.underliftInner.scale.z=1+s.liftExtension/1.25;
+      equip.underliftHead.position.z=2.85+s.liftExtension;
+      equip.underliftHead.rotation.x=-pitch; // Level tire crossbar throughout lift.
+      equip.liftCross.visible=s.tools.includes('lift');
+      for(const fork of equip.forks){
+        fork.grid.visible=s.liftDeployed;
+        fork.grid.position.set(fork.side*(.78+s.gridWidth),-.14,0);
+        fork.grid.rotation.y=s.armsClosed?0:fork.side*.28;
+        fork.lArm.position.z=s.armsClosed?.55:1.05;
+      }
+      equip.body.updateWorldMatrix(true,true);
+      for(const {mesh,side} of equip.liftCylinders){
+        const a=V(side*.36,.88,1.84);
+        const b=equip.body.worldToLocal(equip.underliftPivot.localToWorld(V(side*.28,0,1.05)));
+        const d=b.clone().sub(a);
+        mesh.position.copy(a).addScaledVector(d,.5);
+        mesh.quaternion.setFromUnitVectors(V(0,1,0),d.clone().normalize());
+        mesh.scale.y=d.length();
+        mesh.visible=s.tools.includes('lift');
+      }
+      const hitchZ=2.4+Math.cos(pitch)*(2.85+s.liftExtension);
+      for(const strap of equip.straps){
+        strap.visible=s.strapsOn&&s.tools.includes('lift');
+        strap.position.y=1.18-Math.sin(pitch)*(2.85+s.liftExtension)+.13;
+        strap.position.z=hitchZ;
+      }
+    }
     // Ditch resistance and recovery vehicle interaction.
     const pickForward=V(Math.sin(s.pickYaw),0,-Math.cos(s.pickYaw));
-    const pa=s.pos.clone().add(V(0,1.1,0)).add(forward.clone().multiplyScalar(-2.3));
+    const pa=s.boomDeployed&&s.tools.includes('boom')&&equip.boomTip?equip.boomTip.getWorldPosition(V()):s.pos.clone().add(V(0,1.1,0)).add(forward.clone().multiplyScalar(-2.3));
     const pb=s.pickPos.clone().add(V(0,1,0)).add(pickForward.clone().multiplyScalar(2.0));
     const delta=pb.clone().sub(pa);const dist=delta.length();const dir=delta.normalize();
     if(s.hook){
@@ -120,7 +224,7 @@ export default function TowingGame(){
     if(s.loaded){if(s.type.id==='flatbed'){s.pickPos.copy(s.pos).addScaledVector(forward,-.9);s.pickYaw=s.yaw;}else{
       // Wheel-lift: hitch is fixed to the truck, and the trailing axle rolls behind it.
       // Never aim the car at the hitch: that causes 180-degree flips at rest.
-      const hitch=s.pos.clone().addScaledVector(forward,-5.05-s.liftExtension);
+      const hitchPitch=.35-.36*s.liftHeight;const hitchDistance=2.4+Math.cos(hitchPitch)*(2.85+s.liftExtension);const hitch=s.pos.clone().addScaledVector(forward,-hitchDistance);
       const drawbar=3.0;
       const previousHitch=s.prevHitch||hitch;
       const travel=hitch.clone().sub(previousHitch);
@@ -171,18 +275,21 @@ export default function TowingGame(){
  const s=sim.current;const press=(key,val)=>e=>{e.preventDefault();const s=sim.current;if(!s)return;if((key==='winch'||key==='winchOut')&&val&&((s.tools.includes('boom')&&!s.boomDeployed)||(s.heavyRecovery&&!s.riggersDeployed)||!s.parkingBrake)){setNotice(s.heavyRecovery?'Heavy recovery: deploy BOOM, RIGGERS and PARK BRAKE.':'Deploy BOOM and engage PARK BRAKE first.');return;}s[key]=val;};
  const joystickMove=e=>{const el=e.currentTarget,rect=el.getBoundingClientRect(),dx=(e.clientX-(rect.left+rect.width/2))/(rect.width*.42);const steer=clamp(dx*settingsRef.current.steering,-1,1);setSteerVisual(steer);if(sim.current)sim.current.steer=steer;};
  const joystickStop=e=>{e.preventDefault();setSteerVisual(0);if(sim.current)sim.current.steer=0;};
- const adjustBoom=d=>{const s=sim.current;if(!s||!s.tools.includes('boom')||!s.boomDeployed)return;if(!s.parkingBrake||s.vel.length()>.25){setNotice('Engage PARK BRAKE first.');return;}if(s.heavyRecovery&&!s.riggersDeployed){setNotice('Deploy RIGGERS first.');return;}s.boomAngle=clamp(s.boomAngle+d*.13*settingsRef.current.boom,-.5,.8);};const toggleBoom=()=>{const s=sim.current;if(!s)return;if(!s.tools.includes('boom'))return;if(!s.parkingBrake||s.vel.length()>.25){setNotice('Stop and manually apply PARK BRAKE before deploying the boom.');return;}if(s.hook&&!s.boomDeployed){setNotice('Unhook before changing boom position.');return;}s.boomDeployed=!s.boomDeployed;if(!s.boomDeployed)s.boomAngle=0;}; 
- const adjustHeavyBoom=(axis,delta)=>{const s=sim.current;if(!s||s.type.id!=='rotator'||!s.boomDeployed)return;if(!s.parkingBrake||!s.riggersDeployed){setNotice('Apply PARK BRAKE and deploy RIGGERS first.');return;}s[axis]=clamp(s[axis]+delta*settingsRef.current.boom,axis==='boomSwing'?-1.1:0,axis==='boomSwing'?1.1:2.2);};
+ const setBoomControl=(axis,d)=>{const s=sim.current;if(!s)return;if(d===0){s[axis]=0;return;}if(!s.tools.includes('boom')||!s.boomDeployed){setNotice('Deploy recovery boom first.');return;}if(!s.parkingBrake||s.vel.length()>.25){setNotice('Engage PARK BRAKE to operate the boom.');return;}if(s.heavyRecovery&&!s.riggersDeployed){setNotice('Deploy RIGGERS for heavy recovery.');return;}s[axis]=d;};
+ const boomPress=(axis,d)=>e=>{e.preventDefault();setBoomControl(axis,d);};
+ const toggleBoom=()=>{const s=sim.current;if(!s||!s.tools.includes('boom'))return;if(!s.parkingBrake||s.vel.length()>.25){setNotice('Stop and manually apply PARK BRAKE before deploying the boom.');return;}if(s.hook&&!s.boomDeployed){setNotice('Unhook before changing boom position.');return;}s.boomDeployed=!s.boomDeployed;s.boomControl=0;s.boomExtendControl=0;if(s.boomDeployed)s.boomAngle=.36;else{s.boomAngle=.36;s.boomExtension=0;s.boomSwing=0;}setNotice(s.boomDeployed?'Recovery boom unlocked. Hold BOOM UP / DOWN to raise or lower.':'Recovery boom stowed.');};
+ const adjustHeavyBoom=(delta)=>{const s=sim.current;if(!s||s.type.id!=='rotator'||!s.boomDeployed)return;if(!s.parkingBrake||!s.riggersDeployed){setNotice('Apply PARK BRAKE and deploy RIGGERS first.');return;}s.boomSwing=clamp(s.boomSwing+delta*settingsRef.current.boom,-1.1,1.1);};
  const toggleRiggers=()=>{const s=sim.current;if(!s||!s.tools.includes('riggers'))return;if(s.vel.length()>.4){setNotice('Stop the truck before deploying riggers.');return;}if(!s.parkingBrake){setNotice('Engage PARK BRAKE manually before operating riggers.');return;}s.riggersDeployed=!s.riggersDeployed;};
- const adjustLift=(axis,delta)=>{const s=sim.current;if(!s||!s.tools.includes('lift'))return;if(!s.parkingBrake||s.vel.length()>.25){setNotice('Stop and engage PARK BRAKE to operate the wheel lift.');return;}if(!s.liftDeployed){setNotice('Deploy the wheel lift first.');return;}if(axis==='liftHeight'&&delta<0&&s.strapsOn&&s.liftHeight<=.45){setNotice('Remove straps before lowering car.');return;}s[axis]=clamp(s[axis]+delta,0,axis==='liftHeight'?1.25:1.5);};
- const toggleLift=()=>{const s=sim.current;if(!s||!s.tools.includes('lift'))return;if(!s.parkingBrake||s.vel.length()>.25){setNotice('Stop and manually apply PARK BRAKE before deploying the lift.');return;}if(s.loaded){setNotice('Lower car and release L-arms before folding lift.');return;}s.liftDeployed=!s.liftDeployed;if(s.liftDeployed){s.liftHeight=0;s.armsClosed=false;s.strapsOn=false;setNotice('Grid lowered. Release PARK BRAKE, reverse into both tires, then close L-arms.');}};
- const hydraulicStop=()=>setHydraulic({x:0,y:0});
- const hydraulicMove=e=>{const s=sim.current;if(!s||!s.liftDeployed||!s.parkingBrake)return;const rect=e.currentTarget.getBoundingClientRect();const x=clamp((e.clientX-rect.left-rect.width/2)/(rect.width*.42),-1,1),y=clamp((rect.top+rect.height/2-e.clientY)/(rect.height*.42),-1,1);setHydraulic({x,y});if(Math.abs(x)>.12)adjustLift('liftExtension',x*.055*settingsRef.current.boom);if(Math.abs(y)>.12)adjustLift('liftHeight',y*.045*settingsRef.current.boom);};
+ const setLiftControl=(axis,d)=>{const s=sim.current;if(!s)return;if(d===0){s[axis]=0;return;}if(!s.tools.includes('lift')||!s.liftDeployed){setNotice('Deploy wheel lift first.');return;}if(!s.parkingBrake||s.vel.length()>.25){setNotice('Engage PARK BRAKE to move wheel lift.');return;}if(axis==='liftControl'&&d<0&&s.strapsOn&&s.liftHeight<=.45){setNotice('Remove straps before lowering the car.');return;}s[axis]=d;};
+ const liftPress=(axis,d)=>e=>{e.preventDefault();setLiftControl(axis,d);};
+ const toggleLift=()=>{const s=sim.current;if(!s||!s.tools.includes('lift'))return;if(!s.parkingBrake||s.vel.length()>.25){setNotice('Stop and manually apply PARK BRAKE before deploying the lift.');return;}if(s.loaded){setNotice('Lower car and release L-arms before folding lift.');return;}s.liftDeployed=!s.liftDeployed;s.liftControl=0;s.liftExtendControl=0;s.liftHydraulicX=0;s.liftHydraulicY=0;if(s.liftDeployed){s.liftHeight=0;s.armsClosed=false;s.strapsOn=false;setNotice('Wheel lift folded down. Use held LIFT UP / DOWN or the hydraulic joystick.');}else{s.liftExtension=0;s.liftHeight=0;setNotice('Wheel lift folded upright.');}};
+ const hydraulicStop=()=>{const s=sim.current;if(s){s.liftHydraulicX=0;s.liftHydraulicY=0;}setHydraulic({x:0,y:0});};
+ const hydraulicMove=e=>{const s=sim.current;if(!s||!s.liftDeployed||!s.parkingBrake)return;const rect=e.currentTarget.getBoundingClientRect();const x=clamp((e.clientX-rect.left-rect.width/2)/(rect.width*.42),-1,1),y=clamp((rect.top+rect.height/2-e.clientY)/(rect.height*.42),-1,1);s.liftHydraulicX=Math.abs(x)>.12?x:0;s.liftHydraulicY=Math.abs(y)>.12?y:0;setHydraulic({x,y});};
  const adjustGrid=delta=>{const s=sim.current;if(!s||!s.liftDeployed||!s.parkingBrake)return;s.gridWidth=clamp(s.gridWidth+delta,0,.45);};
  const toggleArms=()=>{const s=sim.current;if(!s||!s.liftDeployed||!s.parkingBrake){setNotice('Deploy lift and engage PARK BRAKE first.');return;}if(s.loaded&&s.strapsOn){setNotice('Remove straps before opening L-arms.');return;}if(s.loaded&&s.liftHeight>.25){setNotice('Lower the lift before opening L-arms.');return;}if(!s.armsClosed&&!tireGridContact(s).ok){setNotice('Back into BOTH tires before closing L-arms.');return;}s.armsClosed=!s.armsClosed;s.loaded=s.armsClosed;if(s.armsClosed){s.pickYaw=s.yaw;s.prevHitch=null;setNotice('Tires captured. Raise lift, then apply tire straps.');}else{setNotice('L-arms opened.');}};
  const togglePark=()=>{const s=sim.current;if(!s)return;if(s.riggersDeployed&&s.parkingBrake){setNotice('Retract riggers before releasing parking brake.');return;}s.parkingBrake=!s.parkingBrake;};
  const toggleHook=()=>{const s=sim.current;if(!s)return;if(!s.hook&&!s.boomDeployed&&s.tools.includes('boom')){setNotice('Deploy the boom before hooking.');return;}if(!s.hook&&!s.tools.includes('winch')){setNotice('This truck has no winch.');return;}if(!s.hook&&s.pos.distanceTo(s.pickPos)>24){setNotice('Move within 24 m to hook the vehicle.');return;}s.hook=!s.hook;if(s.hook){const f=V(Math.sin(s.yaw),0,-Math.cos(s.yaw));const a=s.pos.clone().add(f.multiplyScalar(-2.3));s.cableLength=clamp(a.distanceTo(s.pickPos),4,25);}};
- const reset=()=>{const s=sim.current;if(!s)return;s.pos.set(0,0,7);s.vel.set(0,0,0);s.yaw=0;const job=JOBS[careerRef.current.job%JOBS.length];s.pickPos.set(job.x,0,job.z);s.jobIndex=careerRef.current.job;s.jobDone=false;s.heavyRecovery=careerRef.current.job%JOBS.length===3;s.loaded=false;s.prevHitch=null;s.strapsOn=false;s.bedTilt=false;s.zone.position.set(job.kind==='tow'||job.kind==='flatbed'?0:2,.12,job.kind==='tow'||job.kind==='flatbed'?23:job.z);s.pickVel.set(0,0,0);s.hook=false;s.winch=false;s.winchOut=false;s.parkingBrake=false;s.boomDeployed=false;s.boomAngle=0;s.boomSwing=0;s.boomExtension=0;s.liftDeployed=false;s.liftHeight=0;s.liftExtension=0;s.gridWidth=0;s.armsClosed=false;s.riggersDeployed=false;s.cableLength=14;};
+ const reset=()=>{const s=sim.current;if(!s)return;s.pos.set(0,0,7);s.vel.set(0,0,0);s.yaw=0;const job=JOBS[careerRef.current.job%JOBS.length];s.pickPos.set(job.x,0,job.z);s.jobIndex=careerRef.current.job;s.jobDone=false;s.heavyRecovery=careerRef.current.job%JOBS.length===3;s.loaded=false;s.prevHitch=null;s.strapsOn=false;s.bedTilt=false;s.zone.position.set(job.kind==='tow'||job.kind==='flatbed'?0:2,.12,job.kind==='tow'||job.kind==='flatbed'?23:job.z);s.pickVel.set(0,0,0);s.hook=false;s.winch=false;s.winchOut=false;s.parkingBrake=false;s.boomDeployed=false;s.boomAngle=.36;s.boomSwing=0;s.boomExtension=0;s.boomControl=0;s.boomExtendControl=0;s.liftDeployed=false;s.liftHeight=0;s.liftExtension=0;s.liftControl=0;s.liftExtendControl=0;s.liftHydraulicX=0;s.liftHydraulicY=0;s.gridWidth=0;s.armsClosed=false;s.riggersDeployed=false;s.cableLength=14;};
  const upgrade=type=>{const lvl=careerRef.current[type],price=(lvl+1)*500;if(lvl>=3||careerRef.current.cash<price){setNotice(lvl>=3?'Fully upgraded':'Not enough cash: $'+price);return;}saveCareer(p=>({...p,cash:p.cash-price,[type]:p[type]+1}));setNotice(type.toUpperCase()+' upgraded!');};
  // Wheel-lift capture uses the front tire positions, not the distance between vehicle centers.
  // Allow 0.85 m per tire so alignment is achievable on a touchscreen.
@@ -192,7 +299,7 @@ export default function TowingGame(){
   const carForward=V(Math.sin(s.pickYaw),0,-Math.cos(s.pickYaw));
   const carRight=V(Math.cos(s.pickYaw),0,Math.sin(s.pickYaw));
   const axle=s.pickPos.clone().addScaledVector(carForward,1.55);
-  const gridCenter=s.pos.clone().addScaledVector(forward,-5.05-s.liftExtension);
+  const gridCenter=s.pos.clone().addScaledVector(forward,-(2.4+Math.cos(.35-.36*s.liftHeight)*(2.85+s.liftExtension)));
   const lateral=.78+s.gridWidth;
   const errors=[-1,1].map(side=>{
    const tire=axle.clone().addScaledVector(carRight,side*.84);
@@ -209,13 +316,13 @@ export default function TowingGame(){
  const selectTestJob=index=>{const j=JOBS[index];if(!j)return;saveCareer(p=>({...p,job:index,selected:j.truck,owned:FLEET.map(truck=>truck.id)}));setGarage(false);setHelp(false);setNotice('TEST JOB: '+j.name+' — '+FLEET.find(t=>t.id===j.truck).name);};
  const Hold=({label,onDown,onUp,wide=false})=><button className={wide?'control wide':'control'} onPointerDown={onDown} onPointerUp={onUp} onPointerCancel={onUp} onPointerLeave={onUp} onContextMenu={e=>e.preventDefault()}>{label}</button>;
  return <main className="game-shell"><div className="scene" ref={mount}/>
-  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .17 • CUSTOM CONTROLS</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
+  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .18 • HYDRAULIC PIVOTS</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
   <div style={{position:'absolute',left:12,bottom:195,zIndex:9,width:mapOpen?146:106,height:mapOpen?166:36,pointerEvents:'auto',border:'2px solid #f3c851',borderRadius:12,background:'rgba(9,20,30,.88)',color:'#fff',boxShadow:'0 3px 14px #0008',padding:6,boxSizing:'border-box'}}><button onClick={()=>setMapOpen(v=>!v)} style={{fontSize:11,fontWeight:800,width:'100%',background:'transparent',border:0,color:'white'}}>{mapOpen?'MAP −':'MAP +'}</button>{mapOpen&&<svg viewBox="0 0 140 140" width="132" height="132" aria-label="Truck, disabled vehicle and depot map"><rect x="0" y="0" width="140" height="140" rx="6" fill="#1b3431"/><path d="M 70 0 V 140" stroke="#61787a" strokeWidth="28"/><path d="M 70 0 V 140" stroke="#c4c8a6" strokeDasharray="5 7" strokeWidth="1.5"/><rect x="59" y="12" width="22" height="13" rx="3" fill="#49dc77" stroke="#fff" strokeWidth="1"/><text x="70" y="21" fill="#0d2518" fontSize="8" textAnchor="middle" fontWeight="bold">DEPOT</text><g transform={`translate(${70+(hud.carX??3)*2},${70+(hud.carZ??-18)*1.8}) rotate(${-(hud.carYaw??0)*180/Math.PI})`}><rect x="-4" y="-7" width="8" height="14" rx="2" fill="#ffcf58" stroke="#111" strokeWidth="1"/></g><g transform={`translate(${70+(hud.mapX??0)*2},${70+(hud.mapZ??7)*1.8}) rotate(${-(hud.mapYaw??0)*180/Math.PI})`}><rect x="-5" y="-10" width="10" height="20" rx="2" fill="#55b7ff" stroke="white" strokeWidth="1.5"/><path d="M -3 -6 L 0 -9 L 3 -6" fill="none" stroke="white"/></g><text x="5" y="135" fontSize="8" fill="#fff">BLUE: YOU</text></svg>}</div>
   <section className="mission"><div className="eyebrow">DISPATCH #{career.completed+1} · ${career.completed} COMPLETED</div><b>{JOBS[career.job%JOBS.length].name}</b><span>{JOBS[career.job%JOBS.length].kind==='tow'?'Secure both tires and deliver to depot.':JOBS[career.job%JOBS.length].kind==='flatbed'?'Load on rollback and deliver to depot.':'Winch the disabled vehicle into the green recovery zone.'} Reward: ${JOBS[career.job%JOBS.length].pay}</span><div className="stats"><span>CASH ${career.cash}</span><span>ENGINE {career.engine}/3 · WINCH {career.winch}/3</span></div><div className="stats"><span>{hud.hook?'CABLE CONNECTED':'CABLE DISCONNECTED'}</span><span>{hud.tension.toFixed(1)} kN · {hud.range?.toFixed(0)} m</span></div></section>
-  <div className="bottom-ui">{settings.driveMode==='joystick'?<div className="joystick" onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);joystickMove(e);}} onPointerMove={joystickMove} onPointerUp={joystickStop} onPointerCancel={joystickStop}><div className="stick-knob" style={{transform:`translateX(${steerVisual*23}px)`}}>●</div><span>STEER</span></div>:<div className="joystick" style={{display:'flex',gap:5}}><Hold label="◀ LEFT" onDown={press('steer',-1)} onUp={press('steer',0)}/><Hold label="RIGHT ▶" onDown={press('steer',1)} onUp={press('steer',0)}/></div>}<div className="recovery"><button className={'action '+(hud.parking?'active':'')} onClick={togglePark}>PARK BRAKE</button>{s?.tools.includes('boom')&&<button className={'action '+(s?.boomDeployed?'active':'')} onClick={toggleBoom}>BOOM {s?.boomDeployed?'FOLD':'DEPLOY'}</button>}{s?.tools.includes('boom')&&hud.boom&&<><button className="action" onClick={()=>adjustBoom(1)}>BOOM UP</button><button className="action" onClick={()=>adjustBoom(-1)}>BOOM DOWN</button></>}{s?.tools.includes('lift')&&<button className={'action '+(s?.liftDeployed?'active':'')} onClick={toggleLift}>LIFT {s?.liftDeployed?'FOLD':'DEPLOY'}</button>}{s?.tools.includes('lift')&&hud.lift&&<><button className="action" onClick={()=>adjustGrid(-.1)}>GRID NARROW</button><button className="action" onClick={()=>adjustGrid(.1)}>GRID WIDE</button><button className="action" onClick={toggleArms}>{s?.armsClosed?'OPEN L-ARMS':'CLOSE L-ARMS'}</button></>}{s?.tools.includes('lift')&&hud.lift&&<div aria-label="Hydraulic lift joystick" style={{width:105,height:105,border:'2px solid #f3c851',borderRadius:18,background:'#183941',touchAction:'none',position:'relative',display:'grid',placeItems:'center',color:'white',fontSize:10,fontWeight:800}} onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);hydraulicMove(e);}} onPointerMove={e=>{if(e.buttons)hydraulicMove(e);}} onPointerUp={hydraulicStop} onPointerCancel={hydraulicStop}><span style={{position:'absolute',top:3}}>UP</span><span style={{position:'absolute',bottom:3}}>DOWN</span><span style={{position:'absolute',left:2}}>IN</span><span style={{position:'absolute',right:2}}>OUT</span><div style={{width:30,height:30,borderRadius:'50%',background:'#f3c851',transform:`translate(${hydraulic.x*28}px,${-hydraulic.y*28}px)`,boxShadow:'0 2px 5px #0009'}}/></div>}{s?.type.id==='rotator'&&hud.boom&&<><button className="action" onClick={()=>adjustHeavyBoom('boomSwing',-.15)}>BOOM LEFT</button><button className="action" onClick={()=>adjustHeavyBoom('boomSwing',.15)}>BOOM RIGHT</button><button className="action" onClick={()=>adjustHeavyBoom('boomExtension',.25)}>BOOM OUT</button><button className="action" onClick={()=>adjustHeavyBoom('boomExtension',-.25)}>BOOM IN</button></>}{s?.tools.includes('riggers')&&<button className={'action '+(hud.riggers?'active':'')} onClick={toggleRiggers}>RIGGERS {hud.riggers?'RETRACT':'DEPLOY'}</button>}{s?.tools.includes('winch')&&<button className={'action '+(hud.hook?'active':'')} onClick={toggleHook}>{hud.hook?'UNHOOK':'HOOK'}</button>}{s?.tools.includes('winch')&&<Hold label="WINCH IN" onDown={press('winch',true)} onUp={press('winch',false)}/>}{s?.tools.includes('winch')&&<Hold label="WINCH OUT" onDown={press('winchOut',true)} onUp={press('winchOut',false)}/>}<>{s?.tools.includes('lift')&&<button className="action" onClick={strapTires}>TIRE STRAPS</button>}{s?.tools.includes('bed')&&<button className="action" onClick={toggleBed}>BED TILT</button>}{(s?.tools.includes('lift')||s?.tools.includes('bed'))&&<button className="action" onClick={secureLoad}>{s?.loaded?'UNLOAD':'SECURE LOAD'}</button>}</></div><div className="drive"><Hold label="REV" onDown={press('throttle',-.55)} onUp={press('throttle',0)}/><Hold label="GAS" wide onDown={press('throttle',1)} onUp={press('throttle',0)}/></div></div>
+  <div className="bottom-ui">{settings.driveMode==='joystick'?<div className="joystick" onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);joystickMove(e);}} onPointerMove={joystickMove} onPointerUp={joystickStop} onPointerCancel={joystickStop}><div className="stick-knob" style={{transform:`translateX(${steerVisual*23}px)`}}>●</div><span>STEER</span></div>:<div className="joystick" style={{display:'flex',gap:5}}><Hold label="◀ LEFT" onDown={press('steer',-1)} onUp={press('steer',0)}/><Hold label="RIGHT ▶" onDown={press('steer',1)} onUp={press('steer',0)}/></div>}<div className="recovery"><button className={'action '+(hud.parking?'active':'')} onClick={togglePark}>PARK BRAKE</button>{s?.tools.includes('boom')&&<button className={'action '+(s?.boomDeployed?'active':'')} onClick={toggleBoom}>BOOM {s?.boomDeployed?'FOLD':'DEPLOY'}</button>}{s?.tools.includes('boom')&&hud.boom&&<><Hold label="BOOM UP" onDown={boomPress('boomControl',1)} onUp={boomPress('boomControl',0)}/><Hold label="BOOM DOWN" onDown={boomPress('boomControl',-1)} onUp={boomPress('boomControl',0)}/><Hold label="BOOM OUT" onDown={boomPress('boomExtendControl',1)} onUp={boomPress('boomExtendControl',0)}/><Hold label="BOOM IN" onDown={boomPress('boomExtendControl',-1)} onUp={boomPress('boomExtendControl',0)}/></>}{s?.tools.includes('lift')&&<button className={'action '+(s?.liftDeployed?'active':'')} onClick={toggleLift}>LIFT {s?.liftDeployed?'FOLD':'DEPLOY'}</button>}{s?.tools.includes('lift')&&hud.lift&&<><Hold label="LIFT UP" onDown={liftPress('liftControl',1)} onUp={liftPress('liftControl',0)}/><Hold label="LIFT DOWN" onDown={liftPress('liftControl',-1)} onUp={liftPress('liftControl',0)}/><button className="action" onClick={()=>adjustGrid(-.1)}>GRID NARROW</button><button className="action" onClick={()=>adjustGrid(.1)}>GRID WIDE</button><button className="action" onClick={toggleArms}>{s?.armsClosed?'OPEN L-ARMS':'CLOSE L-ARMS'}</button></>}{s?.tools.includes('lift')&&hud.lift&&<div aria-label="Hydraulic lift joystick" style={{width:105,height:105,border:'2px solid #f3c851',borderRadius:18,background:'#183941',touchAction:'none',position:'relative',display:'grid',placeItems:'center',color:'white',fontSize:10,fontWeight:800}} onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);hydraulicMove(e);}} onPointerMove={e=>{if(e.buttons)hydraulicMove(e);}} onPointerUp={hydraulicStop} onPointerCancel={hydraulicStop}><span style={{position:'absolute',top:3}}>UP</span><span style={{position:'absolute',bottom:3}}>DOWN</span><span style={{position:'absolute',left:2}}>IN</span><span style={{position:'absolute',right:2}}>OUT</span><div style={{width:30,height:30,borderRadius:'50%',background:'#f3c851',transform:`translate(${hydraulic.x*28}px,${-hydraulic.y*28}px)`,boxShadow:'0 2px 5px #0009'}}/></div>}{s?.type.id==='rotator'&&hud.boom&&<><button className="action" onClick={()=>adjustHeavyBoom(-.15)}>ROTATE LEFT</button><button className="action" onClick={()=>adjustHeavyBoom(.15)}>ROTATE RIGHT</button></>}{s?.tools.includes('riggers')&&<button className={'action '+(hud.riggers?'active':'')} onClick={toggleRiggers}>RIGGERS {hud.riggers?'RETRACT':'DEPLOY'}</button>}{s?.tools.includes('winch')&&<button className={'action '+(hud.hook?'active':'')} onClick={toggleHook}>{hud.hook?'UNHOOK':'HOOK'}</button>}{s?.tools.includes('winch')&&<Hold label="WINCH IN" onDown={press('winch',true)} onUp={press('winch',false)}/>}{s?.tools.includes('winch')&&<Hold label="WINCH OUT" onDown={press('winchOut',true)} onUp={press('winchOut',false)}/>}<>{s?.tools.includes('lift')&&<button className="action" onClick={strapTires}>TIRE STRAPS</button>}{s?.tools.includes('bed')&&<button className="action" onClick={toggleBed}>BED TILT</button>}{(s?.tools.includes('lift')||s?.tools.includes('bed'))&&<button className="action" onClick={secureLoad}>{s?.loaded?'UNLOAD':'SECURE LOAD'}</button>}</></div><div className="drive"><Hold label="REV" onDown={press('throttle',-.55)} onUp={press('throttle',0)}/><Hold label="GAS" wide onDown={press('throttle',1)} onUp={press('throttle',0)}/></div></div>
   <div className="toolbar"><select aria-label="Select test job" value={career.job%JOBS.length} onChange={e=>selectTestJob(Number(e.target.value))} style={{background:"#153c43",color:"#fff",border:"2px solid #f3c851",borderRadius:7,padding:"8px",fontWeight:800,maxWidth:190}}>{JOBS.map((job,index)=><option key={job.name} value={index}>{index+1}. {job.name}</option>)}</select><button onClick={()=>{reset();setNotice('Dispatch: '+JOBS[careerRef.current.job%JOBS.length].name);}}>NEXT JOB</button><button onClick={()=>{setGarage(v=>!v);setHelp(false);}}>FLEET / GARAGE</button><button onClick={reset}>RESET</button><button onClick={()=>{const s=sim.current;if(s){s.cameraYaw=0;s.cameraPitch=.24;s.zoom=13;}}}>RESET CAMERA</button><button onClick={()=>setSettingsOpen(v=>!v)}>SETTINGS</button><button onClick={()=>setHelp(v=>!v)}>CONTROLS</button></div>
   {settingsOpen&&<aside className="help" style={{zIndex:30,maxWidth:310}}><button onClick={()=>setSettingsOpen(false)}>×</button><b>CONTROL SETTINGS</b>{[['steering','Driving sensitivity',0.4,1.6],['boom','Boom / hydraulic sensitivity',0.3,2],['winch','Winch speed',0.3,2]].map(([key,label,min,max])=><label key={key}>{label}: {settings[key].toFixed(1)}× <input type="range" min={min} max={max} step="0.1" value={settings[key]} onChange={e=>changeSetting(key,Number(e.target.value))}/></label>)}<label>Steering <select value={settings.driveMode} onChange={e=>changeSetting('driveMode',e.target.value)}><option value="joystick">Joystick</option><option value="arrows">Arrows</option></select></label><small>Saved on this device.</small></aside>}{notice&&<div className="game-notice" onClick={()=>setNotice('')}>{notice} ✕</div>}
   {garage&&<aside className="help garage"><button onClick={()=>setGarage(false)}>×</button><b>RECOVERY GARAGE</b><span>TEST MODE: All jobs and trucks unlocked. Choose any job from the bottom toolbar.</span><span>Balance: ${career.cash}</span><div className="fleet-list">{FLEET.map(t=><button key={t.id} className="garage-buy" onClick={()=>chooseTruck(t.id)}>{t.name} · {career.selected===t.id?'SELECTED':'TEST DRIVE'}</button>)}</div><button className="garage-buy" onClick={()=>upgrade('engine')}>ENGINE LV {career.engine}/3 · {'$'+(career.engine+1)*500}</button><button className="garage-buy" onClick={()=>upgrade('winch')}>WINCH LV {career.winch}/3 · {'$'+(career.winch+1)*500}</button><small>Progress saves on this device.</small></aside>}
-  {help&&<aside className="help"><button onClick={()=>setHelp(false)}>×</button><b>HOW TO OPERATE</b><span>Use the left joystick to steer. Reverse and gas are on the right. Release the gas to slow down; use PARK BRAKE to stop and secure the truck. Deploy the boom and parking brake before winching. Heavy recoveries also require riggers. The parking brake is manual and must be engaged before hydraulic operations. Drag the scene to orbit; pinch to zoom. Drive within 24 m to hook the pickup. Light wheel-lift: park and lower the grids, release parking brake, back beneath both front tires, reapply brake, close L-arms to capture, raise the lift with the hydraulic joystick, then apply tire straps and tow. Flatbed: tilt bed, hook, secure load and deliver. Medium wrecker: boom and winch recovery. Heavy rotator: boom, outriggers and winch. Buy trucks in FLEET / GARAGE.</span><small>Keyboard: W/S drive & reverse · A/D steer · H hook · R winch</small></aside>}
+  {help&&<aside className="help"><button onClick={()=>setHelp(false)}>×</button><b>HOW TO OPERATE</b><span>Use the left joystick to steer. Reverse and gas are on the right. Release the gas to slow down; use PARK BRAKE to stop and secure the truck. Deploy the boom and parking brake before winching. Heavy recoveries also require riggers. The parking brake is manual and must be engaged before hydraulic operations. Drag the scene to orbit; pinch to zoom. Drive within 24 m to hook the pickup. Light wheel-lift: park and lower the grids, release parking brake, back beneath both front tires, reapply brake, close L-arms to capture, raise the lift with the hydraulic joystick, then apply tire straps and tow. Flatbed: tilt bed, hook, secure load and deliver. Medium wrecker: fixed rear boom raises/lowers and telescopes but does not swing. Deploy the separate wheel lift, then hold LIFT UP/DOWN or its hydraulic joystick to raise/lower the tow bar. Only the heavy rotator can swing its boom with the riggers deployed. Buy trucks in FLEET / GARAGE.</span><small>Keyboard: W/S drive & reverse · A/D steer · H hook · R winch</small></aside>}
  </main>;
 }
