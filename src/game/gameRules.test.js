@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {canCompleteJob,minimapX,minimapY,wheelLiftCaptureReady} from './gameRules.js';
+import {canCompleteJob,minimapX,minimapY,wheelLiftCaptureReady,winchLoadBand,poweredWinchForce,stopWinchCoast} from './gameRules.js';
 
 test('no job finishes before reaching its destination',()=>{
  for(const kind of ['tow','flatbed','recovery','heavy'])
@@ -38,4 +38,21 @@ test('wheel lift captures front tires only when both sides are lined up and lowe
  assert.equal(wheelLiftCaptureReady({...good,facing:.2}),false);
  assert.equal(wheelLiftCaptureReady({...good,height:.5}),false);
  assert.equal(wheelLiftCaptureReady({...good,rightError:NaN}),false);
+});
+
+test('line-load indicators warn before standard and heavy winch limits',()=>{
+ assert.equal(winchLoadBand(0,42).level,'normal');
+ assert.equal(winchLoadBand(24,42).level,'normal');
+ assert.equal(winchLoadBand(26,42).level,'warning');
+ assert.equal(winchLoadBand(36,42).level,'danger');
+ assert.equal(winchLoadBand(20,32).level,'warning');
+ assert.equal(winchLoadBand(28,32).level,'danger');
+ assert.equal(winchLoadBand(100,42).fraction,1);
+});
+test('releasing motor eliminates pulling force and rolling coast',()=>{
+ assert.equal(poweredWinchForce(false,40000),0);
+ assert.equal(poweredWinchForce(true,28000),28000);
+ assert.equal(stopWinchCoast(3,.25),0);
+ assert.equal(stopWinchCoast(-2,.25),0);
+ assert.ok(stopWinchCoast(3,1/60)<3);
 });
