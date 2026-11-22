@@ -6,3 +6,17 @@
 
 /* Fleet selector and equipment actions */
 .fleet-list{display:flex;flex-direction:column;gap:6px;max-height:31vh;overflow-y:auto;padding:2px}.garage{max-height:83vh;overflow-y:auto}.garage .garage-buy{flex-shrink:0;position:static;display:block;width:100%;min-height:40px;padding:9px 12px}.recovery{scrollbar-width:thin}.recovery .action{flex-shrink:0}@media(max-width:520px){.garage{top:49%;width:min(330px,calc(100% - 20px))}.fleet-list{max-height:27vh}.recovery{max-height:56vh}}
+
+/* Build .22: independent controls prevent top-right overlap on phones. */
+.toolbar{top:calc(82px + env(safe-area-inset-top));right:10px;z-index:12;align-items:flex-end}
+.toolbar .menu-toggle{min-width:98px;height:39px;border:2px solid #f3c851;border-radius:10px;background:#112f37;color:#fff;font-size:12px;font-weight:850;box-shadow:0 4px 16px #0009}
+.toolbar-panel{display:flex;flex-direction:column;gap:7px;width:184px;max-height:min(60dvh,calc(100dvh - 165px));overflow-y:auto;padding:9px;background:rgba(9,23,30,.97);border:1px solid #f3c851;border-radius:10px;box-shadow:0 10px 26px #000b;scrollbar-width:thin}
+.toolbar-panel button{min-height:36px;font-size:10px}
+.toolbar-panel select{max-width:100%!important;font-size:11px}
+.bottom-ui .recovery{right:9px;bottom:77px;max-height:min(51dvh,calc(100dvh - 218px));width:min(168px,44vw);padding:5px;overflow-y:auto;overflow-x:hidden;background:rgba(9,22,29,.93);border:1px solid #72838a;border-radius:12px;box-shadow:0 5px 18px #0009;scrollbar-width:thin}
+.bottom-ui .recovery.is-collapsed{width:min(168px,44vw);max-height:46px;overflow:hidden}
+.recovery-toggle{position:sticky;top:0;flex-shrink:0;width:100%;min-height:35px;background:#0e414c;color:#fff;border:1px solid #f3c851;border-radius:9px;font-size:11px;font-weight:900;z-index:2}
+.recovery .control,.recovery .action{width:100%;min-height:38px;flex-shrink:0}
+.lift-status{padding:7px;border:1px solid #718996;border-radius:8px;background:#263840;color:#f8e6bd;text-align:center;font-size:10px;font-weight:800;line-height:1.3}
+.lift-status.aligned{border-color:#53d48b;background:#1d4939;color:#d2ffe6}
+@media(max-width:520px){.toolbar{top:calc(77px + env(safe-area-inset-top));right:8px}.toolbar-panel{width:164px;max-height:min(60dvh,calc(100dvh - 145px))}.bottom-ui .recovery{bottom:72px;max-height:min(52dvh,calc(100dvh - 190px));width:min(147px,43vw)}.bottom-ui .recovery.is-collapsed{width:min(147px,43vw)}.recovery-toggle{font-size:10px}}
