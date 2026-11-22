@@ -20,3 +20,14 @@ export function winchLoadBand(tension,limit){const fraction=Number.isFinite(tens
 export const poweredWinchForce=(active,force)=>active&&Number.isFinite(force)?Math.max(0,force):0;
 // Fast rolling resistance when the winch motor stops; seconds are frame-delta.
 export function stopWinchCoast(speed,seconds){if(!Number.isFinite(speed)||!Number.isFinite(seconds))return 0;const v=Math.max(0,Math.abs(speed)-16*Math.max(0,seconds));return v<.035?0:Math.sign(speed)*v;}
+
+// An idle recovery drum is braked, not free-spooling. A taut cable can therefore
+// take opposing load even while its own motor is off. relativeSpeed is positive
+// when the vehicle is approaching the guide and negative when moving away.
+export function recoveryCableTension(distance,spool,relativeSpeed=0,limit=42000){
+ if(![distance,spool,relativeSpeed,limit].every(Number.isFinite)||limit<=0)return 0;
+ const stretch=distance-spool;
+ if(stretch<=0)return 0;
+ return Math.max(0,Math.min(limit,stretch*7200-relativeSpeed*1000));
+}
+export const canPowerBothRecoveryLines=(lines,ready)=>Boolean(ready&&Array.isArray(lines)&&lines.length===2&&lines.every(line=>line.connected));

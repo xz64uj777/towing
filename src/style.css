@@ -125,3 +125,10 @@
 .equipment-compact .recovery-line-compact.line-a-controls .line-summary{color:#ffc04e}
 .equipment-compact .recovery-line-compact.line-b-controls .line-summary{color:#55d3ec}
 @media(max-width:520px){.tension-readout{width:min(164px,43vw);padding:5px 6px;gap:2px}.tension-item-head{font-size:9px}.tension-readout .tension-amount{font-size:9px}.tension-readout small{font-size:7px}}
+
+/* Build .37: simultaneous pull without a scrolling button stack. */
+.equipment-compact .equipment-tabs.recovery-tabs-three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.equipment-compact .equipment-tabs.recovery-tabs-three button{font-size:8px;padding:3px 1px}
+.equipment-compact .dual-line-status{display:flex;justify-content:space-between;gap:4px;font-size:8px}
+.equipment-compact .dual-line-status .line-a-label{color:#ffc04e}
+.equipment-compact .dual-line-status .line-b-label{color:#55d3ec}

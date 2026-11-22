@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {canCompleteJob,minimapX,minimapY,wheelLiftCaptureReady,winchLoadBand,poweredWinchForce,stopWinchCoast} from './gameRules.js';
+import {canCompleteJob,minimapX,minimapY,wheelLiftCaptureReady,winchLoadBand,poweredWinchForce,stopWinchCoast,recoveryCableTension,canPowerBothRecoveryLines} from './gameRules.js';
 
 test('no job finishes before reaching its destination',()=>{
  for(const kind of ['tow','flatbed','recovery','heavy'])
@@ -55,4 +55,19 @@ test('releasing motor eliminates pulling force and rolling coast',()=>{
  assert.equal(stopWinchCoast(3,.25),0);
  assert.equal(stopWinchCoast(-2,.25),0);
  assert.ok(stopWinchCoast(3,1/60)<3);
+});
+
+test('an idle taut recovery cable carries opposing load without powered reeling',()=>{
+ assert.equal(recoveryCableTension(10,10,0),0);
+ assert.equal(recoveryCableTension(10,12,-4),0); // slack never pushes a car
+ assert.equal(recoveryCableTension(12,10,0),14400); // fixed idle spool
+ assert.equal(recoveryCableTension(12,10,-2),16400); // pulling away increases load
+ assert.equal(recoveryCableTension(12,10,2),12400); // moving toward guide reduces load
+ assert.equal(recoveryCableTension(100,10,0),42000); // simulated rating
+});
+test('dual-winch motor command requires two connected lines and secured truck',()=>{
+ const lines=[{connected:true},{connected:true}];
+ assert.equal(canPowerBothRecoveryLines(lines,true),true);
+ assert.equal(canPowerBothRecoveryLines([{connected:true},{connected:false}],true),false);
+ assert.equal(canPowerBothRecoveryLines(lines,false),false);
 });
