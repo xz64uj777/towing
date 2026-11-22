@@ -103,7 +103,7 @@
 .anchor-placement-hint button{pointer-events:auto;touch-action:manipulation;min-height:38px;width:100%;border:1px solid #f3c851;border-radius:7px;background:#294654;color:#fff;font-weight:800}
 @media(max-height:520px){.anchor-placement-hint{top:calc(47px + env(safe-area-inset-top));width:min(260px,calc(100vw - 28px));padding:7px;font-size:10px}.anchor-placement-hint button{min-height:30px}}
 
-// Build .36: match A/B text to physical cables; display load threshold bars.
+/* Build .36: match A/B text to physical cables; display load threshold bars. */
 .tension-readout{width:min(174px,43vw);gap:3px;padding:6px 8px;min-height:0}
 .tension-item{display:flex;flex-direction:column;gap:2px}
 .tension-item-head{display:flex;justify-content:space-between;gap:5px;align-items:baseline;white-space:nowrap;font-size:10px}
