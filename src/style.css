@@ -95,3 +95,10 @@
 .equipment-compact .winch-speed-selector button.selected{background:#ad741c;border-color:#ffdd78;color:#fff}
 @media(max-width:520px){.tension-readout{left:7px;width:min(145px,41vw);padding:6px;font-size:10px;bottom:calc(118px + env(safe-area-inset-bottom))}.equipment-compact .winch-speed-selector button{font-size:8px;min-height:26px}}
 @media(max-height:470px){.tension-readout{left:7px;bottom:calc(102px + env(safe-area-inset-bottom));padding:4px 6px;min-height:45px;font-size:9px}.equipment-compact .winch-speed-selector button{min-height:23px}}
+
+/* Build .34: temporary tap-to-place overlay, never obstruct the scene. */
+.anchor-placement-scene canvas{cursor:crosshair;touch-action:none}
+.anchor-placement-hint{position:absolute;top:calc(90px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:26;width:min(330px,calc(100vw - 28px));padding:10px 12px;border:2px solid #f3c851;border-radius:12px;background:rgba(7,28,35,.96);box-shadow:0 5px 20px #000b;display:flex;flex-direction:column;gap:6px;align-items:center;text-align:center;pointer-events:none;font-size:11px}
+.anchor-placement-hint b{color:#ffe28b;font-size:13px;letter-spacing:.5px}
+.anchor-placement-hint button{pointer-events:auto;touch-action:manipulation;min-height:38px;width:100%;border:1px solid #f3c851;border-radius:7px;background:#294654;color:#fff;font-weight:800}
+@media(max-height:520px){.anchor-placement-hint{top:calc(47px + env(safe-area-inset-top));width:min(260px,calc(100vw - 28px));padding:7px;font-size:10px}.anchor-placement-hint button{min-height:30px}}
