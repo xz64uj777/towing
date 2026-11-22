@@ -6,9 +6,11 @@ test('no job finishes before reaching its destination',()=>{
  for(const kind of ['tow','flatbed','recovery','heavy'])
   assert.equal(canCompleteJob(kind,{reached:false,loaded:true,strapped:true,hook:true,recoveryConnected:true}),false);
 });
-test('light wheel-lift requires straps',()=>{
- assert.equal(canCompleteJob('tow',{reached:true,loaded:true,strapped:false}),false);
- assert.equal(canCompleteJob('tow',{reached:true,loaded:true,strapped:true}),true);
+test('light wheel-lift pays only after completed depot unloading',()=>{
+ assert.equal(canCompleteJob('tow',{reached:true,loaded:true,strapped:true,delivered:false}),false);
+ assert.equal(canCompleteJob('tow',{reached:true,loaded:true,strapped:false,delivered:true}),false);
+ assert.equal(canCompleteJob('tow',{reached:true,loaded:false,strapped:false,delivered:false}),false);
+ assert.equal(canCompleteJob('tow',{reached:true,loaded:false,strapped:false,delivered:true}),true);
 });
 test('rollback requires secured load',()=>{
  assert.equal(canCompleteJob('flatbed',{reached:true,loaded:false}),false);
