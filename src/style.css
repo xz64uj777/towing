@@ -83,3 +83,15 @@
 .equipment-compact .line-summary{color:#f3c851;font-weight:800;text-align:center;font-size:10px}
 @media(max-width:520px){.bottom-ui .recovery.equipment-compact{width:min(158px,44vw);bottom:73px;padding:4px}.equipment-compact .action,.equipment-compact .control{font-size:9px;min-height:34px}.equipment-compact .equipment-row>.control{min-height:34px}.bottom-ui .boom-float{right:calc(8px + min(158px,44vw) + 7px)}}
 @media(max-height:470px){.bottom-ui .recovery.equipment-compact{bottom:65px;gap:3px}.equipment-compact .action,.equipment-compact .control{min-height:29px;padding:3px}.equipment-compact .recovery-toggle{min-height:29px}.equipment-compact .equipment-tabs button{min-height:25px}}
+
+
+/* Build .33: live line load is kept away from all hold buttons and visible over the scene. */
+.tension-readout{position:absolute;left:12px;bottom:calc(132px + env(safe-area-inset-bottom));z-index:11;display:flex;flex-direction:column;gap:3px;width:min(152px,40vw);min-height:53px;padding:7px 9px;border:1px solid #f3c851;border-radius:9px;background:rgba(9,22,29,.94);box-shadow:0 4px 14px #0009;pointer-events:none;font-size:11px;font-weight:750;font-variant-numeric:tabular-nums}
+.tension-readout span{display:flex;justify-content:space-between;gap:5px;white-space:nowrap}
+.tension-readout b{color:#ffe07a}
+.tension-readout small{font-size:9px;color:#aecbd3;letter-spacing:.35px}
+.equipment-compact .winch-speed-selector{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;width:100%;flex-shrink:0}
+.equipment-compact .winch-speed-selector button{min-width:0;min-height:28px;padding:3px 1px;background:#18313b;color:#fff;border:1px solid #738992;border-radius:6px;font-size:9px;font-weight:850;touch-action:manipulation}
+.equipment-compact .winch-speed-selector button.selected{background:#ad741c;border-color:#ffdd78;color:#fff}
+@media(max-width:520px){.tension-readout{left:7px;width:min(145px,41vw);padding:6px;font-size:10px;bottom:calc(118px + env(safe-area-inset-bottom))}.equipment-compact .winch-speed-selector button{font-size:8px;min-height:26px}}
+@media(max-height:470px){.tension-readout{left:7px;bottom:calc(102px + env(safe-area-inset-bottom));padding:4px 6px;min-height:45px;font-size:9px}.equipment-compact .winch-speed-selector button{min-height:23px}}
