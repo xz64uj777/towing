@@ -20,3 +20,25 @@
 .lift-status{padding:7px;border:1px solid #718996;border-radius:8px;background:#263840;color:#f8e6bd;text-align:center;font-size:10px;font-weight:800;line-height:1.3}
 .lift-status.aligned{border-color:#53d48b;background:#1d4939;color:#d2ffe6}
 @media(max-width:520px){.toolbar{top:calc(77px + env(safe-area-inset-top));right:8px}.toolbar-panel{width:164px;max-height:min(60dvh,calc(100dvh - 145px))}.bottom-ui .recovery{bottom:72px;max-height:min(52dvh,calc(100dvh - 190px));width:min(147px,43vw)}.bottom-ui .recovery.is-collapsed{width:min(147px,43vw)}.recovery-toggle{font-size:10px}}
+
+/* Arrow steering: horizontal pair instead of the circular joystick's vertical stack. */
+.bottom-ui .steering-arrows{
+  width:132px;
+  height:76px;
+  border-radius:16px;
+  flex-direction:row;
+  flex-wrap:nowrap;
+  gap:5px;
+  padding:5px;
+}
+.bottom-ui .steering-arrows .control{
+  flex:1 1 0;
+  min-width:0;
+  height:58px;
+  padding:0 4px;
+  font-size:11px;
+}
+@media(max-width:520px){
+  .bottom-ui .steering-arrows{width:118px;height:68px;gap:3px;padding:3px}
+  .bottom-ui .steering-arrows .control{height:54px;font-size:10px;padding:0 2px}
+}
