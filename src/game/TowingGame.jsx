@@ -713,7 +713,7 @@ export default function TowingGame(){
  const currentJob=JOBS[career.job%JOBS.length];
  return <main className="game-shell"><div className={'scene'+(placingAnchor?' anchor-placement-scene':'')} ref={mount}/>
    {placingAnchor&&<div className="anchor-placement-hint" role="status"><b>PLACE GROUND ANCHOR</b><span>Tap open ground off the road, 4–32 m from truck and 3–32 m from vehicle.</span><button type="button" onClick={cancelAnchorPlacement}>CANCEL PLACEMENT</button></div>}
-  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .38 • CAMERA PRESETS</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
+  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .39 • DEEP RAVINE</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
   <div style={{position:'absolute',left:12,bottom:195,zIndex:9,width:mapOpen?146:106,height:mapOpen?166:36,pointerEvents:'auto',border:'2px solid #f3c851',borderRadius:12,background:'rgba(9,20,30,.88)',color:'#fff',boxShadow:'0 3px 14px #0008',padding:6,boxSizing:'border-box'}}>
    <button onClick={()=>setMapOpen(v=>!v)} style={{fontSize:11,fontWeight:800,width:'100%',background:'transparent',border:0,color:'white'}}>{mapOpen?'MAP −':'MAP +'}</button>
    {mapOpen&&<svg viewBox="0 0 140 140" width="132" height="132" aria-label="Map of recovery vehicles and destination">
@@ -778,7 +778,7 @@ export default function TowingGame(){
    {equipmentTab==='quick'?<>
     <div className="equipment-row">
       {!s?.loaded&&<button className={'action '+(s?.liftDeployed?'active':'')} onClick={toggleLift}>{s?.liftDeployed?'FOLD LIFT':'LOWER LIFT'}</button>}
-      <button className={'action '+(rearCamera?'active':'')} onClick={toggleRearCamera}>{cameraMode==='reverse'?'NORMAL CAM':'REAR CAM'}</button>
+      <button className={'action '+(cameraMode==='reverse'?'active':'')} onClick={toggleRearCamera}>{cameraMode==='reverse'?'NORMAL CAM':'REAR CAM'}</button>
     </div>
     {!s?.loaded&&<button className="action priority-action" onClick={autoLoadVehicle}>{s?.autoLoad?'LOADING…':'AUTO LOAD VEHICLE'}</button>}
     {s?.loaded&&<>
