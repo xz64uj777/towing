@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {canCompleteJob,minimapX,minimapY,wheelLiftCaptureReady,winchLoadBand,poweredWinchForce,stopWinchCoast,recoveryCableTension,canPowerBothRecoveryLines} from './gameRules.js';
+import {canCompleteJob,minimapX,minimapY,wheelLiftCaptureReady,winchLoadBand,poweredWinchForce,stopWinchCoast,recoveryCableTension,canPowerBothRecoveryLines,cameraPresetPose} from './gameRules.js';
 
 test('no job finishes before reaching its destination',()=>{
  for(const kind of ['tow','flatbed','recovery','heavy'])
@@ -70,4 +70,25 @@ test('dual-winch motor command requires two connected lines and secured truck',(
  assert.equal(canPowerBothRecoveryLines(lines,true),true);
  assert.equal(canPowerBothRecoveryLines([{connected:true},{connected:false}],true),false);
  assert.equal(canPowerBothRecoveryLines(lines,false),false);
+});
+
+test('camera angles are relative to the truck and the overhead camera is higher',()=>{
+ const truck={x:0,z:0},vehicle={x:8,z:-12};
+ assert.ok(cameraPresetPose('chase',truck,0,vehicle).position.z>0);
+ assert.ok(cameraPresetPose('front',truck,0,vehicle).position.z<0);
+ assert.ok(cameraPresetPose('left',truck,0,vehicle).position.x<0);
+ assert.ok(cameraPresetPose('right',truck,0,vehicle).position.x>0);
+ assert.ok(cameraPresetPose('top',truck,0,vehicle).position.y>cameraPresetPose('chase',truck,0,vehicle).position.y);
+});
+test('hook camera focuses vehicle and wide camera frames recovery center; zoom increases distance',()=>{
+ const truck={x:10,z:-20},vehicle={x:-5,z:-50};
+ const hook=cameraPresetPose('hook',truck,.4,vehicle),wide=cameraPresetPose('wide',truck,.4,vehicle);
+ assert.equal(hook.target.x,vehicle.x);assert.equal(hook.target.z,vehicle.z);
+ assert.equal(wide.target.x,(truck.x+vehicle.x)/2);assert.equal(wide.target.z,(truck.z+vehicle.z)/2);
+ const large=cameraPresetPose('chase',truck,.4,vehicle,20),normal=cameraPresetPose('chase',truck,.4,vehicle,13);
+ assert.ok(Math.hypot(large.position.x-truck.x,large.position.z-truck.z)>Math.hypot(normal.position.x-truck.x,normal.position.z-truck.z));
+ for(const mode of ['chase','reverse','front','left','right','top','hook','wide']){
+  const pose=cameraPresetPose(mode,truck,.7,vehicle);
+  assert.ok([...Object.values(pose.position),...Object.values(pose.target)].every(Number.isFinite),mode);
+ }
 });

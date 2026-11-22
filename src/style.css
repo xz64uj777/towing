@@ -132,3 +132,13 @@
 .equipment-compact .dual-line-status{display:flex;justify-content:space-between;gap:4px;font-size:8px}
 .equipment-compact .dual-line-status .line-a-label{color:#ffc04e}
 .equipment-compact .dual-line-status .line-b-label{color:#55d3ec}
+
+/* Build .38: tap-friendly camera controls separate from equipment and menu. */
+.toolbar .camera-shortcuts{display:flex;gap:4px;align-self:flex-end;width:min(192px,56vw)}
+.toolbar .camera-shortcuts button{min-height:35px;padding:6px 4px;font-size:9px;border:1px solid #8ab7c8;background:rgba(11,44,55,.96);box-shadow:0 2px 9px #0006}
+.toolbar .camera-shortcuts .camera-cycle{flex:1.3;min-width:0;font-weight:900;border-color:#f3c851}
+.toolbar .camera-shortcuts .camera-angles{flex:.9;min-width:0}
+.toolbar .camera-selector{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-self:flex-end;gap:5px;width:min(192px,56vw);padding:7px;border:1px solid #f3c851;border-radius:10px;background:rgba(9,24,31,.98);box-shadow:0 5px 20px #000a}
+.toolbar .camera-selector button{min-width:0;min-height:33px;padding:4px 1px;font-size:9px;background:#24414b;border:1px solid #6a8a98;color:#fff}
+.toolbar .camera-selector button.selected{background:#836023;border-color:#f3c851;color:#fff}
+@media(max-height:470px){.toolbar .camera-shortcuts button{min-height:29px;padding:4px 3px}.toolbar .camera-selector{gap:3px;padding:4px}.toolbar .camera-selector button{min-height:26px}}
