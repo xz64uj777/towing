@@ -57,3 +57,6 @@
 .bottom-ui .boom-float .boom-joystick{width:100%;height:124px}
 .bottom-ui .boom-float .action{width:100%;height:auto;min-height:38px;white-space:normal;line-height:1.2}
 @media(max-width:520px){.bottom-ui .boom-float{right:calc(8px + min(147px,43vw) + 7px);bottom:116px;width:min(126px,calc(100vw - 175px));max-width:126px;padding:5px}.bottom-ui .boom-float .boom-joystick{height:116px}.bottom-ui .boom-float .boom-status{font-size:9px}}
+
+/* Keep the joystick touch surface above the collapsible minimap on narrow screens. */
+.bottom-ui:has(.boom-float){z-index:10}
