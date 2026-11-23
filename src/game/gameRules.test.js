@@ -124,3 +124,47 @@ test('deep ravine recovery slope and road approach remain physically distinct',(
  const gravity=levelFourDownhillAcceleration(-10,-76,.36);
  assert.ok(gravity.x<-.5,'gravity must resist uphill winching');
 });
+
+
+import {captureRecoverySave,parseRecoverySave,restoreRecoverySave} from './progressSave.js';
+const checkpointVector=(x,y,z)=>({x,y,z,set(a,b,c){this.x=a;this.y=b;this.z=c;}});
+function checkpointFixture(){
+ const marker=()=>({visible:false,position:checkpointVector(0,0,0)});
+ return {jobIndex:4,type:{id:'rotator'},pos:checkpointVector(0,0,-61),vel:checkpointVector(0,0,0),yaw:0,
+ pickPos:checkpointVector(-19,-.7,-76),pickVel:checkpointVector(0,0,0),pickYaw:-.18,pickRoll:1.2,
+ secondary:{pos:checkpointVector(-22,-.4,-100),vel:checkpointVector(0,0,0),yaw:0,roll:0,active:false,mesh:{visible:false}},
+ parkingBrake:true,riggersDeployed:true,boomDeployed:true,boomAngle:.5,boomSwing:0,boomExtension:1.2,
+ liftDeployed:false,liftHeight:0,liftExtension:0,gridWidth:0,armsClosed:false,loaded:false,strapsOn:false,
+ bedTilt:false,hook:false,hookPoint:0,hookRedirect:0,cableLength:14,autoLoad:false,autoUnload:false,
+ dropoffArrived:false,dropoffComplete:false,winchSpeed:'fine',
+ riggingAnchors:[{pos:null},{pos:null},{pos:null},{pos:checkpointVector(-9,.7,-69),marker:marker()},{pos:checkpointVector(-11,.8,-70),marker:marker()}],
+ recoveryLines:[{connected:true,point:6,customPoint:{id:'custom',label:'CUSTOM HOOK',x:.8,y:.73,z:-1.6},redirect:3,secondRedirect:4,target:0,spool:28,motor:1,tension:3000},
+ {connected:true,point:7,redirect:0,secondRedirect:0,target:0,spool:22,motor:-1,tension:900}],
+ cameraMode:'orbit',cameraYaw:.5,cameraPitch:.3,presetYaw:0,presetPitch:0,zoom:15};
+}
+test('save preserves player placed anchors, custom tow point, and both cables',()=>{
+ const save=captureRecoverySave({job:4,cash:1000},checkpointFixture());
+ const fromStorage=parseRecoverySave(JSON.stringify(save),7);
+ assert.ok(fromStorage);assert.equal(fromStorage.jobIndex,4);
+ assert.equal(fromStorage.lines[0].customPoint.x,.8);
+ assert.deepEqual(fromStorage.anchors[1],{x:-11,y:.8,z:-70});
+ assert.equal(fromStorage.lines[0].secondRedirect,4);
+ assert.equal(fromStorage.lines[1].connected,true);
+});
+test('resume restores positions, line tension settings, brakes without restarting motors',()=>{
+ const saved=captureRecoverySave({job:4},checkpointFixture()),fresh=checkpointFixture();
+ fresh.pos.set(5,0,5);fresh.pickPos.set(0,0,0);fresh.parkingBrake=false;
+ fresh.recoveryLines[0].connected=false;fresh.riggingAnchors[3].pos=null;
+ restoreRecoverySave(fresh,saved,checkpointVector);
+ assert.deepEqual([fresh.pickPos.x,fresh.pickPos.z],[-19,-76]);
+ assert.equal(fresh.parkingBrake,true);assert.equal(fresh.recoveryLines[0].connected,true);
+ assert.equal(fresh.recoveryLines[0].motor,0);assert.equal(fresh.recoveryLines[1].motor,0);
+ assert.equal(fresh.riggingAnchors[3].marker.visible,true);
+ assert.ok(Math.abs(fresh.riggingAnchors[3].marker.position.y-.15)<1e-8);
+});
+test('invalid saved games are ignored rather than crashing startup',()=>{
+ assert.equal(parseRecoverySave('{',7),null);
+ const saved=captureRecoverySave({job:4},checkpointFixture());
+ assert.equal(parseRecoverySave({...saved,version:2},7),null);
+ assert.equal(parseRecoverySave({...saved,lines:[{...saved.lines[0],redirect:99},saved.lines[1]]},7),null);
+});
