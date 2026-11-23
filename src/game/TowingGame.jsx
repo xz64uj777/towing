@@ -494,7 +494,7 @@ export default function TowingGame(){
     }
     if(s.hook)updateWinchLine(cable,guide?[pa,guide,pb]:[pa,pb]);else cable.visible=false;
    }
-   // Driving and recovery presets track moving objects; drag converts to free orbit.
+   // Driving and recovery camera presets remain locked until CAM or ANGLES explicitly changes them.
    if(s.cameraMode==='ravine'&&levelFour){
      const look=s.pos.clone().lerp(s.pickPos,.72);
      camera.position.set(s.pos.x+11,s.pos.y+13,s.pos.z+13);
@@ -530,18 +530,7 @@ export default function TowingGame(){
     if(s.anchorPlacement||!s.pointers.has(e.pointerId))return;
     s.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(s.pointers.size===1&&s.drag){
-      if(s.cameraMode!=='orbit'&&Math.hypot(e.clientX-s.drag.x,e.clientY-s.drag.y)>7){
-        s.orbitFocus=s.cameraMode==='hook'?'hook':s.cameraMode==='wide'?'wide':'truck';
-        const focus=s.orbitFocus==='hook'?s.pickPos.clone().add(V(0,1.2,0)):
-          s.orbitFocus==='wide'?s.pos.clone().lerp(s.pickPos,.5).add(V(0,1.2,0)):
-          s.pos.clone().add(V(0,1.2,0));
-        const delta=camera.position.clone().sub(focus),length=Math.max(.1,delta.length());
-        s.cameraYaw=Math.atan2(delta.x,delta.z);
-        s.cameraPitch=clamp(Math.asin(clamp(delta.y/length,-1,1)),-.05,1.48);
-        s.zoom=clamp(length,5,40);
-        s.cameraMode='orbit';setCameraMode('orbit');setCameraPanelOpen(false);
-        s.drag={x:e.clientX,y:e.clientY,yaw:s.cameraYaw,pitch:s.cameraPitch};
-      }
+      // Camera presets stay selected when the player drags or moves. Only FREE supports orbit rotation.
       if(s.cameraMode==='orbit'){
         s.cameraYaw=s.drag.yaw-(e.clientX-s.drag.x)*.006;
         s.cameraPitch=clamp(s.drag.pitch+(e.clientY-s.drag.y)*.004,-.05,1.48);
@@ -719,7 +708,7 @@ export default function TowingGame(){
  const currentJob=JOBS[career.job%JOBS.length];
  return <main className="game-shell"><div className={'scene'+(placingAnchor?' anchor-placement-scene':'')} ref={mount}/>
    {placingAnchor&&<div className="anchor-placement-hint" role="status"><b>PLACE GROUND ANCHOR</b><span>Tap open ground off the road, 4–32 m from truck and 3–32 m from vehicle.</span><button type="button" onClick={cancelAnchorPlacement}>CANCEL PLACEMENT</button></div>}
-  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .41 • RAVINES ENABLED</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
+  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .42 • CAMERA LOCK</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
   <div style={{position:'absolute',left:12,bottom:195,zIndex:9,width:mapOpen?146:106,height:mapOpen?166:36,pointerEvents:'auto',border:'2px solid #f3c851',borderRadius:12,background:'rgba(9,20,30,.88)',color:'#fff',boxShadow:'0 3px 14px #0008',padding:6,boxSizing:'border-box'}}>
    <button onClick={()=>setMapOpen(v=>!v)} style={{fontSize:11,fontWeight:800,width:'100%',background:'transparent',border:0,color:'white'}}>{mapOpen?'MAP −':'MAP +'}</button>
    {mapOpen&&<svg viewBox="0 0 140 140" width="132" height="132" aria-label="Map of recovery vehicles and destination">
