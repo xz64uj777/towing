@@ -32,7 +32,11 @@ const RECOVERY_POINTS=[
 {id:'left',label:'LEFT EYE',x:-.96,y:.80,z:0},
 {id:'right',label:'RIGHT EYE',x:.96,y:.80,z:0},
 {id:'upper',label:'UPPER FRAME',x:.9,y:1.35,z:.1},
-{id:'lower',label:'LOWER FRAME',x:-.9,y:.65,z:.1}
+{id:'lower',label:'LOWER FRAME',x:-.9,y:.65,z:.1},
+{id:'frontLeft',label:'FRONT LEFT',x:-.86,y:.72,z:-1.65},
+{id:'frontRight',label:'FRONT RIGHT',x:.86,y:.72,z:-1.65},
+{id:'rearLeft',label:'REAR LEFT',x:-.86,y:.72,z:1.65},
+{id:'rearRight',label:'REAR RIGHT',x:.86,y:.72,z:1.65}
 ];
 // Fictional attachment and redirect points; simplified recovery physics, not field rigging advice.
 const recoveryAnchor=(target,point)=>target.pos.clone().add(V(0,.65,0)).add(V(point.x,point.y,point.z).applyEuler(new THREE.Euler(0,-target.yaw,target.roll,'YXZ')));
@@ -862,7 +866,7 @@ export default function TowingGame(){
   </>}
   {s?.type.id==='flatbed'&&<>
    <button className={'action '+(s?.bedTilt?'active':'')} onClick={toggleBed}>{s?.bedTilt?'LEVEL BED':'TILT ROLLBACK BED'}</button>
-   {!hud.hook&&<><div className="equipment-row"><button className="action" onClick={changeHookPoint}>{RECOVERY_POINTS[s?.hookPoint??0].label}</button><button className="action" onClick={changeHookRedirect}>{s?.riggingAnchors[s.hookRedirect].label??'DIRECT LINE'}</button></div><button className="action" onClick={()=>startAnchorPlacement(null)}>PLACE / MOVE ANCHOR</button></>}
+   {!hud.hook&&<><div className="equipment-row"><select className="action" aria-label="Choose winch hook position" value={s?.hookPoint??0} onChange={e=>{if(s&&!s.hook){s.hookPoint=Number(e.target.value);setNotice("Hook position: "+RECOVERY_POINTS[s.hookPoint].label);}}}>{RECOVERY_POINTS.map((p,i)=><option key={p.id} value={i}>{p.label}</option>)}</select><button className="action" onClick={changeHookRedirect}>{s?.riggingAnchors[s.hookRedirect].label??'DIRECT LINE'}</button></div><button className="action" onClick={()=>startAnchorPlacement(null)}>PLACE / MOVE ANCHOR</button></>}
    <button className={'action '+(hud.hook?'active':'')} onClick={toggleHook}>{hud.hook?'UNHOOK VEHICLE':'CONNECT TO VEHICLE'}</button>
    {hud.hook&&<div className="equipment-row"><Hold label="WINCH IN" onDown={press('winch',true)} onUp={press('winch',false)}/><Hold label="WINCH OUT" onDown={press('winchOut',true)} onUp={press('winchOut',false)}/></div>}
    <button className="action priority-action" onClick={secureLoad}>{s?.loaded?'RELEASE VEHICLE':'SECURE LOAD'}</button>
@@ -870,7 +874,7 @@ export default function TowingGame(){
   {s?.type.id==='medium'&&<>
    <div className="equipment-tabs"><button type="button" className={equipmentTab==='quick'?'selected':''} onClick={()=>setEquipmentTab('quick')}>BOOM / WINCH</button><button type="button" className={equipmentTab==='manual'?'selected':''} onClick={()=>setEquipmentTab('manual')}>WHEEL LIFT</button></div>
    {equipmentTab==='quick'?<>
-    {!hud.hook&&<><div className="equipment-row"><button className="action" onClick={changeHookPoint}>{RECOVERY_POINTS[s?.hookPoint??0].label}</button><button className="action" onClick={changeHookRedirect}>{s?.riggingAnchors[s.hookRedirect].label??'DIRECT LINE'}</button></div><button className="action" onClick={()=>startAnchorPlacement(null)}>PLACE / MOVE ANCHOR</button></>}
+    {!hud.hook&&<><div className="equipment-row"><select className="action" aria-label="Choose winch hook position" value={s?.hookPoint??0} onChange={e=>{if(s&&!s.hook){s.hookPoint=Number(e.target.value);setNotice("Hook position: "+RECOVERY_POINTS[s.hookPoint].label);}}}>{RECOVERY_POINTS.map((p,i)=><option key={p.id} value={i}>{p.label}</option>)}</select><button className="action" onClick={changeHookRedirect}>{s?.riggingAnchors[s.hookRedirect].label??'DIRECT LINE'}</button></div><button className="action" onClick={()=>startAnchorPlacement(null)}>PLACE / MOVE ANCHOR</button></>}
     <button className={'action '+(hud.hook?'active':'')} onClick={toggleHook}>{hud.hook?'DISCONNECT HOOK':'CONNECT TO VEHICLE'}</button>
     {hud.hook&&<div className="equipment-row"><Hold label="WINCH IN" onDown={press('winch',true)} onUp={press('winch',false)}/><Hold label="WINCH OUT" onDown={press('winchOut',true)} onUp={press('winchOut',false)}/></div>}
    </>:<>
@@ -892,7 +896,7 @@ export default function TowingGame(){
    {s?.type.id==='rotator'&&<><button type="button" className="action" onClick={startDoubleAnchorSetup}>LINE A • TWO REDIRECT POINTS</button><div className="equipment-row">{[3,4].map((slot,i)=><button key={slot} type="button" className="action" disabled={!s.riggingAnchors[slot].pos} onClick={()=>removePlacedAnchor(slot)}>REMOVE ANCHOR {i===0?'A':'B'}</button>)}</div></>}
    {s?.recoveryLines[activeRecoveryLine]&&<div className={'recovery-line-compact '+(activeRecoveryLine===0?'line-a-controls':'line-b-controls')}>
     <div className="line-summary">BOOM → {s.riggingAnchors[s.recoveryLines[activeRecoveryLine].redirect].label}{s.recoveryLines[activeRecoveryLine].secondRedirect?' → '+s.riggingAnchors[s.recoveryLines[activeRecoveryLine].secondRedirect].label:''} → {RECOVERY_POINTS[s.recoveryLines[activeRecoveryLine].point].label}</div>
-    {!s.recoveryLines[activeRecoveryLine].connected&&<div className="equipment-row"><button className="action" onClick={()=>changeRecoveryPoint(activeRecoveryLine)}>{RECOVERY_POINTS[s.recoveryLines[activeRecoveryLine].point].label}</button><button className="action" onClick={()=>changeRecoveryRedirect(activeRecoveryLine)}>{s.riggingAnchors[s.recoveryLines[activeRecoveryLine].redirect].label}</button></div>}
+    {!s.recoveryLines[activeRecoveryLine].connected&&<div className="equipment-row"><select className="action" aria-label="Choose vehicle attachment point" value={s.recoveryLines[activeRecoveryLine].point} onChange={e=>{const line=s.recoveryLines[activeRecoveryLine];if(!line.connected){line.point=Number(e.target.value);setNotice("Hook position: "+RECOVERY_POINTS[line.point].label);}}}>{RECOVERY_POINTS.map((p,i)=><option key={p.id} value={i}>{p.label}</option>)}</select><button className="action" onClick={()=>changeRecoveryRedirect(activeRecoveryLine)}>{s.riggingAnchors[s.recoveryLines[activeRecoveryLine].redirect].label}</button></div>}
     {!s.recoveryLines[activeRecoveryLine].connected&&<button className="action" onClick={()=>startAnchorPlacement(activeRecoveryLine)}>PLACE / MOVE ANCHOR</button>}
      {s.recoveryLines[activeRecoveryLine].connected&&<div className="line-summary">CONNECTED TO VEHICLE • {RECOVERY_POINTS[s.recoveryLines[activeRecoveryLine].point].label}</div>}
     {s.secondary.active&&<button className="action" onClick={()=>changeRecoveryTarget(activeRecoveryLine)}>TARGET VEHICLE {s.recoveryLines[activeRecoveryLine].target+1}</button>}
