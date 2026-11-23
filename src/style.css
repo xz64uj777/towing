@@ -142,3 +142,28 @@
 .toolbar .camera-selector button{min-width:0;min-height:33px;padding:4px 1px;font-size:9px;background:#24414b;border:1px solid #6a8a98;color:#fff}
 .toolbar .camera-selector button.selected{background:#836023;border-color:#f3c851;color:#fff}
 @media(max-height:470px){.toolbar .camera-shortcuts button{min-height:29px;padding:4px 3px}.toolbar .camera-selector{gap:3px;padding:4px}.toolbar .camera-selector button{min-height:26px}}
+
+
+/* Mobile HUD declutter: menu is an exclusive overlay; equipment stays accessible after closing it. */
+.game-shell:has(.toolbar-panel) .bottom-ui .recovery,
+.game-shell:has(.toolbar-panel) .bottom-ui .boom-float,
+.game-shell:has(.toolbar-panel) .tension-readout { visibility:hidden; pointer-events:none; }
+.toolbar { max-width: min(220px, 58vw); }
+.toolbar-panel { max-width:100%; overscroll-behavior:contain; }
+@media (max-width: 800px) {
+  .toolbar { top:calc(64px + env(safe-area-inset-top)); right:calc(8px + env(safe-area-inset-right)); }
+  .toolbar-panel { width:min(210px, 55vw); max-height:calc(100dvh - 105px - env(safe-area-inset-bottom)); }
+  .toolbar .camera-shortcuts { width:min(190px, 53vw); }
+  .toolbar .camera-selector { width:min(190px, 53vw); }
+  .bottom-ui .recovery.equipment-compact {
+    max-height:min(52dvh, calc(100dvh - 110px - env(safe-area-inset-bottom)));
+    overflow-y:auto; overscroll-behavior:contain;
+  }
+  .bottom-ui .recovery.equipment-compact.is-collapsed { overflow:hidden; }
+}
+@media (max-height: 500px) and (orientation:landscape) {
+  .toolbar { top:calc(42px + env(safe-area-inset-top)); }
+  .toolbar-panel { max-height:calc(100dvh - 65px - env(safe-area-inset-bottom)); }
+  .bottom-ui .recovery.equipment-compact { bottom:calc(58px + env(safe-area-inset-bottom)); max-height:calc(100dvh - 112px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+  .bottom-ui .boom-float { bottom:calc(76px + env(safe-area-inset-bottom)); }
+}
