@@ -234,7 +234,7 @@ export default function TowingGame(){
   pickup.rotation.y=.18;
   // Pickup starts low in the soft ditch with a little yaw.
   const cableMat=new THREE.LineBasicMaterial({color:0xf3bd43});const cableGeo=new THREE.BufferGeometry().setFromPoints([V(),V(),V()]);cableGeo.setDrawRange(0,2);const cable=new THREE.Line(cableGeo,cableMat);scene.add(cable);cable.visible=false;
-  const s={truck,pickup,zone,anchorPlacement:null,levelFour,pos:V(0,levelFour?levelFourHeight(0,ravineStartZ):0,ravineStartZ),vel:V(),yaw:0,steer:0,throttle:0,brake:0,hook:false,winch:false,winchOut:false,parkingBrake:false,boomDeployed:false,boomAngle:.36,boomSwing:0,boomExtension:0,boomControl:0,boomExtendControl:0,boomSwingControl:0,liftDeployed:false,liftHeight:0,liftExtension:0,liftControl:0,liftExtendControl:0,liftHydraulicX:0,liftHydraulicY:0,gridWidth:0,armsClosed:false,riggersDeployed:false,cableLength:14,tension:0,pickPos:V(firstJob.x,levelFour?levelFourHeight(firstJob.x,firstJob.z):0,firstJob.z),pickVel:V(),pickYaw:-.18,cameraYaw:0,cameraPitch:.24,zoom:13,cameraMode:levelFour?'ravine':cameraMode,orbitFocus:'truck',drag:null,pointers:new Map(),lastHud:0,jobIndex:careerRef.current.job,jobDone:false,dropoffArrived:false,dropoffComplete:false,autoUnload:false,autoLoad:false,heavyRecovery:firstJob.kind==='heavy',loaded:false,strapsOn:false,bedTilt:false,pickRoll:firstJob.roll??0,pickRollVel:0,secondary:{mesh:secondaryPickup,active:!!firstJob.second,pos:V(firstJob.second?.x??-22,levelFour?levelFourHeight(firstJob.second?.x??-22,firstJob.second?.z??-106):0,firstJob.second?.z??-106),vel:V(),yaw:firstJob.second?.yaw??-.1,roll:firstJob.second?.roll??0,rollVel:0},recoveryCables,riggingAnchors,hookPoint:0,hookRedirect:0,winchSpeed,recoveryLines:[{connected:false,point:0,redirect:0,target:0,spool:20,motor:0,tension:0},{connected:false,point:1,redirect:0,target:0,spool:20,motor:0,tension:0}],type,tools};
+  const s={truck,pickup,zone,anchorPlacement:null,levelFour,pos:V(0,levelFour?levelFourHeight(0,ravineStartZ):0,ravineStartZ),vel:V(),yaw:0,steer:0,throttle:0,brake:0,hook:false,winch:false,winchOut:false,parkingBrake:false,boomDeployed:false,boomAngle:.36,boomSwing:0,boomExtension:0,boomControl:0,boomExtendControl:0,boomSwingControl:0,liftDeployed:false,liftHeight:0,liftExtension:0,liftControl:0,liftExtendControl:0,liftHydraulicX:0,liftHydraulicY:0,gridWidth:0,armsClosed:false,riggersDeployed:false,cableLength:14,tension:0,pickPos:V(firstJob.x,levelFour?levelFourHeight(firstJob.x,firstJob.z):0,firstJob.z),pickVel:V(),pickYaw:-.18,cameraYaw:0,cameraPitch:.24,presetYaw:0,presetPitch:0,zoom:13,cameraMode:levelFour?'ravine':cameraMode,orbitFocus:'truck',drag:null,pointers:new Map(),lastHud:0,jobIndex:careerRef.current.job,jobDone:false,dropoffArrived:false,dropoffComplete:false,autoUnload:false,autoLoad:false,heavyRecovery:firstJob.kind==='heavy',loaded:false,strapsOn:false,bedTilt:false,pickRoll:firstJob.roll??0,pickRollVel:0,secondary:{mesh:secondaryPickup,active:!!firstJob.second,pos:V(firstJob.second?.x??-22,levelFour?levelFourHeight(firstJob.second?.x??-22,firstJob.second?.z??-106):0,firstJob.second?.z??-106),vel:V(),yaw:firstJob.second?.yaw??-.1,roll:firstJob.second?.roll??0,rollVel:0},recoveryCables,riggingAnchors,hookPoint:0,hookRedirect:0,winchSpeed,recoveryLines:[{connected:false,point:0,redirect:0,target:0,spool:20,motor:0,tension:0},{connected:false,point:1,redirect:0,target:0,spool:20,motor:0,tension:0}],type,tools};
   sim.current=s;
   if(levelFour)setCameraMode('ravine');
   const resize=()=>{const w=host.clientWidth,h=host.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);};const ro=new ResizeObserver(resize);ro.observe(host);resize();
@@ -496,11 +496,13 @@ export default function TowingGame(){
     if(s.hook)updateWinchLine(cable,guide?[pa,guide,pb]:[pa,pb]);else cable.visible=false;
    }
    // Driving and recovery camera presets remain locked until CAM or ANGLES explicitly changes them.
+   let presetFocus=null;
    if(s.cameraMode==='ravine'&&levelFour){
      const look=s.pos.clone().lerp(s.pickPos,.72);
      // Elevated roadside vantage frames the road, steep near wall, and wreck below.
      camera.position.set(s.pos.x+5.5,s.pos.y+11,s.pos.z+8);
-     camera.lookAt(look.x,look.y-2.5,look.z);
+     presetFocus=V(look.x,look.y-2.5,look.z);
+     camera.lookAt(presetFocus);
    }else if(s.cameraMode==='orbit'){
      const focus=s.orbitFocus==='hook'?s.pickPos.clone().add(V(0,1.2,0)):
        s.orbitFocus==='wide'?s.pos.clone().lerp(s.pickPos,.5).add(V(0,1.2,0)):
@@ -512,7 +514,17 @@ export default function TowingGame(){
      const pose=cameraPresetPose(s.cameraMode,{x:s.pos.x,z:s.pos.z},s.yaw,{x:s.pickPos.x,z:s.pickPos.z},s.zoom);
      const heightOffset=levelFour?(s.cameraMode==='hook'?s.pickPos.y:s.cameraMode==='wide'?(s.pos.y+s.pickPos.y)*.5:s.pos.y):0;
       camera.position.set(pose.position.x,pose.position.y+heightOffset,pose.position.z);
-      camera.lookAt(pose.target.x,pose.target.y+heightOffset,pose.target.z);
+      presetFocus=V(pose.target.x,pose.target.y+heightOffset,pose.target.z);
+      camera.lookAt(presetFocus);
+   }
+   // Touch orbit is an offset from the selected camera preset, not a mode switch.
+   if(presetFocus){
+     const delta=camera.position.clone().sub(presetFocus),baseRadius=Math.max(1,delta.length());
+     const baseYaw=Math.atan2(delta.x,delta.z),basePitch=Math.asin(clamp(delta.y/baseRadius,-1,1));
+     const yaw=baseYaw+s.presetYaw,pitch=clamp(basePitch+s.presetPitch,-1.35,1.48);
+     const radius=baseRadius*13/s.zoom,cosPitch=Math.cos(pitch);
+     camera.position.copy(presetFocus).add(V(Math.sin(yaw)*cosPitch*radius,Math.sin(pitch)*radius,Math.cos(yaw)*cosPitch*radius));
+     camera.lookAt(presetFocus);
    }
    if(now-s.lastHud>120){const sp=s.vel.length()*3.6;setHud({speed:sp,gear:s.throttle<-.1?'R':'D',hook:s.hook,tension:s.tension/1000,winch:s.winch?'REELING':'IDLE',parking:s.parkingBrake,riggers:s.riggersDeployed,boom:s.boomDeployed,lift:s.liftDeployed,range:s.pos.distanceTo(s.pickPos),mapX:s.pos.x,mapZ:s.pos.z,mapYaw:s.yaw,roll:s.pickRoll,roll2:s.secondary.roll,secondX:s.secondary.pos.x,secondZ:s.secondary.pos.z,lineTensions:s.recoveryLines.map(l=>l.tension/1000),carX:s.pickPos.x,carZ:s.pickPos.z,carYaw:s.pickYaw,loaded:s.loaded,liftHeight:s.liftHeight,armsClosed:s.armsClosed,strapsOn:s.strapsOn,gridContact:tireGridContact(s)});s.lastHud=now;}
    renderer.render(scene,camera);raf=requestAnimationFrame(update);
@@ -526,16 +538,20 @@ export default function TowingGame(){
   const onPointerDown=e=>{
     renderer.domElement.setPointerCapture(e.pointerId);
     if(s.anchorPlacement){s.anchorTap={id:e.pointerId,x:e.clientX,y:e.clientY};return;}
-    s.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(s.pointers.size===1)s.drag={x:e.clientX,y:e.clientY,yaw:s.cameraYaw,pitch:s.cameraPitch};
+    s.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(s.pointers.size===1)s.drag={x:e.clientX,y:e.clientY,yaw:s.cameraYaw,pitch:s.cameraPitch,presetYaw:s.presetYaw,presetPitch:s.presetPitch};
   };
   const onPointerMove=e=>{
     if(s.anchorPlacement||!s.pointers.has(e.pointerId))return;
     s.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(s.pointers.size===1&&s.drag){
-      // Camera presets stay selected when the player drags or moves. Only FREE supports orbit rotation.
+      const dx=e.clientX-s.drag.x,dy=e.clientY-s.drag.y;
       if(s.cameraMode==='orbit'){
-        s.cameraYaw=s.drag.yaw-(e.clientX-s.drag.x)*.006;
-        s.cameraPitch=clamp(s.drag.pitch+(e.clientY-s.drag.y)*.004,-.05,1.48);
+        s.cameraYaw=s.drag.yaw-dx*.006;
+        s.cameraPitch=clamp(s.drag.pitch+dy*.004,-.05,1.48);
+      }else{
+        // Rotate the selected view without changing its camera mode.
+        s.presetYaw=s.drag.presetYaw-dx*.006;
+        s.presetPitch=clamp(s.drag.presetPitch+dy*.004,-1.1,1.1);
       }
     }
     if(s.pointers.size===2){
@@ -702,7 +718,7 @@ export default function TowingGame(){
  const changeCamera=mode=>{
    if(!CAMERA_MODES.some(([id])=>id===mode))return;
    const s=sim.current;
-   if(s){s.cameraMode=mode;s.zoom=13;if(mode==='orbit'){s.orbitFocus='truck';s.cameraYaw=0;s.cameraPitch=.30;}}
+   if(s){s.cameraMode=mode;s.zoom=13;s.presetYaw=0;s.presetPitch=0;if(mode==='orbit'){s.orbitFocus='truck';s.cameraYaw=0;s.cameraPitch=.30;}}
    setCameraMode(mode);setCameraPanelOpen(false);
  };
  const nextCamera=()=>{const index=CAMERA_MODES.findIndex(([id])=>id===cameraMode);changeCamera(CAMERA_MODES[(index+1)%CAMERA_MODES.length][0]);};
@@ -710,7 +726,7 @@ export default function TowingGame(){
  const currentJob=JOBS[career.job%JOBS.length];
  return <main className="game-shell"><div className={'scene'+(placingAnchor?' anchor-placement-scene':'')} ref={mount}/>
    {placingAnchor&&<div className="anchor-placement-hint" role="status"><b>PLACE GROUND ANCHOR</b><span>Tap open ground off the road, 4–32 m from truck and 3–32 m from vehicle.</span><button type="button" onClick={cancelAnchorPlacement}>CANCEL PLACEMENT</button></div>}
-  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .43 • RAVINE PHYSICS</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
+  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .44 • CAMERA ORBIT</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
   <div style={{position:'absolute',left:12,bottom:195,zIndex:9,width:mapOpen?146:106,height:mapOpen?166:36,pointerEvents:'auto',border:'2px solid #f3c851',borderRadius:12,background:'rgba(9,20,30,.88)',color:'#fff',boxShadow:'0 3px 14px #0008',padding:6,boxSizing:'border-box'}}>
    <button onClick={()=>setMapOpen(v=>!v)} style={{fontSize:11,fontWeight:800,width:'100%',background:'transparent',border:0,color:'white'}}>{mapOpen?'MAP −':'MAP +'}</button>
    {mapOpen&&<svg viewBox="0 0 140 140" width="132" height="132" aria-label="Map of recovery vehicles and destination">
