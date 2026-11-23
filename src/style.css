@@ -167,3 +167,12 @@
   .bottom-ui .recovery.equipment-compact { bottom:calc(58px + env(safe-area-inset-bottom)); max-height:calc(100dvh - 112px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
   .bottom-ui .boom-float { bottom:calc(76px + env(safe-area-inset-bottom)); }
 }
+
+
+/* Build .52: save and resume unfinished dispatches in the compact mobile menu. */
+.checkpoint-actions{display:flex;flex-direction:column;gap:5px;padding:7px;border:1px solid #6b8590;border-radius:9px;background:#152e38}
+.checkpoint-caption{color:#c7dae3;font-size:9px;line-height:1.35;font-weight:700}
+.toolbar-panel .checkpoint-actions button{width:100%;min-height:38px;font-size:10px;white-space:normal;line-height:1.2}
+.toolbar-panel .checkpoint-save{background:#285b77;border-color:#8ccae5}
+.toolbar-panel .checkpoint-resume{background:#287549;border-color:#91dfa9}
+.toolbar-panel .checkpoint-delete{background:#483c3d;border-color:#947d7c;font-size:9px}
