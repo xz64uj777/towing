@@ -402,7 +402,7 @@ export default function TowingGame(){
           torques[line.target]+=(cx*direction.y-cy*direction.dot(axis))*pull/(target.mass*8200);
           // Horizontal moment about the vehicle's center: off-center pulls pivot the chassis.
           const offset=V(point.x,0,point.z).applyAxisAngle(V(0,1,0),-target.yaw);
-          yawTorques[line.target]+=(offset.z*direction.x-offset.x*direction.z)*pull/(target.mass*4200);
+          yawTorques[line.target]+=(offset.x*direction.z-offset.z*direction.x)*pull/(target.mass*4200);
           target.vel.addScaledVector(V(direction.x,0,direction.z),pull/(target.mass*(levelFour?1350:3100))*h);
         }
       }
