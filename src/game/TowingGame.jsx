@@ -40,6 +40,7 @@ const RECOVERY_POINTS=[
 ];
 // Fictional attachment and redirect points; simplified recovery physics, not field rigging advice.
 const recoveryAnchor=(target,point)=>target.pos.clone().add(V(0,.65,0)).add(V(point.x,point.y,point.z).applyEuler(new THREE.Euler(0,-target.yaw,target.roll,'YXZ')));
+const selectedRecoveryPoint=(s,line)=>line.customPoint||RECOVERY_POINTS[line.point];
 const lineRoute=(head,eye,redirect,second=null)=>[head,...(redirect?[redirect]:[]),...(second?[second]:[]),eye];
 const linePathLength=(head,eye,redirect,second=null)=>{const points=lineRoute(head,eye,redirect,second);return points.slice(1).reduce((sum,p,i)=>sum+p.distanceTo(points[i]),0);};
 // Three.js cannot grow an existing two-vertex BufferGeometry via setFromPoints.
@@ -245,7 +246,7 @@ export default function TowingGame(){
   pickup.rotation.y=.18;
   // Pickup starts low in the soft ditch with a little yaw.
   const cableMat=new THREE.LineBasicMaterial({color:0xf3bd43});const cableGeo=new THREE.BufferGeometry().setFromPoints([V(),V(),V()]);cableGeo.setDrawRange(0,2);const cable=new THREE.Line(cableGeo,cableMat);scene.add(cable);cable.visible=false;
-  const s={truck,pickup,zone,anchorPlacement:null,doubleAnchorSetup:false,levelFour,pos:V(0,levelFour?terrainHeight(0,ravineStartZ):0,ravineStartZ),vel:V(),yaw:0,steer:0,throttle:0,brake:0,hook:false,winch:false,winchOut:false,parkingBrake:false,boomDeployed:false,boomAngle:.36,boomSwing:0,boomExtension:0,boomControl:0,boomExtendControl:0,boomSwingControl:0,liftDeployed:false,liftHeight:0,liftExtension:0,liftControl:0,liftExtendControl:0,liftHydraulicX:0,liftHydraulicY:0,gridWidth:0,armsClosed:false,riggersDeployed:false,cableLength:14,tension:0,pickPos:V(firstJob.x,levelFour?terrainHeight(firstJob.x,firstJob.z):0,firstJob.z),pickVel:V(),pickYaw:-.18,pickYawVel:0,cameraYaw:0,cameraPitch:.24,presetYaw:0,presetPitch:0,zoom:13,cameraMode:levelFour?'ravine':cameraMode,orbitFocus:'truck',drag:null,pointers:new Map(),lastHud:0,jobIndex:careerRef.current.job,jobDone:false,dropoffArrived:false,dropoffComplete:false,autoUnload:false,autoLoad:false,heavyRecovery:firstJob.kind==='heavy',loaded:false,strapsOn:false,bedTilt:false,pickRoll:firstJob.roll??0,pickRollVel:0,secondary:{mesh:secondaryPickup,active:!!firstJob.second,pos:V(firstJob.second?.x??-22,levelFour?terrainHeight(firstJob.second?.x??-22,firstJob.second?.z??-106):0,firstJob.second?.z??-106),vel:V(),yaw:firstJob.second?.yaw??-.1,yawVel:0,roll:firstJob.second?.roll??0,rollVel:0},recoveryCables,riggingAnchors,hookPoint:0,hookRedirect:0,winchSpeed,recoveryLines:[{connected:false,point:0,redirect:0,target:0,spool:20,motor:0,tension:0},{connected:false,point:1,redirect:0,target:0,spool:20,motor:0,tension:0}],type,tools};
+  const s={truck,pickup,zone,anchorPlacement:null,customHookPlacement:null,doubleAnchorSetup:false,levelFour,pos:V(0,levelFour?terrainHeight(0,ravineStartZ):0,ravineStartZ),vel:V(),yaw:0,steer:0,throttle:0,brake:0,hook:false,winch:false,winchOut:false,parkingBrake:false,boomDeployed:false,boomAngle:.36,boomSwing:0,boomExtension:0,boomControl:0,boomExtendControl:0,boomSwingControl:0,liftDeployed:false,liftHeight:0,liftExtension:0,liftControl:0,liftExtendControl:0,liftHydraulicX:0,liftHydraulicY:0,gridWidth:0,armsClosed:false,riggersDeployed:false,cableLength:14,tension:0,pickPos:V(firstJob.x,levelFour?terrainHeight(firstJob.x,firstJob.z):0,firstJob.z),pickVel:V(),pickYaw:-.18,pickYawVel:0,cameraYaw:0,cameraPitch:.24,presetYaw:0,presetPitch:0,zoom:13,cameraMode:levelFour?'ravine':cameraMode,orbitFocus:'truck',drag:null,pointers:new Map(),lastHud:0,jobIndex:careerRef.current.job,jobDone:false,dropoffArrived:false,dropoffComplete:false,autoUnload:false,autoLoad:false,heavyRecovery:firstJob.kind==='heavy',loaded:false,strapsOn:false,bedTilt:false,pickRoll:firstJob.roll??0,pickRollVel:0,secondary:{mesh:secondaryPickup,active:!!firstJob.second,pos:V(firstJob.second?.x??-22,levelFour?terrainHeight(firstJob.second?.x??-22,firstJob.second?.z??-106):0,firstJob.second?.z??-106),vel:V(),yaw:firstJob.second?.yaw??-.1,yawVel:0,roll:firstJob.second?.roll??0,rollVel:0},recoveryCables,riggingAnchors,hookPoint:0,hookRedirect:0,winchSpeed,recoveryLines:[{connected:false,point:0,redirect:0,target:0,spool:20,motor:0,tension:0},{connected:false,point:1,redirect:0,target:0,spool:20,motor:0,tension:0}],type,tools};
   sim.current=s;
   if(levelFour)setCameraMode('ravine');
   const resize=()=>{const w=host.clientWidth,h=host.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);};const ro=new ResizeObserver(resize);ro.observe(host);resize();
@@ -381,7 +382,7 @@ export default function TowingGame(){
       for(let i=0;i<2;i++){
         const line=s.recoveryLines[i],rope=s.recoveryCables[i],target=targets[line.target];
         if(!line.connected||!s.boomDeployed||(line.target===1&&!s.secondary.active)){rope.visible=false;line.tension=0;continue;}
-        const point=RECOVERY_POINTS[line.point],anchor=recoveryAnchor(target,point);
+        const point=selectedRecoveryPoint(s,line),anchor=recoveryAnchor(target,point);
         const head=equip.boomTip.getWorldPosition(V()).add(V(i===0?-.25:.25,0,0));
         const guide=s.riggingAnchors[line.redirect].pos;
         const second=line.secondRedirect?s.riggingAnchors[line.secondRedirect].pos:null;
@@ -560,11 +561,11 @@ export default function TowingGame(){
   const raycaster=new THREE.Raycaster(),placementPlane=new THREE.Plane(V(0,1,0),0);
   const onPointerDown=e=>{
     renderer.domElement.setPointerCapture(e.pointerId);
-    if(s.anchorPlacement){s.anchorTap={id:e.pointerId,x:e.clientX,y:e.clientY};return;}
+    if(s.anchorPlacement||s.customHookPlacement!==null){s.anchorTap={id:e.pointerId,x:e.clientX,y:e.clientY};return;}
     s.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(s.pointers.size===1)s.drag={x:e.clientX,y:e.clientY,yaw:s.cameraYaw,pitch:s.cameraPitch,presetYaw:s.presetYaw,presetPitch:s.presetPitch};
   };
   const onPointerMove=e=>{
-    if(s.anchorPlacement||!s.pointers.has(e.pointerId))return;
+    if(s.anchorPlacement||s.customHookPlacement!==null||!s.pointers.has(e.pointerId))return;
     s.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(s.pointers.size===1&&s.drag){
       const dx=e.clientX-s.drag.x,dy=e.clientY-s.drag.y;
@@ -584,6 +585,23 @@ export default function TowingGame(){
     }
   };
   const onPointerUp=e=>{
+    if(s.customHookPlacement!==null){
+      const tap=s.anchorTap;s.anchorTap=null;
+      if(e.type==='pointercancel'||!tap||tap.id!==e.pointerId||Math.hypot(e.clientX-tap.x,e.clientY-tap.y)>18)return;
+      const rect=renderer.domElement.getBoundingClientRect();
+      raycaster.setFromCamera(new THREE.Vector2((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1),camera);
+      const index=s.customHookPlacement,line=s.recoveryLines[index];
+      const vehicle=line.target===1?s.secondary.mesh:s.pickup;
+      const hit=raycaster.intersectObject(vehicle,true)[0];
+      if(!hit){setNotice('Tap the vehicle body, not the ground.');return;}
+      const local=vehicle.worldToLocal(hit.point.clone());
+      const x=clamp(local.x,-.96,.96),z=clamp(local.z,-1.85,1.85);
+      if(Math.abs(x)<.65&&Math.abs(z)<1.35){setNotice('Choose a frame edge or bumper, not the center body panel.');return;}
+      line.customPoint={id:'custom',label:'CUSTOM HOOK',x,y:.73,z};
+      s.customHookPlacement=null;setPlacingAnchor(false);setRecoveryOpen(true);
+      setNotice('Custom hook selected. Connect the line to use this point.');
+      return;
+    }
     if(s.anchorPlacement){
       const tap=s.anchorTap;s.anchorTap=null;
       if(e.type==='pointercancel'||!tap||tap.id!==e.pointerId||Math.hypot(e.clientX-tap.x,e.clientY-tap.y)>18)return;
@@ -752,9 +770,16 @@ export default function TowingGame(){
     setNotice('Tap open ground off the road, within 32 m of truck and vehicle.');
   };
   const cancelAnchorPlacement=()=>{if(sim.current){sim.current.anchorPlacement=null;sim.current.anchorTap=null;sim.current.doubleAnchorSetup=false;}setPlacingAnchor(false);setRecoveryOpen(true);setNotice('Anchor placement cancelled.');};
+  const startCustomHook=index=>{
+    const s=sim.current;if(!s||s.type.id!=='rotator')return;
+    if(s.recoveryLines[index].connected){setNotice('Disconnect the line before changing its hook.');return;}
+    s.customHookPlacement=index;s.anchorTap=null;setPlacingAnchor(true);setRecoveryOpen(false);
+    setNotice('CUSTOM HOOK: Tap a frame edge or bumper on the target vehicle.');
+  };
+  const cancelCustomHook=()=>{const s=sim.current;if(s){s.customHookPlacement=null;s.anchorTap=null;}setPlacingAnchor(false);setRecoveryOpen(true);setNotice('Custom hook cancelled.');};
   const changeRecoveryPoint=index=>{const s=sim.current;if(!s||s.type.id!=='rotator')return;const l=s.recoveryLines[index];if(l.connected){setNotice('Disconnect line before changing its attachment.');return;}l.point=(l.point+1)%RECOVERY_POINTS.length;setNotice('Line '+(index===0?'A':'B')+': '+RECOVERY_POINTS[l.point].label);};
  const changeRecoveryTarget=index=>{const s=sim.current;if(!s||!s.secondary.active)return;const l=s.recoveryLines[index];if(l.connected){setNotice('Disconnect line before changing target.');return;}l.target=(l.target+1)%2;setNotice('Line '+(index===0?'A':'B')+' target: vehicle '+(l.target+1));};
- const toggleRecoveryLine=index=>{const s=sim.current;if(!s||s.type.id!=='rotator')return;const l=s.recoveryLines[index];if(l.connected){l.connected=false;l.motor=0;l.tension=0;setNotice('Line '+(index===0?'A':'B')+' disconnected.');return;}if(!s.parkingBrake||!s.riggersDeployed||!s.boomDeployed){setNotice('Deploy BOOM and RIGGERS and apply PARK BRAKE first.');return;}const target=l.target===1?s.secondary:{pos:s.pickPos,yaw:s.pickYaw,roll:s.pickRoll};const a=recoveryAnchor(target,RECOVERY_POINTS[l.point]),b=s.truck.userData.boomTip.getWorldPosition(V()),guide=s.riggingAnchors[l.redirect].pos;if(l.redirect&&!guide){setNotice('Place the selected anchor before connecting.');return;}const second=l.secondRedirect?s.riggingAnchors[l.secondRedirect].pos:null;if(l.secondRedirect&&!second){setNotice('Place both redirect anchors before connecting.');return;}const distance=linePathLength(b,a,guide,second);if(distance>90){setNotice('Recovery line out of reach: reposition truck.');return;}l.connected=true;l.motor=0;l.spool=distance;setNotice('Line '+(index===0?'A':'B')+' attached to '+RECOVERY_POINTS[l.point].label+' via '+s.riggingAnchors[l.redirect].label+'.');};
+ const toggleRecoveryLine=index=>{const s=sim.current;if(!s||s.type.id!=='rotator')return;const l=s.recoveryLines[index];if(l.connected){l.connected=false;l.motor=0;l.tension=0;setNotice('Line '+(index===0?'A':'B')+' disconnected.');return;}if(!s.parkingBrake||!s.riggersDeployed||!s.boomDeployed){setNotice('Deploy BOOM and RIGGERS and apply PARK BRAKE first.');return;}const target=l.target===1?s.secondary:{pos:s.pickPos,yaw:s.pickYaw,roll:s.pickRoll};const a=recoveryAnchor(target,selectedRecoveryPoint(s,l)),b=s.truck.userData.boomTip.getWorldPosition(V()),guide=s.riggingAnchors[l.redirect].pos;if(l.redirect&&!guide){setNotice('Place the selected anchor before connecting.');return;}const second=l.secondRedirect?s.riggingAnchors[l.secondRedirect].pos:null;if(l.secondRedirect&&!second){setNotice('Place both redirect anchors before connecting.');return;}const distance=linePathLength(b,a,guide,second);if(distance>90){setNotice('Recovery line out of reach: reposition truck.');return;}l.connected=true;l.motor=0;l.spool=distance;setNotice('Line '+(index===0?'A':'B')+' attached to '+selectedRecoveryPoint(s,l).label+' via '+s.riggingAnchors[l.redirect].label+'.');};
  const setRecoveryMotor=(index,value)=>{const s=sim.current;if(!s||s.type.id!=='rotator')return;const l=s.recoveryLines[index];if(value!==0&&(!l.connected||!s.parkingBrake||!s.riggersDeployed||!s.boomDeployed)){setNotice('Connect the line, deploy BOOM and RIGGERS, then apply PARK BRAKE.');return;}const released=l.motor>0&&value===0;l.motor=value;if(released){const otherPull=s.recoveryLines.some((other,i)=>i!==index&&other.connected&&other.target===l.target&&other.motor>0);if(!otherPull){if(l.target===0){s.pickVel.set(0,0,0);s.pickRollVel=0;}else{s.secondary.vel.set(0,0,0);s.secondary.rollVel=0;}}}};
  const recoveryPress=(index,value)=>e=>{e.preventDefault();setRecoveryMotor(index,value);};
  const setBothRecoveryMotors=value=>{
@@ -781,7 +806,7 @@ export default function TowingGame(){
  const toggleRearCamera=()=>changeCamera(cameraMode==='reverse'?'orbit':'reverse');
  const currentJob=JOBS[career.job%JOBS.length];
  return <main className="game-shell"><div className={'scene'+(placingAnchor?' anchor-placement-scene':'')} ref={mount}/>
-   {placingAnchor&&<div className="anchor-placement-hint" role="status"><b>PLACE GROUND ANCHOR</b><span>Tap open ground off the road, 4–32 m from truck and 3–32 m from vehicle.</span><button type="button" onClick={cancelAnchorPlacement}>CANCEL PLACEMENT</button></div>}
+   {placingAnchor&&<div className="anchor-placement-hint" role="status"><b>{s?.customHookPlacement!==null?'SELECT CUSTOM HOOK':'PLACE GROUND ANCHOR'}</b><span>{s?.customHookPlacement!==null?'Tap a frame edge or bumper on the recovery vehicle.':'Tap open ground off the road, 4–32 m from truck and 3–32 m from vehicle.'}</span><button type="button" onClick={s?.customHookPlacement!==null?cancelCustomHook:cancelAnchorPlacement}>CANCEL PLACEMENT</button></div>}
   <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .49 • LAKE RECOVERY</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
   <div style={{position:'absolute',left:12,bottom:195,zIndex:9,width:mapOpen?146:106,height:mapOpen?166:36,pointerEvents:'auto',border:'2px solid #f3c851',borderRadius:12,background:'rgba(9,20,30,.88)',color:'#fff',boxShadow:'0 3px 14px #0008',padding:6,boxSizing:'border-box'}}>
    <button onClick={()=>setMapOpen(v=>!v)} style={{fontSize:11,fontWeight:800,width:'100%',background:'transparent',border:0,color:'white'}}>{mapOpen?'MAP −':'MAP +'}</button>
@@ -895,8 +920,9 @@ export default function TowingGame(){
    </div>}
    {s?.type.id==='rotator'&&<><button type="button" className="action" onClick={startDoubleAnchorSetup}>LINE A • TWO REDIRECT POINTS</button><div className="equipment-row">{[3,4].map((slot,i)=><button key={slot} type="button" className="action" disabled={!s.riggingAnchors[slot].pos} onClick={()=>removePlacedAnchor(slot)}>REMOVE ANCHOR {i===0?'A':'B'}</button>)}</div></>}
    {s?.recoveryLines[activeRecoveryLine]&&<div className={'recovery-line-compact '+(activeRecoveryLine===0?'line-a-controls':'line-b-controls')}>
-    <div className="line-summary">BOOM → {s.riggingAnchors[s.recoveryLines[activeRecoveryLine].redirect].label}{s.recoveryLines[activeRecoveryLine].secondRedirect?' → '+s.riggingAnchors[s.recoveryLines[activeRecoveryLine].secondRedirect].label:''} → {RECOVERY_POINTS[s.recoveryLines[activeRecoveryLine].point].label}</div>
-    {!s.recoveryLines[activeRecoveryLine].connected&&<div className="equipment-row"><select className="action" aria-label="Choose vehicle attachment point" value={s.recoveryLines[activeRecoveryLine].point} onChange={e=>{const line=s.recoveryLines[activeRecoveryLine];if(!line.connected){line.point=Number(e.target.value);setNotice("Hook position: "+RECOVERY_POINTS[line.point].label);}}}>{RECOVERY_POINTS.map((p,i)=><option key={p.id} value={i}>{p.label}</option>)}</select><button className="action" onClick={()=>changeRecoveryRedirect(activeRecoveryLine)}>{s.riggingAnchors[s.recoveryLines[activeRecoveryLine].redirect].label}</button></div>}
+    <div className="line-summary">BOOM → {s.riggingAnchors[s.recoveryLines[activeRecoveryLine].redirect].label}{s.recoveryLines[activeRecoveryLine].secondRedirect?' → '+s.riggingAnchors[s.recoveryLines[activeRecoveryLine].secondRedirect].label:''} → {selectedRecoveryPoint(s,s.recoveryLines[activeRecoveryLine]).label}</div>
+    {!s.recoveryLines[activeRecoveryLine].connected&&<div className="equipment-row"><select className="action" aria-label="Choose vehicle attachment point" value={s.recoveryLines[activeRecoveryLine].point} onChange={e=>{const line=s.recoveryLines[activeRecoveryLine];if(!line.connected){line.point=Number(e.target.value);line.customPoint=null;setNotice("Hook position: "+RECOVERY_POINTS[line.point].label);}}}>{RECOVERY_POINTS.map((p,i)=><option key={p.id} value={i}>{p.label}</option>)}</select><button className="action" onClick={()=>changeRecoveryRedirect(activeRecoveryLine)}>{s.riggingAnchors[s.recoveryLines[activeRecoveryLine].redirect].label}</button></div>}
+    {!s.recoveryLines[activeRecoveryLine].connected&&<button className="action" onClick={()=>startCustomHook(activeRecoveryLine)}>CUSTOM HOOK • TAP VEHICLE</button>}
     {!s.recoveryLines[activeRecoveryLine].connected&&<button className="action" onClick={()=>startAnchorPlacement(activeRecoveryLine)}>PLACE / MOVE ANCHOR</button>}
      {s.recoveryLines[activeRecoveryLine].connected&&<div className="line-summary">CONNECTED TO VEHICLE • {RECOVERY_POINTS[s.recoveryLines[activeRecoveryLine].point].label}</div>}
     {s.secondary.active&&<button className="action" onClick={()=>changeRecoveryTarget(activeRecoveryLine)}>TARGET VEHICLE {s.recoveryLines[activeRecoveryLine].target+1}</button>}
