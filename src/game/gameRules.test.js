@@ -115,3 +115,12 @@ test('level 4 downslope acceleration pushes stranded truck toward the bottom',()
   for(const z of [-130,-100,-75,-63,-45,0])
    assert.ok(Number.isFinite(levelFourHeight(x,z)),'terrain must have no holes');
 });
+
+test('deep ravine recovery slope and road approach remain physically distinct',()=>{
+ const road=levelFourHeight(-4,-76),lip=levelFourHeight(-8,-76),wall=levelFourHeight(-12,-76),floor=levelFourHeight(-22,-76);
+ assert.ok(road-lip>0.3,'road shoulder must break into a drop');
+ assert.ok(lip-wall>5,'near wall must have a steep fall');
+ assert.ok(road-floor>17,'wreck rests at least 17 metres below the road');
+ const gravity=levelFourDownhillAcceleration(-10,-76,.36);
+ assert.ok(gravity.x<-.5,'gravity must resist uphill winching');
+});

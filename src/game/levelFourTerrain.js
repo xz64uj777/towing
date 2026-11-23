@@ -1,4 +1,4 @@
-// Level 4-only ravine. Identical height function drives the scene mesh,
+// Shared steep ravine heightfield for advanced heavy-recovery dispatches. Identical height function drives the scene mesh,
 // winch targets, truck suspension, placed anchors and steep-slope forces.
 // Eighteen metres (about 59 feet) deep: an eroded steep-sided gorge, not a ditch.
 const smooth=(a,b,v)=>{const t=Math.max(0,Math.min(1,(v-a)/(b-a)));return t*t*(3-2*t);};

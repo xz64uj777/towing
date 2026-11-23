@@ -3,7 +3,7 @@ import {levelFourHeight,levelFourSlope} from './levelFourTerrain.js';
 // Self-contained Level 4 scenery. All visible slopes come from the heightfield
 // used by recovery and driving physics; no false, flat-bottomed ravine boxes.
 export function createLevelFourScene(THREE,scene){
- const geo=new THREE.PlaneGeometry(220,220,202,202);
+ const geo=new THREE.PlaneGeometry(220,220,280,280);
  geo.rotateX(-Math.PI/2);
  const pos=geo.attributes.position;
  const colors=[];
@@ -98,6 +98,14 @@ export function createLevelFourScene(THREE,scene){
   debris.rotation.y=i*.57;
  }
 
+ // Large exposed rock outcrops on the steep wall provide strong scale and depth cues.
+ const cliffFaceMat=new THREE.MeshStandardMaterial({color:0x676665,roughness:1,flatShading:true});
+ for(let i=0;i<25;i++){
+  const z=-102+i*2.5,x=-10.8-(i%3)*1.1;
+  const y=levelFourHeight(x,z);
+  const face=create(new THREE.DodecahedronGeometry(1.9+(i%4)*.35,0),cliffFaceMat,x,y-.22,z, 'Steep ravine exposed cliff wall');
+  face.scale.set(.45,2.0,.85);face.rotation.y=i*.28;
+ }
  // Rock shelves track the actual surface of the steep-sided channel.
  const ledgeMat=new THREE.MeshStandardMaterial({color:0x555b5b,roughness:1,flatShading:true});
  for(let i=0;i<46;i++){

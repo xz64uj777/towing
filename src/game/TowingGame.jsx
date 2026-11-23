@@ -358,9 +358,9 @@ export default function TowingGame(){
     }
     if(levelFour&&!s.loaded){
       // Surface gravity makes uphill pulls resist the winches.
-      const g=levelFourDownhillAcceleration(s.pickPos.x,s.pickPos.z,.20);
+      const g=levelFourDownhillAcceleration(s.pickPos.x,s.pickPos.z,.36);
       s.pickVel.x+=g.x*h;s.pickVel.z+=g.z*h;
-      if(s.secondary.active){const g2=levelFourDownhillAcceleration(s.secondary.pos.x,s.secondary.pos.z,.32);
+      if(s.secondary.active){const g2=levelFourDownhillAcceleration(s.secondary.pos.x,s.secondary.pos.z,.36);
         s.secondary.vel.x+=g2.x*h;s.secondary.vel.z+=g2.z*h;}
     }
     // Recovery ropes pull on selectable frame eyes, generating translation and roll torque.
@@ -388,7 +388,7 @@ export default function TowingGame(){
           const cx=point.x*Math.cos(target.roll)-point.y*Math.sin(target.roll);
           const cy=point.x*Math.sin(target.roll)+point.y*Math.cos(target.roll);
           torques[line.target]+=(cx*direction.y-cy*direction.dot(axis))*pull/(target.mass*8200);
-          target.vel.addScaledVector(V(direction.x,0,direction.z),pull/(target.mass*(levelFour?1900:3100))*h);
+          target.vel.addScaledVector(V(direction.x,0,direction.z),pull/(target.mass*(levelFour?1350:3100))*h);
         }
       }
       if(!s.recoveryLines.some(l=>l.connected&&l.target===0&&l.motor>0)){s.pickVel.x=stopWinchCoast(s.pickVel.x,h);s.pickVel.z=stopWinchCoast(s.pickVel.z,h);s.pickRollVel=stopWinchCoast(s.pickRollVel,h);}
@@ -452,7 +452,8 @@ export default function TowingGame(){
     // Pickup's soft-ground drag and rolling resistance.
     const pside=s.pickVel.dot(V(Math.cos(s.pickYaw),0,Math.sin(s.pickYaw)));s.pickVel.addScaledVector(V(Math.cos(s.pickYaw),0,Math.sin(s.pickYaw)),-pside*Math.min(1,2.6*h));
     if(!s.loaded){
-      s.pickVel.multiplyScalar(Math.pow(levelFour ? .988 : .994,h*60));
+      // Rolling resistance on steep terrain; downhill gravity remains active.
+      s.pickVel.multiplyScalar(Math.pow(levelFour ? .982 : .994,h*60));
       s.pickPos.addScaledVector(s.pickVel,h);
       if(levelFour){
         for(const rock of terrainScene.obstacles){
@@ -497,8 +498,9 @@ export default function TowingGame(){
    // Driving and recovery camera presets remain locked until CAM or ANGLES explicitly changes them.
    if(s.cameraMode==='ravine'&&levelFour){
      const look=s.pos.clone().lerp(s.pickPos,.72);
-     camera.position.set(s.pos.x+11,s.pos.y+13,s.pos.z+13);
-     camera.lookAt(look.x,look.y+2,look.z);
+     // Elevated roadside vantage frames the road, steep near wall, and wreck below.
+     camera.position.set(s.pos.x+5.5,s.pos.y+11,s.pos.z+8);
+     camera.lookAt(look.x,look.y-2.5,look.z);
    }else if(s.cameraMode==='orbit'){
      const focus=s.orbitFocus==='hook'?s.pickPos.clone().add(V(0,1.2,0)):
        s.orbitFocus==='wide'?s.pos.clone().lerp(s.pickPos,.5).add(V(0,1.2,0)):
@@ -708,7 +710,7 @@ export default function TowingGame(){
  const currentJob=JOBS[career.job%JOBS.length];
  return <main className="game-shell"><div className={'scene'+(placingAnchor?' anchor-placement-scene':'')} ref={mount}/>
    {placingAnchor&&<div className="anchor-placement-hint" role="status"><b>PLACE GROUND ANCHOR</b><span>Tap open ground off the road, 4–32 m from truck and 3–32 m from vehicle.</span><button type="button" onClick={cancelAnchorPlacement}>CANCEL PLACEMENT</button></div>}
-  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .42 • CAMERA LOCK</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
+  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .43 • RAVINE PHYSICS</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
   <div style={{position:'absolute',left:12,bottom:195,zIndex:9,width:mapOpen?146:106,height:mapOpen?166:36,pointerEvents:'auto',border:'2px solid #f3c851',borderRadius:12,background:'rgba(9,20,30,.88)',color:'#fff',boxShadow:'0 3px 14px #0008',padding:6,boxSizing:'border-box'}}>
    <button onClick={()=>setMapOpen(v=>!v)} style={{fontSize:11,fontWeight:800,width:'100%',background:'transparent',border:0,color:'white'}}>{mapOpen?'MAP −':'MAP +'}</button>
    {mapOpen&&<svg viewBox="0 0 140 140" width="132" height="132" aria-label="Map of recovery vehicles and destination">
