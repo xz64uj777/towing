@@ -421,8 +421,12 @@ export default function TowingGame(){
        if(!pulling)s.cableLength=Math.max(s.cableLength,dist);
        const rel=s.pickVel.clone().sub(s.vel).dot(dir);
        s.tension=poweredWinchForce(pulling,Math.max(0,(dist-s.cableLength)*6200+rel*780));
-       if(s.tension>32000){s.hook=false;s.winch=false;s.tension=0;}
-       else if(pulling&&dist>s.cableLength){const force=Math.min(s.tension,32000);s.pickVel.addScaledVector(dir,-force/2350*h);if(!guide)s.vel.addScaledVector(dir,force/6200*h);}
+       if(s.tension>32000){
+         // A stalled winch retains the attached cable instead of silently snapping it.
+         s.tension=32000;s.winch=false;s.cableLength=Math.max(s.cableLength,dist-32000/6200);
+         if(!s.winchOverloadNotified){s.winchOverloadNotified=true;setNotice('WINCH OVERLOAD: Cable held, motor stopped. Use rotator lines A/B or improve the pull angle.');}
+       }else if(pulling&&dist>s.cableLength){const force=Math.min(s.tension,32000);s.pickVel.addScaledVector(dir,-force/2350*h);if(!guide)s.vel.addScaledVector(dir,force/6200*h);}
+       if(s.tension<28000)s.winchOverloadNotified=false;
        if(!pulling){s.pickVel.x=stopWinchCoast(s.pickVel.x,h);s.pickVel.z=stopWinchCoast(s.pickVel.z,h);}
      } else s.tension=0;
     if(s.loaded){if(s.type.id==='flatbed'){s.pickPos.copy(s.pos).addScaledVector(forward,-.9);s.pickYaw=s.yaw;}else{
@@ -726,7 +730,7 @@ export default function TowingGame(){
  const currentJob=JOBS[career.job%JOBS.length];
  return <main className="game-shell"><div className={'scene'+(placingAnchor?' anchor-placement-scene':'')} ref={mount}/>
    {placingAnchor&&<div className="anchor-placement-hint" role="status"><b>PLACE GROUND ANCHOR</b><span>Tap open ground off the road, 4–32 m from truck and 3–32 m from vehicle.</span><button type="button" onClick={cancelAnchorPlacement}>CANCEL PLACEMENT</button></div>}
-  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .44 • CAMERA ORBIT</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
+  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .45 • RECOVERY FIX</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
   <div style={{position:'absolute',left:12,bottom:195,zIndex:9,width:mapOpen?146:106,height:mapOpen?166:36,pointerEvents:'auto',border:'2px solid #f3c851',borderRadius:12,background:'rgba(9,20,30,.88)',color:'#fff',boxShadow:'0 3px 14px #0008',padding:6,boxSizing:'border-box'}}>
    <button onClick={()=>setMapOpen(v=>!v)} style={{fontSize:11,fontWeight:800,width:'100%',background:'transparent',border:0,color:'white'}}>{mapOpen?'MAP −':'MAP +'}</button>
    {mapOpen&&<svg viewBox="0 0 140 140" width="132" height="132" aria-label="Map of recovery vehicles and destination">
