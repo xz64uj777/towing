@@ -3,19 +3,19 @@ import {levelFourHeight,levelFourSlope} from './levelFourTerrain.js';
 // Self-contained Level 4 scenery. All visible slopes come from the heightfield
 // used by recovery and driving physics; no false, flat-bottomed ravine boxes.
 export function createLevelFourScene(THREE,scene){
- const geo=new THREE.PlaneGeometry(220,220,156,156);
+ const geo=new THREE.PlaneGeometry(220,220,202,202);
  geo.rotateX(-Math.PI/2);
  const pos=geo.attributes.position;
  const colors=[];
- const forest=new THREE.Color('#476348'),soil=new THREE.Color('#73634b');
- const gravel=new THREE.Color('#8c8365'),rock=new THREE.Color('#77756b');
+ const forest=new THREE.Color('#466b4c'),soil=new THREE.Color('#765d49');
+ const gravel=new THREE.Color('#99876b'),rock=new THREE.Color('#6f7377');
  for(let i=0;i<pos.count;i++){
   const x=pos.getX(i),z=pos.getZ(i),y=levelFourHeight(x,z);
   pos.setY(i,y);
   const slope=levelFourSlope(x,z),grade=Math.hypot(slope.x,slope.z);
-  const c=forest.clone().lerp(soil,Math.min(1,grade*.9+.10));
-  if(y< -6)c.lerp(gravel,.48);
-  if(grade>.9)c.lerp(rock,Math.min(.75,(grade-.9)*.30));
+  const c=forest.clone().lerp(soil,Math.min(1,grade*.35+.08));
+  if(y< -12)c.lerp(gravel,.38);
+  if(grade>1.0)c.lerp(rock,Math.min(.97,(grade-.55)*.47));
   colors.push(c.r,c.g,c.b);
  }
  geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
@@ -34,12 +34,12 @@ export function createLevelFourScene(THREE,scene){
  };
  // Deep creek: it follows the cut valley and disappears naturally where its ends rise.
  const waterPoints=[];
- for(let z=-94;z<=-42;z+=2){const x=-24+Math.sin(z*.14)*.9;waterPoints.push({x,z,y:levelFourHeight(x,z)+.18});}
+ for(let z=-110;z<=-39;z+=2){const x=-24+Math.sin(z*.14)*.9;waterPoints.push({x,z,y:levelFourHeight(x,z)+.18});}
  const waterVert=[],waterIndex=[];
  waterPoints.forEach(({x,y,z})=>{waterVert.push(x-1.05,y,z,x+1.05,y,z);});
  for(let i=0;i<waterPoints.length-1;i++){const n=i*2;waterIndex.push(n,n+1,n+2,n+1,n+3,n+2);}
  const waterGeo=new THREE.BufferGeometry();waterGeo.setAttribute('position',new THREE.Float32BufferAttribute(waterVert,3));waterGeo.setIndex(waterIndex);waterGeo.computeVertexNormals();
- const creek=new THREE.Mesh(waterGeo,new THREE.MeshStandardMaterial({color:0x527e86,metalness:.32,roughness:.27,transparent:true,opacity:.87,side:THREE.DoubleSide}));
+ const creek=new THREE.Mesh(waterGeo,new THREE.MeshStandardMaterial({color:0x458f9f,metalness:.30,roughness:.22,transparent:true,opacity:.90,side:THREE.DoubleSide}));
  creek.name='Ravine creek';scene.add(creek);
  // Broken guardrail leaves a six-metre breach at the crash site.
  for(let z=-98;z<=-37;z+=3){
@@ -96,6 +96,21 @@ export function createLevelFourScene(THREE,scene){
   const x=-10-i*1.9,z=-83+(i*7%34),y=levelFourHeight(x,z);
   const debris=create(new THREE.BoxGeometry(.38,.10,1.4),gravelMat,x,y+.08,z,'Loose timber debris');
   debris.rotation.y=i*.57;
+ }
+
+ // Rock shelves track the actual surface of the steep-sided channel.
+ const ledgeMat=new THREE.MeshStandardMaterial({color:0x555b5b,roughness:1,flatShading:true});
+ for(let i=0;i<46;i++){
+   const z=-109+(i*17%73),x=-7.8-(i%5)*1.2;
+   const base=levelFourHeight(x,z),radius=.55+(i%5)*.24;
+   const ledge=create(new THREE.DodecahedronGeometry(radius,0),ledgeMat,x,base+.12,z,'Exposed layered cliff rock');
+   ledge.scale.set(1.4,.58,.8);ledge.rotation.y=(i%7)*.39;
+ }
+ // Loose deadwood collected on the riverbed and beneath the broken rail.
+ for(let i=0;i<16;i++){
+   const x=-22+(i%5)*1.3,z=-99+i*3.3,y=levelFourHeight(x,z);
+   const branch=create(new THREE.CylinderGeometry(.04,.12,2.4+(i%3),6),barkMat,x,y+.25,z,'Fallen creek branch');
+   branch.rotation.z=.9+(i%4)*.2;branch.rotation.x=(i%3)*.43;
  }
  return {ground,obstacles};
 }

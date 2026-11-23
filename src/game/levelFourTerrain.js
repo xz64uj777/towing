@@ -1,20 +1,23 @@
-// Level 4 only: the road stays at grade while the west shoulder drops
-// into a 9–10 m (roughly 30 ft) ravine and rises toward a mountainside.
-// All quantities are world metres. Keep deterministic for replay and restart.
+// Level 4-only ravine. Identical height function drives the scene mesh,
+// winch targets, truck suspension, placed anchors and steep-slope forces.
+// Eighteen metres (about 59 feet) deep: an eroded steep-sided gorge, not a ditch.
 const smooth=(a,b,v)=>{const t=Math.max(0,Math.min(1,(v-a)/(b-a)));return t*t*(3-2*t);};
-export const LEVEL_FOUR_DEPTH_METRES=9.4;
+export const LEVEL_FOUR_DEPTH_METRES=18;
+export const LEVEL_FOUR_STAGING={x:0,z:-49};
 export function levelFourHeight(x,z){
  const distance=-z,west=-x;
- const reach=smooth(37,53,distance)*(1-smooth(94,113,distance));
- const cross=smooth(6.2,15.5,west)*(1-smooth(27,39,west));
- const carved=-LEVEL_FOUR_DEPTH_METRES*cross*reach;
- const ridge=16.5*smooth(38,74,west)*(.78+.22*Math.sin(z*.035+1.6));
- const ripple=(Math.sin(x*.35+z*.17)+Math.sin(x*.19-z*.31)*.65)*.16;
- const texture=ripple*smooth(5.5,12,Math.abs(x))*(1-smooth(7,11,Math.max(0,Math.abs(x)-39)));
- return -.12+carved+ridge+texture;
+ // Channel is cut beside the west road shoulder. It has tapered head and tail
+ // and a narrow, shaded river bottom, with the far bank climbing to a ridge.
+ const reach=smooth(34,48,distance)*(1-smooth(99,122,distance));
+ const lip=6.2+.55*Math.sin((z+63)*.115);
+ const nearWall=.70*smooth(lip,lip+4.7,west)+.30*smooth(lip+4.7,lip+13.4,west);
+ const oppositeBank=smooth(29,45,west)*LEVEL_FOUR_DEPTH_METRES*reach;
+ const mountain=23*smooth(42,78,west)*(.82+.18*Math.sin(z*.035+1.3));
+ const erosion=(Math.sin(x*.27+z*.13)+Math.sin(x*.55-z*.23)*.5)*.16*smooth(6.3,15,west);
+ return -.12-LEVEL_FOUR_DEPTH_METRES*nearWall*reach+oppositeBank+mountain+erosion;
 }
 export function levelFourSlope(x,z){
- const h=.5;
+ const h=.35;
  return {x:(levelFourHeight(x+h,z)-levelFourHeight(x-h,z))/(2*h),
          z:(levelFourHeight(x,z+h)-levelFourHeight(x,z-h))/(2*h)};
 }

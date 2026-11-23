@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {canCompleteJob,minimapX,minimapY,wheelLiftCaptureReady,winchLoadBand,poweredWinchForce,stopWinchCoast,recoveryCableTension,canPowerBothRecoveryLines,cameraPresetPose} from './gameRules.js';
-import {LEVEL_FOUR_DEPTH_METRES,levelFourHeight,levelFourSlope,levelFourDownhillAcceleration} from './levelFourTerrain.js';
+import {LEVEL_FOUR_DEPTH_METRES,LEVEL_FOUR_STAGING,levelFourHeight,levelFourSlope,levelFourDownhillAcceleration} from './levelFourTerrain.js';
 
 test('no job finishes before reaching its destination',()=>{
  for(const kind of ['tow','flatbed','recovery','heavy'])
@@ -94,18 +94,21 @@ test('hook camera focuses vehicle and wide camera frames recovery center; zoom i
  }
 });
 
-test('level 4 car is in a real nine-metre-deep ravine, with a level road',()=>{
- const road=levelFourHeight(0,-63),bottom=levelFourHeight(-18,-63);
- assert.ok(Math.abs(road+.12)<.01,'road must remain level');
- assert.ok(road-bottom>8.5,'ravine must be physically deep, not shallow banks');
- assert.ok(road-bottom<11,'drop must be a believable 30-foot ravine');
- assert.equal(LEVEL_FOUR_DEPTH_METRES,9.4);
- assert.ok(levelFourHeight(-55,-63)>road+2,'mountainside must rise above the road');
- assert.ok(levelFourHeight(-18,-128)>bottom+7,'ravine tapers outside the accident area');
+test('level 4 has a steep, visibly deep canyon cut directly beside road',()=>{
+ const road=levelFourHeight(0,-63),bottom=levelFourHeight(-22,-63);
+ assert.ok(Math.abs(road+.12)<.01,'road must stay flat at grade');
+ assert.ok(road-bottom>17,'channel must drop over 17 metres under roadside');
+ assert.ok(road-bottom<19,'channel is approximately 60 feet deep');
+ assert.equal(LEVEL_FOUR_DEPTH_METRES,18);
+ assert.ok(road-levelFourHeight(-11,-63)>7,'near road edge should descend sharply');
+ assert.ok(Math.abs(levelFourHeight(-22,-63)-levelFourHeight(-27,-63))<2,'bottom is a narrow channel');
+ assert.ok(levelFourHeight(-55,-63)>road+3,'far canyon wall must rise above road');
+ assert.ok(levelFourHeight(-22,-128)>bottom+15,'ravine must taper away outside accident area');
+ assert.equal(LEVEL_FOUR_STAGING.z,-49,'truck should spawn near canyon');
 });
 test('level 4 downslope acceleration pushes stranded truck toward the bottom',()=>{
- const bank=levelFourSlope(-11,-63),gravity=levelFourDownhillAcceleration(-11,-63);
- assert.ok(bank.x>0.3,'bank must have a substantial grade');
+ const bank=levelFourSlope(-9,-63),gravity=levelFourDownhillAcceleration(-9,-63);
+ assert.ok(bank.x>1.0,'bank must have a substantial grade');
  assert.ok(gravity.x<-.1,'vehicle must accelerate downhill toward the west');
  assert.ok(Number.isFinite(gravity.z));
  for(const x of [-80,-35,-22,-18,-11,-5,0,8])
