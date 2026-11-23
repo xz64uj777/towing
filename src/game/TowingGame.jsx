@@ -703,6 +703,18 @@ export default function TowingGame(){
  const changeHookPoint=()=>{const s=sim.current;if(!s||!s.tools.includes('winch'))return;if(s.hook){setNotice('Disconnect hook before changing attachment eye.');return;}s.hookPoint=(s.hookPoint+1)%RECOVERY_POINTS.length;setNotice('Winch hook: '+RECOVERY_POINTS[s.hookPoint].label);};
  const changeHookRedirect=()=>{const s=sim.current;if(!s||!s.tools.includes('winch'))return;if(s.hook){setNotice('Disconnect hook before changing anchor.');return;}s.hookRedirect=nextAnchorSlot(s.riggingAnchors,s.hookRedirect);setNotice('Winch route: '+s.riggingAnchors[s.hookRedirect].label);};
  const changeRecoveryRedirect=index=>{const s=sim.current;if(!s||s.type.id!=='rotator')return;const l=s.recoveryLines[index];if(l.connected){setNotice('Disconnect line before changing redirect anchor.');return;}l.redirect=nextAnchorSlot(s.riggingAnchors,l.redirect);setNotice('Line '+(index===0?'A':'B')+' route: '+s.riggingAnchors[l.redirect].label);};
+ const removePlacedAnchor=slot=>{
+    const s=sim.current;if(!s||![3,4].includes(slot))return;
+    const anchor=s.riggingAnchors[slot];if(!anchor?.pos){setNotice('That ground anchor is not placed.');return;}
+    if(s.recoveryLines.some(line=>line.connected&&line.redirect===slot)||(s.hook&&s.hookRedirect===slot)){
+      setNotice('Disconnect the cable using this anchor before removing it.');return;
+    }
+    anchor.pos=null;if(anchor.marker)anchor.marker.visible=false;
+    for(const line of s.recoveryLines)if(line.redirect===slot)line.redirect=0;
+    if(s.hookRedirect===slot)s.hookRedirect=0;
+    if(s.anchorPlacement?.slot===slot){s.anchorPlacement=null;s.anchorTap=null;s.doubleAnchorSetup=false;setPlacingAnchor(false);setRecoveryOpen(true);}
+    setNotice('ANCHOR '+(slot===3?'A':'B')+' REMOVED. Cable routing reset to DIRECT LINE.');
+  };
  const startDoubleAnchorSetup=()=>{
     const s=sim.current;if(!s||s.type.id!=='rotator')return;
     if(!s.parkingBrake||s.vel.length()>.25){setNotice('Stop and apply PARK BRAKE before double anchor placement.');return;}
@@ -751,7 +763,7 @@ export default function TowingGame(){
  const currentJob=JOBS[career.job%JOBS.length];
  return <main className="game-shell"><div className={'scene'+(placingAnchor?' anchor-placement-scene':'')} ref={mount}/>
    {placingAnchor&&<div className="anchor-placement-hint" role="status"><b>PLACE GROUND ANCHOR</b><span>Tap open ground off the road, 4–32 m from truck and 3–32 m from vehicle.</span><button type="button" onClick={cancelAnchorPlacement}>CANCEL PLACEMENT</button></div>}
-  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .46 • DOUBLE ANCHOR</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
+  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .47 • REMOVE ANCHORS</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
   <div style={{position:'absolute',left:12,bottom:195,zIndex:9,width:mapOpen?146:106,height:mapOpen?166:36,pointerEvents:'auto',border:'2px solid #f3c851',borderRadius:12,background:'rgba(9,20,30,.88)',color:'#fff',boxShadow:'0 3px 14px #0008',padding:6,boxSizing:'border-box'}}>
    <button onClick={()=>setMapOpen(v=>!v)} style={{fontSize:11,fontWeight:800,width:'100%',background:'transparent',border:0,color:'white'}}>{mapOpen?'MAP −':'MAP +'}</button>
    {mapOpen&&<svg viewBox="0 0 140 140" width="132" height="132" aria-label="Map of recovery vehicles and destination">
@@ -862,7 +874,7 @@ export default function TowingGame(){
      <div className="line-summary dual-line-status"><span className="line-a-label">A: {s.recoveryLines[0].connected?'CONNECTED':'NOT CONNECTED'}</span><span className="line-b-label">B: {s.recoveryLines[1].connected?'CONNECTED':'NOT CONNECTED'}</span></div>
      {s.recoveryLines.every(line=>line.connected)?<div className="equipment-row"><Hold label="WINCH BOTH" onDown={bothRecoveryPress(1)} onUp={bothRecoveryPress(0)}/><Hold label="PAY BOTH" onDown={bothRecoveryPress(-1)} onUp={bothRecoveryPress(0)}/></div>:<div className="line-summary">Connect A and B from their tabs first.</div>}
    </div>}
-   {s?.type.id==='rotator'&&<button type="button" className="action" onClick={startDoubleAnchorSetup}>DOUBLE ANCHOR • SET UP A + B</button>}
+   {s?.type.id==='rotator'&&<><button type="button" className="action" onClick={startDoubleAnchorSetup}>DOUBLE ANCHOR • SET UP A + B</button><div className="equipment-row">{[3,4].map((slot,i)=><button key={slot} type="button" className="action" disabled={!s.riggingAnchors[slot].pos} onClick={()=>removePlacedAnchor(slot)}>REMOVE ANCHOR {i===0?'A':'B'}</button>)}</div></>}
    {s?.recoveryLines[activeRecoveryLine]&&<div className={'recovery-line-compact '+(activeRecoveryLine===0?'line-a-controls':'line-b-controls')}>
     <div className="line-summary">BOOM → {s.riggingAnchors[s.recoveryLines[activeRecoveryLine].redirect].label} → {RECOVERY_POINTS[s.recoveryLines[activeRecoveryLine].point].label}</div>
     {!s.recoveryLines[activeRecoveryLine].connected&&<div className="equipment-row"><button className="action" onClick={()=>changeRecoveryPoint(activeRecoveryLine)}>{RECOVERY_POINTS[s.recoveryLines[activeRecoveryLine].point].label}</button><button className="action" onClick={()=>changeRecoveryRedirect(activeRecoveryLine)}>{s.riggingAnchors[s.recoveryLines[activeRecoveryLine].redirect].label}</button></div>}
