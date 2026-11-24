@@ -8,9 +8,10 @@ import {sampleSurface,recoverySurfaceVelocity} from './terrainPhysics.js';
 import {createGameAudio} from './gameAudio.js';
 import {ROLLBACK_LENGTH,rollbackDeck,rollbackPose,rollbackStop,rollbackTravel,rollbackReady,rollbackCanConnect} from './rollbackPhysics.js';
 import {cableGeometry,cablePathSpeed,cableLoad,cableReelStep} from './cablePhysics.js';
-import {ditchHeight,physicsFrame,resolveObstacle,stabilityScale} from './simulationPhysics.js';
+import {ditchHeight,physicsFrame,resolveObstacle,recoverySupport,ROTATOR_LINE_RATING,uprightRollAcceleration} from './simulationPhysics.js';
 import { canCompleteJob, minimapX, minimapY, wheelLiftCaptureReady, winchLoadBand, stopWinchCoast, canPowerBothRecoveryLines, parkingBrakeForRiggers, cameraPresetPose, recoveryYawMoment, recoveryYawStep } from './gameRules.js';
 
+const UPRIGHT_ROLL=.28;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const V=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
 const FLEET=[
@@ -439,7 +440,9 @@ export default function TowingGame(){
     }
     if((levelFour||hasDitch)&&!s.loaded){
       // Surface gravity makes uphill pulls resist the winches.
-      const g=terrainGravity(s.pickPos.x,s.pickPos.z,.36);
+      // Level 4 is the starter rotator dispatch. Keep the ravine steep while
+      // leaving enough margin for an upright target to climb on starter gear.
+      const g=terrainGravity(s.pickPos.x,s.pickPos.z,levelIndex===3?.14:.36);
       s.pickVel.x+=g.x*h;s.pickVel.z+=g.z*h;
       if(s.secondary.active){const g2=terrainGravity(s.secondary.pos.x,s.secondary.pos.z,.36);
         s.secondary.vel.x+=g2.x*h;s.secondary.vel.z+=g2.z*h;}
@@ -450,9 +453,13 @@ export default function TowingGame(){
     if(s.type.id==='rotator'){
       const targets=[{pos:s.pickPos,vel:s.pickVel,yaw:s.pickYaw,roll:s.pickRoll,yawRate:s.pickYawVel,rollRate:s.pickRollVel,mass:JOBS[s.jobIndex%JOBS.length].weight||12},{pos:s.secondary.pos,vel:s.secondary.vel,yaw:s.secondary.yaw,roll:s.secondary.roll,yawRate:s.secondary.yawVel,rollRate:s.secondary.rollVel,mass:11}];
       const torques=[0,0],yawMoments=[0,0],forces=[V(),V()];
+      const activeLines=[];
+      const grade=terrainSlope(s.pos.x,s.pos.z),slope=Math.hypot(grade.x,grade.z);
+      const safe=s.parkingBrake&&s.riggersDeployed&&s.vel.length()<.25;
+      const reelSpeed=(2.1+careerRef.current.winch*.35)*settingsRef.current.winch*winchSpeedFactor(s.winchSpeed);
       for(let i=0;i<2;i++){
         const line=s.recoveryLines[i],rope=s.recoveryCables[i],target=targets[line.target];
-        if(!line.connected||!s.boomDeployed||(line.target===1&&!s.secondary.active)){rope.visible=false;line.tension=0;line.strain=0;line.stalled=false;line.stabilityLimited=false;line.previousDistance=null;continue;}
+        if(!line.connected||!s.boomDeployed||(line.target===1&&!s.secondary.active)){rope.visible=false;line.tension=0;line.strain=0;line.stalled=false;line.stabilityLimited=false;line.limit=ROTATOR_LINE_RATING;line.previousDistance=null;continue;}
         const point=selectedRecoveryPoint(s,line),anchor=recoveryAnchor(target,point);
         const head=recoveryHead(s,i);
         const guide=s.riggingAnchors[line.redirect].pos;
@@ -463,7 +470,6 @@ export default function TowingGame(){
         updateWinchLine(rope,route);
         const pathSpeed=cablePathSpeed(distance,line.previousDistance,h);
         line.previousDistance=distance;
-        const safe=s.parkingBrake&&s.riggersDeployed&&s.vel.length()<.25;
         const offset=anchor.clone().sub(target.pos).sub(V(0,.65,0));
         const lead=route[1].clone().sub(head).normalize();
         const returnPoint=line.doubled?route.at(-1):null;
@@ -471,13 +477,25 @@ export default function TowingGame(){
         const truckForce=lead.clone().add(returnLeg);
         const moment=head.clone().sub(s.pos).cross(lead);
         if(returnPoint)moment.add(returnPoint.clone().sub(s.pos).cross(returnLeg));
-        const grade=terrainSlope(s.pos.x,s.pos.z);
-        const share=Math.max(1,s.recoveryLines.filter(l=>l.connected).length);
-        const limit=42000*stabilityScale(42000*share*truckForce.dot(right),42000*share*moment.dot(forward),42000*share*moment.dot(right),Math.hypot(grade.x,grade.z));
-        const load=stepCable(distance,line.spool,pathSpeed,safe?line.motor:0,(2.1+careerRef.current.winch*.35)*settingsRef.current.winch*winchSpeedFactor(s.winchSpeed),h,limit);
-        line.spool=load.spool;
-        const pull=load.tension;
-        line.tension=pull;line.strain=load.strain;line.stalled=line.motor>0&&load.stalled;line.stabilityLimited=line.stalled&&limit<41999;
+        const response=[truckForce.dot(right),moment.dot(forward),moment.dot(right)];
+        const load=cableLoad(distance,line.spool,pathSpeed,ROTATOR_LINE_RATING);
+        activeLines.push({line,target,point,offset,direction,distance,pathSpeed,response,load,demand:load.tension});
+      }
+      const priorSupport=recoverySupport(activeLines,slope);
+      for(let i=0;i<activeLines.length;i++){
+        const entry=activeLines[i],{line,distance,pathSpeed}=entry;
+        const {tension,limit}=priorSupport[i];
+        line.spool=cableReelStep(line.spool,safe?line.motor:0,reelSpeed,h,tension,Math.max(limit,1e-6));
+        entry.load=cableLoad(distance,line.spool,pathSpeed,ROTATOR_LINE_RATING);
+        entry.demand=entry.load.tension;
+      }
+      const supported=recoverySupport(activeLines,slope);
+      for(let i=0;i<activeLines.length;i++){
+        const {line,target,point,offset,direction,load,demand}=activeLines[i];
+        const {tension:pull,limit}=supported[i];
+        line.tension=pull;line.strain=load.strain;line.limit=limit;
+        line.stabilityLimited=line.motor>0&&limit<ROTATOR_LINE_RATING-1&&demand>=limit-1;
+        line.stalled=line.motor>0&&(line.stabilityLimited||load.stalled);
         if(pull>0){
           const axis=V(Math.cos(target.yaw),0,Math.sin(target.yaw));
           const cx=point.x*Math.cos(target.roll)-point.y*Math.sin(target.roll);
@@ -492,7 +510,7 @@ export default function TowingGame(){
       primaryYawMoment=yawMoments[0];
       primaryPowered=s.recoveryLines.some(l=>l.connected&&l.target===0&&l.motor>0);
       if(!primaryPowered){s.pickVel.x=stopWinchCoast(s.pickVel.x,h);s.pickVel.z=stopWinchCoast(s.pickVel.z,h);s.pickRollVel=stopWinchCoast(s.pickRollVel,h);}
-       s.pickRollVel=clamp((s.pickRollVel+torques[0]*h)*Math.exp(-1.7*h),-1.5,1.5);
+       s.pickRollVel=clamp((s.pickRollVel+(torques[0]+uprightRollAcceleration(s.pickRoll))*h)*Math.exp(-1.7*h),-1.5,1.5);
       s.pickRoll=clamp(s.pickRoll+s.pickRollVel*h,-3.06,3.06);
       if(Math.abs(s.pickRoll)>=3.06)s.pickRollVel=0;
       if(s.secondary.active){
@@ -500,7 +518,7 @@ export default function TowingGame(){
         s.secondary.yawVel=recoveryYawStep(s.secondary.yawVel,yawMoments[1],targets[1].mass,h,secondaryPowered);
         s.secondary.yaw+=s.secondary.yawVel*h;
         if(!secondaryPowered){s.secondary.vel.x=stopWinchCoast(s.secondary.vel.x,h);s.secondary.vel.z=stopWinchCoast(s.secondary.vel.z,h);s.secondary.rollVel=stopWinchCoast(s.secondary.rollVel,h);}
-        s.secondary.rollVel=clamp((s.secondary.rollVel+torques[1]*h)*Math.exp(-1.7*h),-1.5,1.5);
+        s.secondary.rollVel=clamp((s.secondary.rollVel+(torques[1]+uprightRollAcceleration(s.secondary.roll))*h)*Math.exp(-1.7*h),-1.5,1.5);
         s.secondary.roll=clamp(s.secondary.roll+s.secondary.rollVel*h,-3.06,3.06);
         if(Math.abs(s.secondary.roll)>=3.06)s.secondary.rollVel=0;
         const ground=recoverySurfaceVelocity(s.secondary.vel.x,s.secondary.vel.z,s.secondary.yaw,s.secondary.roll,h,surfaceAt(s.secondary.pos));
@@ -520,38 +538,33 @@ export default function TowingGame(){
     const dist=linePathLength(pa,pb,guide);
     const dir=pb.clone().sub(guide||pa).normalize();
     if(s.hook){
-       if(isRollback){
-       const ready=(s.boomDeployed||(isRollback&&s.bedTilt&&s.bedProgress>.995))&&(!s.heavyRecovery||s.riggersDeployed)&&s.parkingBrake;
-        const pulling=s.winch&&ready&&(!isRollback||rollbackLocal(s).z>rollbackStop(deck)+.015);
-       const pathSpeed=cablePathSpeed(dist,s.previousCableDistance,h);
-       s.previousCableDistance=dist;
-       if(!pulling)s.cableLength=Math.max(s.cableLength,dist);
-       const prior=cableLoad(dist,s.cableLength,pathSpeed,32000);
-       if(pulling)s.cableLength=cableReelStep(s.cableLength,1,(2.4+careerRef.current.winch*.8)*settingsRef.current.winch*winchSpeedFactor(s.winchSpeed),h,prior.tension,32000,isRollback?.55:3.2);
-       if(s.winchOut&&ready)s.cableLength=cableReelStep(s.cableLength,-1,3.2*settingsRef.current.winch*winchSpeedFactor(s.winchSpeed),h,prior.tension,32000,isRollback?.55:3.2);
-       const offset=pb.clone().sub(s.pickPos).sub(V(0,.65,0));
-       const load=cableLoad(dist,s.cableLength,pathSpeed,32000);
-       s.tension=pulling?load.tension:0;s.cableStrain=pulling?load.strain:0;s.cableStalled=pulling&&load.stalled;
-       if(pulling&&s.tension>0){const force=s.tension;s.pickVel.addScaledVector(dir,-force/2350*h);if(!guide&&!isRollback)s.vel.addScaledVector(dir,force/6200*h);
-         if(!s.loaded&&!isRollback){primaryYawMoment+=recoveryYawMoment(offset,dir.clone().negate(),force);primaryPowered=true;}
-       }
-       }else{
-       const ready=(s.boomDeployed||s.tools.includes('bed'))&&(!s.heavyRecovery||s.riggersDeployed)&&s.parkingBrake;
-       const motor=ready?(s.winchOut?-1:s.winch?1:0):0;
-       const pathSpeed=cablePathSpeed(dist,s.previousCableDistance,h);
-       s.previousCableDistance=dist;
-       const speed=(motor<0?3.2:2.4+careerRef.current.winch*.8)*settingsRef.current.winch*winchSpeedFactor(s.winchSpeed);
-       const load=stepCable(dist,s.cableLength,pathSpeed,motor,speed,h,32000,3.2);
-       s.cableLength=load.spool;s.tension=load.tension;s.cableStrain=load.strain;s.cableStalled=motor>0&&load.stalled;
-       if(s.tension>0&&!s.loaded){
-        const offset=pb.clone().sub(s.pickPos).sub(V(0,.65,0));
-        s.pickVel.addScaledVector(dir.clone().setY(0),-s.tension/2350*h);
-        s.vel.addScaledVector((guide||pb).clone().sub(pa).normalize().setY(0),s.tension/6200*h);
-        primaryYawMoment+=recoveryYawMoment(offset,dir.clone().negate(),s.tension);
-        primaryPowered=true;
-       }
-       }
-     } else {s.tension=0;s.cableStrain=0;s.cableStalled=false;s.previousCableDistance=null;}
+      const pathSpeed=cablePathSpeed(dist,s.previousCableDistance,h);
+      s.previousCableDistance=dist;
+      if(isRollback){
+        const ready=s.parkingBrake&&s.bedTilt&&s.bedProgress>.995;
+        const pulling=s.winch&&ready&&rollbackLocal(s).z>rollbackStop(deck)+.015;
+        if(!pulling)s.cableLength=Math.max(s.cableLength,dist);
+        const prior=cableLoad(dist,s.cableLength,pathSpeed,32000);
+        if(pulling)s.cableLength=cableReelStep(s.cableLength,1,(2.4+careerRef.current.winch*.8)*settingsRef.current.winch*winchSpeedFactor(s.winchSpeed),h,prior.tension,32000,.55);
+        if(s.winchOut&&ready)s.cableLength=cableReelStep(s.cableLength,-1,3.2*settingsRef.current.winch*winchSpeedFactor(s.winchSpeed),h,prior.tension,32000,.55);
+        const load=cableLoad(dist,s.cableLength,pathSpeed,32000);
+        s.tension=pulling?load.tension:0;s.cableStrain=pulling?load.strain:0;s.cableStalled=pulling&&load.stalled;
+        if(s.tension>0)s.pickVel.addScaledVector(dir,-s.tension/2350*h);
+      }else{
+        const ready=s.boomDeployed&&(!s.heavyRecovery||s.riggersDeployed)&&s.parkingBrake;
+        const motor=ready?(s.winchOut?-1:s.winch?1:0):0;
+        const speed=(motor<0?3.2:2.4+careerRef.current.winch*.8)*settingsRef.current.winch*winchSpeedFactor(s.winchSpeed);
+        const load=stepCable(dist,s.cableLength,pathSpeed,motor,speed,h,32000,3.2);
+        s.cableLength=load.spool;s.tension=load.tension;s.cableStrain=load.strain;s.cableStalled=motor>0&&load.stalled;
+        if(s.tension>0&&!s.loaded){
+          const offset=pb.clone().sub(s.pickPos).sub(V(0,.65,0));
+          s.pickVel.addScaledVector(dir.clone().setY(0),-s.tension/2350*h);
+          s.vel.addScaledVector((guide||pb).clone().sub(pa).normalize().setY(0),s.tension/6200*h);
+          primaryYawMoment+=recoveryYawMoment(offset,dir.clone().negate(),s.tension);
+          primaryPowered=true;
+        }
+      }
+    }else{s.tension=0;s.cableStrain=0;s.cableStalled=false;s.previousCableDistance=null;}
     if(!s.loaded&&!isRollback){
        s.pickYawVel=recoveryYawStep(s.pickYawVel,primaryYawMoment,JOBS[s.jobIndex%JOBS.length].weight||12,h,primaryPowered);
       s.pickYaw+=s.pickYawVel*h;
@@ -631,7 +644,7 @@ export default function TowingGame(){
       s.dropoffArrived=true;
       setNotice('AT DEPOT: Park, remove straps, lower the lift, then open L-arms to finish.');
     }
-    const heavyClear=job.kind==='heavy'&&Math.abs(s.pickRoll)<.28&&(!s.secondary.active||Math.abs(s.secondary.roll)<.28)&&s.pickPos.distanceTo(V(2,0,job.z))<7.5&&(!s.secondary.active||s.secondary.pos.distanceTo(V(2,0,job.z))<10);const reached=job.kind==='tow'?s.pos.distanceTo(V(0,0,23))<5:s.loaded?s.pos.distanceTo(V(0,0,23))<5:job.kind==='heavy'?heavyClear:s.pickPos.distanceTo(V(2,0,job.z))<4.2;
+    const heavyClear=job.kind==='heavy'&&Math.abs(s.pickRoll)<UPRIGHT_ROLL&&(!s.secondary.active||Math.abs(s.secondary.roll)<UPRIGHT_ROLL)&&s.pickPos.distanceTo(V(2,0,job.z))<7.5&&(!s.secondary.active||s.secondary.pos.distanceTo(V(2,0,job.z))<10);const reached=job.kind==='tow'?s.pos.distanceTo(V(0,0,23))<5:s.loaded?s.pos.distanceTo(V(0,0,23))<5:job.kind==='heavy'?heavyClear:s.pickPos.distanceTo(V(2,0,job.z))<4.2;
     if(!s.jobDone&&canCompleteJob(job.kind,{reached,loaded:s.loaded,strapped:s.strapsOn,hook:s.hook,recoveryConnected:s.recoveryLines.some(line=>line.connected),delivered:s.dropoffComplete})){
       s.jobDone=true;s.winch=false;s.winchOut=false;s.hook=false;
       for(const line of s.recoveryLines){line.connected=false;line.motor=0;line.tension=0;}
@@ -676,7 +689,7 @@ export default function TowingGame(){
      camera.position.copy(presetFocus).add(V(Math.sin(yaw)*cosPitch*radius,Math.sin(pitch)*radius,Math.cos(yaw)*cosPitch*radius));
      camera.lookAt(presetFocus);
    }
-   if(now-s.lastHud>120){const sp=s.vel.length()*3.6;setHud({speed:sp,gear:s.throttle<-.1?'R':'D',hook:s.hook,tension:s.tension/1000,winch:s.winch?'REELING':'IDLE',parking:s.parkingBrake,riggers:s.riggersDeployed,boom:s.boomDeployed,lift:s.liftDeployed,range:s.pos.distanceTo(s.pickPos),mapX:s.pos.x,mapZ:s.pos.z,mapYaw:s.yaw,roll:s.pickRoll,roll2:s.secondary.roll,secondX:s.secondary.pos.x,secondZ:s.secondary.pos.z,lineTensions:s.recoveryLines.map(l=>l.tension/1000),lineStrains:s.recoveryLines.map(l=>l.strain??0),lineStalls:s.recoveryLines.map(l=>l.stabilityLimited?'STABILITY LIMIT':l.stalled?'STALL':null),cableStrain:s.cableStrain??0,cableStalled:!!s.cableStalled,carX:s.pickPos.x,carZ:s.pickPos.z,carYaw:s.pickYaw,loaded:s.loaded,liftHeight:s.liftHeight,armsClosed:s.armsClosed,strapsOn:s.strapsOn,gridContact:tireGridContact(s),recoverySurface:surfaceAt(s.pickPos).name,secondarySurface:s.secondary.active?surfaceAt(s.secondary.pos).name:null,truckSurface:surfaceAt(s.pos).name});s.lastHud=now;}
+   if(now-s.lastHud>120){const sp=s.vel.length()*3.6;setHud({speed:sp,gear:s.throttle<-.1?'R':'D',hook:s.hook,tension:s.tension/1000,winch:s.winch?'REELING':'IDLE',parking:s.parkingBrake,riggers:s.riggersDeployed,boom:s.boomDeployed,lift:s.liftDeployed,range:s.pos.distanceTo(s.pickPos),mapX:s.pos.x,mapZ:s.pos.z,mapYaw:s.yaw,roll:s.pickRoll,roll2:s.secondary.roll,secondX:s.secondary.pos.x,secondZ:s.secondary.pos.z,lineTensions:s.recoveryLines.map(l=>l.tension/1000),lineLimits:s.recoveryLines.map(l=>(l.limit??ROTATOR_LINE_RATING)/1000),lineStrains:s.recoveryLines.map(l=>l.strain??0),lineStalls:s.recoveryLines.map(l=>l.stabilityLimited?'STABILITY LIMIT':l.stalled?'STALL':null),cableStrain:s.cableStrain??0,cableStalled:!!s.cableStalled,carX:s.pickPos.x,carZ:s.pickPos.z,carYaw:s.pickYaw,loaded:s.loaded,liftHeight:s.liftHeight,armsClosed:s.armsClosed,strapsOn:s.strapsOn,gridContact:tireGridContact(s),recoverySurface:surfaceAt(s.pickPos).name,secondarySurface:s.secondary.active?surfaceAt(s.secondary.pos).name:null,truckSurface:surfaceAt(s.pos).name});s.lastHud=now;}
    audioRef.current?.update(s,dt,surfaceAt(s.pos),settingsRef.current.soundVolume,settingsRef.current.soundMuted,document.hidden||!document.hasFocus());
    renderer.render(scene,camera);raf=requestAnimationFrame(update);
   };raf=requestAnimationFrame(update);
@@ -1007,7 +1020,7 @@ export default function TowingGame(){
   <section className="mission">
    <div className="eyebrow">DISPATCH #{career.job%JOBS.length+1} · {career.completed} COMPLETED</div>
    <b>{currentJob.name}</b>
-   <span>{career.job%JOBS.length===3?'Recover a rolled heavy truck from a steep 60-ft wooded ravine below a broken guardrail. Anchor on firm ground and use both lines against the uphill slope.':currentJob.kind==='tow'?'Capture both tires, raise and strap, drive to the depot, then park, unstrap, lower and release.':currentJob.kind==='flatbed'?'Disabled AWD crossover: line up ahead of it, park, deploy bed, hook and winch onto deck, then secure and deliver.':currentJob.kind==='heavy'?'Use LINE A and B to right the rollover and pull every vehicle into the green recovery zone.':'Pickup stuck in the ditch: park on the road, deploy boom, connect hook and winch the truck into the green recovery circle.'} Reward: {'$'}{currentJob.pay}</span>
+   <span>{career.job%JOBS.length===3?(Math.abs(hud.roll??Infinity)<UPRIGHT_ROLL?'Pull to recovery zone. Bring the upright truck into the green circle.':'Right the overturned truck. Set up on firm ground and use the recovery lines to bring it onto its wheels.'):currentJob.kind==='tow'?'Capture both tires, raise and strap, drive to the depot, then park, unstrap, lower and release.':currentJob.kind==='flatbed'?'Disabled AWD crossover: line up ahead of it, park, deploy bed, hook and winch onto deck, then secure and deliver.':currentJob.kind==='heavy'?'Use LINE A and B to right the rollover and pull every vehicle into the green recovery zone.':'Pickup stuck in the ditch: park on the road, deploy boom, connect hook and winch the truck into the green recovery circle.'} Reward: {'$'}{currentJob.pay}</span>
    <div className="stats"><span>CASH {'$'}{career.cash}</span><span>ENGINE {career.engine}/3 · WINCH {career.winch}/3</span></div>
    <div className="stats">
     {currentJob.kind==='heavy'?<span>RECOVERY LINES {s?.recoveryLines.filter(line=>line.connected).length??0}/2 CONNECTED</span>:<span>{hud.hook?'CABLE CONNECTED':'CABLE DISCONNECTED'}</span>}
@@ -1016,15 +1029,16 @@ export default function TowingGame(){
   </section>
   {s?.tools.includes('winch')&&<div className="tension-readout" role="group" aria-label="Winch load and capacity">
     {(s.type.id==='rotator'?(hud.lineTensions??[0,0]):[hud.tension]).map((tension,i)=>{
-     const limit=s.type.id==='rotator'?42:32,load=winchLoadBand(tension,limit);
+     const rated=s.type.id==='rotator'?ROTATOR_LINE_RATING/1000:32;
+     const limit=hud.lineLimits?.[i]??rated,load=winchLoadBand(tension,Math.max(limit,.01));
      const surface=(s.type.id==='rotator'&&s.recoveryLines[i].target===1?hud.secondarySurface:hud.recoverySurface)??'GROUND';
      const surfaceShort=({PAVEMENT:'PAVED',SUBMERGED:'WATER',GRAVEL:'GRVL'}[surface]??surface);
      return <div className="tension-item" key={i}>
-      <div className="tension-item-head"><span className={'tension-label '+(i===0?'line-a':'line-b')} title={surface} aria-label={(s.type.id==='rotator'?'Line '+(i===0?'A':'B'):'Winch')+', target surface: '+surface}>{(s.type.id==='rotator'?(i===0?'A':'B'):'WINCH')+' · '+surfaceShort}</span><b className={'tension-amount '+load.level}>{tension.toFixed(1)} / {limit} kN</b></div>
-      <div className="tension-track" role="meter" aria-label={(s.type.id==='rotator'?'Line '+(i===0?'A':'B'):'Winch')+' load'} aria-valuemin={0} aria-valuemax={limit} aria-valuenow={Math.min(limit,Math.max(0,tension))}><div className={'tension-fill '+load.level} style={{width:(load.fraction*100).toFixed(0)+'%'}}/></div>
+      <div className="tension-item-head"><span className={'tension-label '+(i===0?'line-a':'line-b')} title={surface} aria-label={(s.type.id==='rotator'?'Line '+(i===0?'A':'B'):'Winch')+', target surface: '+surface}>{(s.type.id==='rotator'?(i===0?'A':'B'):'WINCH')+' · '+surfaceShort}</span><b className={'tension-amount '+load.level}>{tension.toFixed(1)} / {limit.toFixed(limit===rated?0:1)} kN</b></div>
+      <div className="tension-track" role="meter" aria-label={(s.type.id==='rotator'?'Line '+(i===0?'A':'B'):'Winch')+' load'} aria-valuemin={0} aria-valuemax={Math.max(limit,.01)} aria-valuenow={Math.min(limit,Math.max(0,tension))}><div className={'tension-fill '+load.level} style={{width:(load.fraction*100).toFixed(0)+'%'}}/></div>
      </div>;
     })}
-    <small title="Simulated cable strain; yellow 60%, red 85% of rated line load">{s.type.id==='rotator'?[0,1].map(i=>{const l=s.recoveryLines[i];return (i===0?'A':'B')+' '+(l.doubled?'2:1':'1:1')+' '+(hud.lineStalls?.[i]??((hud.lineStrains?.[i]??0).toFixed(1)+'%'));}).join(' · '):(hud.cableStalled?'STALL · ':winchSpeed.toUpperCase()+' · ')+'STRAIN '+(hud.cableStrain??0).toFixed(1)+'%'}</small>
+    <small title="Meter shows the current load limit. The rotator winch rating is 42 kN per line.">{s.type.id==='rotator'?'42 kN rated · '+[0,1].map(i=>{const l=s.recoveryLines[i];return (i===0?'A':'B')+' '+(l.doubled?'2:1':'1:1')+' '+(hud.lineStalls?.[i]??((hud.lineStrains?.[i]??0).toFixed(1)+'%'));}).join(' · '):(hud.cableStalled?'STALL · ':winchSpeed.toUpperCase()+' · ')+'STRAIN '+(hud.cableStrain??0).toFixed(1)+'%'}</small>
    </div>}
   <div className="bottom-ui">{settings.driveMode==='joystick'?<div className="joystick" onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);joystickMove(e);}} onPointerMove={e=>{if(e.buttons)joystickMove(e);}} onPointerUp={joystickStop} onPointerCancel={joystickStop}><div className="stick-knob" style={{transform:`translateX(${steerVisual*23}px)`}}>●</div><span>STEER</span></div>:<div className="joystick steering-arrows"><Hold label="◀ LEFT" onDown={press('steer',-1)} onUp={press('steer',0)}/><Hold label="RIGHT ▶" onDown={press('steer',1)} onUp={press('steer',0)}/></div>}<div className={'equipment-stack'+(s?.tools.includes('boom')&&(hud.parking||hud.riggers)?' has-boom':'')+(s?.tools.includes('boom')?' single-line-stack':'')}>{s?.tools.includes('boom')&&(hud.parking||hud.riggers)&&<div className="boom-float"><div className="boom-control-cluster">
  <div className="boom-status">{(hud.parking||hud.riggers)?'BOOM READY':'PARK OR RIGGERS'} · UP/DOWN + {boomMode==='extend'?'IN/OUT':'SWING'}</div>

@@ -7,7 +7,8 @@
     "dev": "vite --host 0.0.0.0 --port 8080",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "node --test src/game/gameRules.test.js"
+    "test": "node --test src/game/gameRules.test.js",
+    "test:level-four": "node tests/level-four.browser.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.2.0",
@@ -16,5 +17,7 @@
     "three": "^0.187.0",
     "vite": "^8.2.0"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "playwright": "^1.62.1"
+  }
 }

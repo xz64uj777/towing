@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {ditchHeight,physicsFrame,resolveObstacle,stabilityScale} from './simulationPhysics.js';
+import {ditchHeight,physicsFrame,resolveObstacle,recoverySupport,uprightRollAcceleration} from './simulationPhysics.js';
 import {stepCable} from './cablePhysics.js';
 import {canCompleteJob,minimapX,minimapY,wheelLiftCaptureReady,winchLoadBand,poweredWinchForce,stopWinchCoast,recoveryCableTension,canPowerBothRecoveryLines,parkingBrakeForRiggers,cameraPresetPose} from './gameRules.js';
 import {LEVEL_FOUR_DEPTH_METRES,LEVEL_FOUR_STAGING,levelFourHeight,levelFourSlope,levelFourDownhillAcceleration} from './levelFourTerrain.js';
@@ -485,6 +485,7 @@ test('secured load follows deck during leveling',()=>{
  const a=rollbackDeck(1),b=rollbackDeck(0);
  const p=rollbackPose(a,rollbackStop(a),.92),q=rollbackPose(b,rollbackStop(b),.92);
  assert.ok(p.pitch>0);assert.equal(q.pitch,0);assert.equal(q.height,1.56);
+});
 
 test('a stopped drum holds an uphill load and powered payout reduces tension',()=>{
  const held=stepCable(21,20,0,0,2,1/120,32000);
@@ -507,12 +508,52 @@ test('physics catches up at 15 FPS and bounds recovery after a pause',()=>{
 });
 
 test('a low straight pull has greater stability than a high side pull',()=>{
- assert.equal(stabilityScale(0,0,0,0),1);
- assert.ok(stabilityScale(65000,65000,0,5)<1);
+ const lines=(response)=>[{demand:42000,response}];
+ assert.equal(recoverySupport(lines([0,0,1]),0)[0].limit,42000);
+ assert.ok(recoverySupport(lines([1,5,0]),0)[0].limit<42000);
 });
 
 test('the ditch has a recessed bed and a centered obstacle contact resolves outward',()=>{
  assert.ok(ditchHeight(10.5,-20)<ditchHeight(5,-20));
  const contact=resolveObstacle(0,0,0,0,2);
  assert.equal(Math.hypot(contact.x,contact.z),2);
+});
+
+test('a slack recovery line does not reduce the loaded line’s capacity',()=>{
+ const loaded={demand:42000,response:[1,4,0]};
+ const slack={demand:0,response:[1,4,0]};
+ const single=recoverySupport([loaded],0)[0];
+ const [first,second]=recoverySupport([loaded,slack],0);
+ assert.equal(first.tension,single.tension);
+ assert.equal(first.limit,single.limit);
+ assert.equal(second.tension,0);
+ assert.ok(second.limit<1e-6);
+});
+
+test('stability sums signed forces and moments before limiting the winches',()=>{
+ const a={demand:42000,response:[1,4,0]};
+ const aligned=recoverySupport([a,a],0);
+ const opposed=recoverySupport([a,{demand:42000,response:[-1,-4,0]}],0);
+ const slope=recoverySupport([a,a],1);
+ assert.ok(aligned[0].tension<42000);
+ assert.equal(aligned[0].tension,aligned[1].tension);
+ assert.equal(opposed[0].tension,42000);
+ assert.equal(opposed[1].limit,42000);
+ assert.ok(slope[0].limit<aligned[0].limit);
+});
+
+test('tire contact restores upright roll on either side without righting a rollover',()=>{
+ assert.ok(uprightRollAcceleration(.2)<0);
+ assert.equal(uprightRollAcceleration(-.2),-uprightRollAcceleration(.2));
+ assert.equal(Math.abs(uprightRollAcceleration(1.48)),0);
+});
+
+test('an opposing line can counter a reaction above the standalone support limit',()=>{
+ const [first,second]=recoverySupport([
+  {demand:10000,response:[5,0,0]},
+  {demand:42000,response:[-2,0,0]},
+ ],0);
+ assert.equal(first.tension,10000);
+ assert.equal(second.tension,42000);
+ assert.ok(Math.abs(first.limit-27600)<1e-8);
 });
