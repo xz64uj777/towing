@@ -694,3 +694,43 @@ test('damage costs are capped at payout and preserved in recovery checkpoints',(
  restoreRecoverySave(fresh,snap,checkpointVector);assert.equal(fresh.recoveryDamage,150);
  delete snap.equipment.recoveryDamage;restoreRecoverySave(fresh,snap,checkpointVector);assert.equal(fresh.recoveryDamage,0);
 });
+
+import {SUPPORT_PADS,supportWrench,outriggerLoads,padContact,suspensionStep} from './supportPhysics.js';
+import {cableRenderPoints} from './cablePhysics.js';
+test('four equal pads carry static weight and high side pulls transfer load',()=>{
+ const pads=SUPPORT_PADS.map(()=>({contact:true,traction:1}));
+ const zero={x:0,y:0,z:0,mx:0,mz:0},base=outriggerLoads(zero,pads);
+ assert.equal(base.count,4);assert.ok(base.loads.every(v=>v===23000*9.81/4));
+ const w=supportWrench([cp(0,5,0),cp(10,5,0)],42000,false,cp(0),0),loaded=outriggerLoads(w,pads);
+ assert.equal(w.mz,-210000);assert.ok(loaded.loads[1]>loaded.loads[0]);
+ assert.ok(Math.abs(loaded.loads.reduce((a,b)=>a+b,0)-23000*9.81)<1e-6);
+ assert.ok(loaded.ratio>0&&loaded.ratio<1);
+});
+test('opposing cable forces can still create moments and return leg counts',()=>{
+ const a=supportWrench([cp(0,5,0),cp(10,5,0)],10000,false,cp(0),0);
+ const b=supportWrench([cp(0,1,0),cp(-10,1,0)],10000,false,cp(0),0);
+ assert.equal(a.x+b.x,0);assert.notEqual(a.mz+b.mz,0);
+ const w=supportWrench([cp(0,1,0),cp(5,1,0),cp(0,1,0)],10000,true,cp(0),0);
+ assert.equal(w.x,19000);
+});
+test('individual pad stroke detects unsupported ground and reduces grip',()=>{
+ assert.equal(padContact(1,0).contact,true);assert.equal(padContact(3,0).contact,false);
+ assert.equal(padContact(1,1).contact,false);
+ const pads=SUPPORT_PADS.map(()=>({contact:true,traction:1})),w={y:0,mx:0,mz:0};
+ const full=outriggerLoads(w,pads);pads[0].contact=false;pads[1].traction=.45;
+ const partial=outriggerLoads(w,pads);assert.equal(partial.count,3);assert.equal(partial.loads[0],0);assert.ok(partial.grip<full.grip&&partial.ratio>=.65);
+ const none=outriggerLoads(w,pads.map(()=>({contact:false,traction:1})));assert.equal(none.grip,0);assert.equal(none.count,0);assert.ok(none.ratio>=1);
+});
+test('chassis responds smoothly and returns to rest without overshooting',()=>{
+ const zero={pitch:0,roll:0,heave:0},loaded=suspensionStep(zero,0,0,{lateral:1,longitudinal:.5,ratio:1},.1,true);
+ assert.ok(loaded.roll<0&&loaded.pitch>0&&loaded.heave<0);
+ let state=loaded;for(let i=0;i<120;i++)state=suspensionStep(state,0,0,null,1/60,false);
+ assert.ok(Math.abs(state.roll)<1e-6&&Math.abs(state.pitch)<1e-6);
+});
+test('slack cable sags, taut cable straightens, and each redirect stays exact',()=>{
+ const route=[cp(0,5,0),cp(8,5,0),cp(8,5,8)],loose=cableRenderPoints(route,20,0),tight=cableRenderPoints(route,16,42000);
+ assert.equal(loose.length,17);assert.deepEqual(loose[0],route[0]);assert.deepEqual(loose[8],route[1]);assert.deepEqual(loose[16],route[2]);
+ assert.ok(loose[4].y<4.9);assert.equal(tight[4].y,5);
+ assert.ok(cableRenderPoints(route,30,0,()=>4.8)[4].y>=4.85-1e-9);
+ assert.equal(cableRenderPoints([cp(0),cp(0,3),cp(1,3),cp(2,3),cp(3,3)],12,0).length,33);
+});

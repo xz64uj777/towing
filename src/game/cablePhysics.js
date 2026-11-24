@@ -38,3 +38,24 @@ export function cableReelStep(spool,motor,baseSpeed,seconds,tension,limit,min=3,
  return motor>0?Math.max(Math.min(min,spool),spool-baseSpeed*factor*seconds):
   Math.min(Math.max(max,spool),spool+baseSpeed*factor*seconds);
 }
+
+// Render-only sag. All redirects remain exact vertices; cable force and
+// spool calculations still use the straight segmented route.
+export function cableRenderPoints(points,spool,tension,ground=()=>-Infinity,segments=8){
+ const lengths=points.slice(1).map((p,i)=>length(p,points[i]));
+ const distance=lengths.reduce((a,b)=>a+b,0);
+ const slack=Math.max(0,(Number.isFinite(spool)?spool:distance)-distance);
+ const tight=clamp(1-Math.max(0,tension)/12000,0,1);
+ const out=[{...points[0]}];
+ for(let i=0;i<lengths.length;i++){
+  const a=points[i],b=points[i+1],d=lengths[i],horizontal=Math.hypot(b.x-a.x,b.z-a.z);
+  const extra=distance>0?slack*d/distance:0;
+  const sag=Math.min(2.4,horizontal*.16,Math.sqrt(Math.max(0,extra*d*.375))+horizontal*.012)*tight;
+  for(let j=1;j<=segments;j++){
+   const f=j/segments,x=a.x+(b.x-a.x)*f,z=a.z+(b.z-a.z)*f,base=a.y+(b.y-a.y)*f;
+   const y=j===segments?b.y:Math.min(base,Math.max(base-4*sag*f*(1-f),ground(x,z)+.055));
+   out.push({x:j===segments?b.x:x,y,z:j===segments?b.z:z});
+  }
+ }
+ return out;
+}
