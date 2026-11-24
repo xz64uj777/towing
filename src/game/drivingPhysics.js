@@ -7,7 +7,8 @@ export function steeringStep(previous,input,sensitivity,speed,dt,heavy=false){
  return previous+clamp(target-previous,-change,change);
 }
 export function brakeStep(speed,rate,dt){
- return Math.sign(speed)*Math.max(0,Math.abs(speed)-Math.max(0,rate)*Math.max(0,dt));
+ const remaining=Math.max(0,Math.abs(speed)-Math.max(0,rate)*Math.max(0,dt));
+ return remaining===0?0:Math.sign(speed)*remaining;
 }
 export function chassisGrade(slope,yaw){
  const c=Math.cos(yaw),s=Math.sin(yaw);
