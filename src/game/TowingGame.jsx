@@ -8,6 +8,7 @@ import {sampleSurface,recoverySurfaceVelocity} from './terrainPhysics.js';
 import {createGameAudio} from './gameAudio.js';
 import {ROLLBACK_LENGTH,rollbackDeck,rollbackPose,rollbackStop,rollbackTravel,rollbackReady,rollbackCanConnect} from './rollbackPhysics.js';
 import {cableGeometry,cablePathSpeed,cableLoad,cableReelStep} from './cablePhysics.js';
+import {supportReaction,supportState} from './supportPhysics.js';
 import { canCompleteJob, minimapX, minimapY, wheelLiftCaptureReady, winchLoadBand, stopWinchCoast, canPowerBothRecoveryLines, parkingBrakeForRiggers, cameraPresetPose, recoveryYawMoment, recoveryYawStep } from './gameRules.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -67,20 +68,63 @@ function box(parent,name,size,pos,color,opts={}) {
   const mesh=new THREE.Mesh(new THREE.BoxGeometry(...size),new THREE.MeshStandardMaterial({color,roughness:opts.roughness??.78,metalness:opts.metalness??.08}));
   mesh.name=name; mesh.position.set(...pos); mesh.castShadow=true; mesh.receiveShadow=true; parent.add(mesh); return mesh;
 }
+// Beveled body panels retain the original collision envelope and attachment coordinates.
+function roundedPanel(parent,name,size,pos,color,opts={}){
+ const [w,h,d]=size,r=Math.min(w,h,d)*.12, x=w/2-r,y=h/2-r;
+ const shape=new THREE.Shape();shape.moveTo(-x,-y);shape.lineTo(x,-y);shape.lineTo(x,y);shape.lineTo(-x,y);shape.closePath();
+ const depth=d-2*r,geo=new THREE.ExtrudeGeometry(shape,{depth,bevelEnabled:true,bevelSegments:3,steps:1,bevelSize:r,bevelThickness:r,curveSegments:4});
+ geo.translate(0,0,-depth/2);
+ const mesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color,roughness:opts.roughness??.42,metalness:opts.metalness??.18}));
+ mesh.name=name;mesh.position.set(...pos);mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;
+}
+function surfaceTexture(repeatX,repeatY,contrast){
+ const size=64,data=new Uint8Array(size*size*4);let seed=19231;
+ for(let i=0;i<size*size;i++){seed=(Math.imul(seed,1664525)+1013904223)>>>0;const v=Math.round(255-contrast*(seed/4294967296));data.set([v,v,v,255],i*4);}
+ const tex=new THREE.DataTexture(data,size,size);tex.wrapS=tex.wrapT=THREE.RepeatWrapping;tex.repeat.set(repeatX,repeatY);tex.magFilter=THREE.LinearFilter;tex.minFilter=THREE.LinearMipmapLinearFilter;tex.generateMipmaps=true;tex.needsUpdate=true;return tex;
+}
 function makeVehicle(scene,{name,color,pos,scale=1}) {
   const root=new THREE.Group(); root.name=name; root.position.copy(pos); scene.add(root);
   const body=new THREE.Group(); root.add(body);
   box(body,'frame',[2.05*scale,.48*scale,4.8*scale],[0,.95*scale,0],0x252a2e);
-  box(body,'cab',[1.92*scale,1.45*scale,1.85*scale],[0,1.78*scale,-1.12*scale],color);
-  box(body,'hood',[1.95*scale,.7*scale,1.55*scale],[0,1.55*scale,-2.45*scale],color);
-  box(body,'windshield',[1.68*scale,.78*scale,.08*scale],[0,2.0*scale,-2.04*scale],0x8eb1c2,{metalness:.25,roughness:.22});
+  roundedPanel(body,'cab',[1.92*scale,1.45*scale,1.85*scale],[0,1.78*scale,-1.12*scale],color);
+  roundedPanel(body,'hood',[1.95*scale,.7*scale,1.55*scale],[0,1.55*scale,-2.45*scale],color);
+  const detail=(name,size,pos,c,opts={})=>box(body,name,size.map(v=>v*scale),pos.map(v=>v*scale),c,opts);
+  const glass={metalness:.25,roughness:.17},chrome={metalness:.7,roughness:.28};
+  detail('windshield gasket',[1.75,.86,.10],[0,2.02,-2.04],0x17232a);
+  detail('windshield',[1.61,.72,.055],[0,2.02,-2.10],0x476d83,glass);
+  detail('front bumper',[2.05,.25,.18],[0,1.06,-3.22],0x858f96,chrome);
+  detail('grille',[1.10,.42,.065],[0,1.55,-3.23],0x202a30);
+  for(let i=0;i<4;i++)detail('grille slat',[1.02,.035,.025],[0,1.40+i*.10,-3.27],0x929da4,chrome);
+  for(const side of [-1,1]){
+   detail('headlight housing',[.36,.28,.08],[side*.76,1.57,-3.22],0x21292c);
+   detail('headlight lens',[.30,.18,.05],[side*.76,1.60,-3.28],0xf4e3b4,glass);
+   detail('side window gasket',[.045,.69,1.23],[side*.966,2.10,-1.16],0x17232a);
+   detail('side glass',[.03,.57,1.06],[side*.993,2.10,-1.16],0x476d83,glass);
+   detail('door handle',[.045,.055,.24],[side*.985,1.62,-.65],0xb4bfc5,chrome);
+   detail('mirror arm',[.28,.045,.055],[side*1.04,2.02,-1.88],0x262c32);
+   detail('mirror housing',[.14,.24,.19],[side*1.20,2.02,-1.88],0x20272c);
+   detail('mirror glass',[.12,.19,.025],[side*1.20,2.02,-1.77],0x9eb1bd,glass);
+   detail('side step',[.26,.10,1.25],[side*1.02,1.03,-1.10],0x59636a,chrome);
+   detail('rear lamp',[.25,.17,.055],[side*.82,1.42,1.93],0xb12c21,{roughness:.3});
+  }
+  if(name==='wrecker'){
+   detail('lightbar base',[1.44,.10,.30],[0,2.53,-1.03],0x242b30);
+   for(const side of [-1,1])detail('amber warning light',[.66,.13,.28],[side*.36,2.63,-1.03],0xffb33a,{roughness:.25});
+  }
   box(body,'bed',[2.0*scale,.3*scale,1.5*scale],[0,1.35*scale,1.15*scale],0x333a40);
   const wheels=[];
   for(const z of [-1.55,1.55]) for(const x of [-1.06,1.06]) {
-    const tire=new THREE.Mesh(new THREE.CylinderGeometry(.48*scale,.48*scale,.32*scale,20),new THREE.MeshStandardMaterial({color:0x17191b,roughness:.95}));
+    const profile=[[.19,-.16],[.35,-.16],[.43,-.145],[.475,-.10],[.48,-.055],[.48,.055],[.475,.10],[.43,.145],[.35,.16],[.19,.16],[.19,-.16]].map(([r,y])=>new THREE.Vector2(r*scale,y*scale));
+    const tire=new THREE.Mesh(new THREE.LatheGeometry(profile,28),new THREE.MeshStandardMaterial({color:0x17191b,roughness:.95}));
     tire.rotation.z=Math.PI/2; tire.position.set(x,.62*scale,z); tire.castShadow=true; root.add(tire); wheels.push(tire);
-    const hub=new THREE.Mesh(new THREE.CylinderGeometry(.2*scale,.2*scale,.335*scale,16),new THREE.MeshStandardMaterial({color:0x8b9297,metalness:.7,roughness:.35}));
-    hub.rotation.z=Math.PI/2; hub.position.copy(tire.position); tire.add(hub); hub.position.set(0,0,0);
+    const hub=new THREE.Mesh(new THREE.CylinderGeometry(.25*scale,.25*scale,.325*scale,20),new THREE.MeshStandardMaterial({color:0x8b9297,metalness:.7,roughness:.35}));
+    tire.add(hub);
+    const outer=x>0?-1:1;
+    const center=new THREE.Mesh(new THREE.CylinderGeometry(.095*scale,.095*scale,.045*scale,14),new THREE.MeshStandardMaterial({color:0x343d43,metalness:.6,roughness:.38}));
+    center.position.y=outer*.18*scale;tire.add(center);
+    const boltGeo=new THREE.CylinderGeometry(.025*scale,.025*scale,.025*scale,6),boltMat=new THREE.MeshStandardMaterial({color:0x343b40,metalness:.55});
+    for(let k=0;k<6;k++){const a=k*Math.PI/3,bolt=new THREE.Mesh(boltGeo,boltMat);bolt.position.set(Math.cos(a)*.17*scale,outer*.17*scale,Math.sin(a)*.17*scale);tire.add(bolt);}
+    for(const y of [-.105,.105]){const groove=new THREE.Mesh(new THREE.TorusGeometry(.473*scale,.010*scale,5,28),new THREE.MeshStandardMaterial({color:0x0a0c0d,roughness:1}));groove.rotation.x=Math.PI/2;groove.position.y=y*scale;tire.add(groove);}
   }
   const forks=[],outriggers=[],boomCylinders=[],liftCylinders=[];
   let recoveryStructure=null,boomPivot=null,boomTilt=null,boomSleeve=null,boomTip=null;
@@ -115,6 +159,7 @@ function makeVehicle(scene,{name,color,pos,scale=1}) {
     for(const side of [-1,1]) {
       const arm=box(body,'outrigger arm',[1.15,.22,.28],[side*1.45,1.05,1.6],0x4c555a);
       const foot=box(body,'outrigger foot',[.48,.14,.6],[side*2.05,.55,1.6],0xe0b340);
+      const jack=new THREE.Mesh(new THREE.CylinderGeometry(.10,.13,.72,12),new THREE.MeshStandardMaterial({color:0x929da5,metalness:.62,roughness:.33}));jack.position.y=.42;foot.add(jack);
       outriggers.push(arm,foot);
     }
     box(body,'underlift hinge housing',[.85,.49,.7],[0,1.12,2.37],0x252f35);
@@ -196,8 +241,8 @@ export default function TowingGame(){
   const host=mount.current;if(!host)return;
   const scene=new THREE.Scene();scene.background=new THREE.Color(0x9db2c2);scene.fog=new THREE.Fog(0x9db2c2,55,180);
   const camera=new THREE.PerspectiveCamera(62,1,.1,350);camera.position.set(9,7,12);
-  const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio,1.8));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;host.appendChild(renderer.domElement);
-  scene.add(new THREE.HemisphereLight(0xdcecff,0x56604a,2.0));const sun=new THREE.DirectionalLight(0xfff0d8,2.4);sun.position.set(-25,38,20);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);scene.add(sun);
+  const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio,1.8));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.12;host.appendChild(renderer.domElement);
+  scene.add(new THREE.HemisphereLight(0xdcecff,0x56604a,2.0));const sun=new THREE.DirectionalLight(0xfff0d8,2.4);sun.position.set(-25,38,20);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-30,right:30,top:30,bottom:-30,near:1,far:100});sun.shadow.camera.updateProjectionMatrix();sun.shadow.normalBias=.035;scene.add(sun,sun.target);
   const levelIndex=careerRef.current.job%JOBS.length;
   const levelFour=levelIndex>=3;
   const lakeLevel=levelIndex===4;
@@ -208,8 +253,8 @@ export default function TowingGame(){
   const terrainScene=lakeLevel?createLakeScene(THREE,scene):levelFour?createLevelFourScene(THREE,scene):null;
   const ravineStartZ=levelFour?Math.min(-49,JOBS[careerRef.current.job%JOBS.length].z+15):7;
   if(levelFour){scene.fog.far=250;scene.background.set(lakeLevel?0x9dc5d2:0xa3b6c1);}
-  if(!levelFour){const ground=new THREE.Mesh(new THREE.PlaneGeometry(240,240),new THREE.MeshStandardMaterial({color:0x59684a,roughness:1}));ground.rotation.x=-Math.PI/2;ground.position.y=-.12;ground.receiveShadow=true;scene.add(ground);}
-  const road=new THREE.Mesh(new THREE.BoxGeometry(10,.12,180),new THREE.MeshStandardMaterial({color:0x303438,roughness:.95}));road.position.set(0,-.02,-36);road.receiveShadow=true;scene.add(road);
+  if(!levelFour){const ground=new THREE.Mesh(new THREE.PlaneGeometry(240,240),new THREE.MeshStandardMaterial({color:0x65734e,roughness:1,map:surfaceTexture(90,90,78)}));ground.rotation.x=-Math.PI/2;ground.position.y=-.12;ground.receiveShadow=true;scene.add(ground);}
+  const road=new THREE.Mesh(new THREE.BoxGeometry(10,.12,180),new THREE.MeshStandardMaterial({color:0x45494b,roughness:.95,map:surfaceTexture(8,120,65)}));road.position.set(0,-.02,-36);road.receiveShadow=true;scene.add(road);
   const shoulder=new THREE.Mesh(new THREE.BoxGeometry(5,.16,180),new THREE.MeshStandardMaterial({color:0x85785d}));shoulder.position.set(7.1,-.07,-36);scene.add(shoulder);
   const ditch=new THREE.Mesh(new THREE.BoxGeometry(4,.55,28),new THREE.MeshStandardMaterial({color:0x4d5840}));ditch.position.set(10.5,-.38,-20);scene.add(ditch);
   if(!levelFour)for(let i=0;i<30;i++){const x=(i%2?1:-1)*(14+Math.random()*28),z=-70+i*5;const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.18,.3,2.8,7),new THREE.MeshStandardMaterial({color:0x59432e}));trunk.position.set(x,1.3,z);scene.add(trunk);const crown=new THREE.Mesh(new THREE.ConeGeometry(1.5+Math.random(),4.4,7),new THREE.MeshStandardMaterial({color:0x344d38}));crown.position.set(x,4.1,z);crown.castShadow=true;scene.add(crown);}
@@ -427,7 +472,7 @@ export default function TowingGame(){
     let primaryPowered=false;
     if(s.type.id==='rotator'){
       const targets=[{pos:s.pickPos,vel:s.pickVel,yaw:s.pickYaw,roll:s.pickRoll,yawRate:s.pickYawVel,rollRate:s.pickRollVel,mass:JOBS[s.jobIndex%JOBS.length].weight||12},{pos:s.secondary.pos,vel:s.secondary.vel,yaw:s.secondary.yaw,roll:s.secondary.roll,yawRate:s.secondary.yawVel,rollRate:s.secondary.rollVel,mass:11}];
-      const torques=[0,0],yawMoments=[0,0],forces=[V(),V()];
+      const torques=[0,0],yawMoments=[0,0],forces=[V(),V()],truckReaction=V();
       for(let i=0;i<2;i++){
         const line=s.recoveryLines[i],rope=s.recoveryCables[i],target=targets[line.target];
         if(!line.connected||!s.boomDeployed||(line.target===1&&!s.secondary.active)){rope.visible=false;line.tension=0;line.strain=0;line.stalled=false;line.previousDistance=null;continue;}
@@ -450,6 +495,7 @@ export default function TowingGame(){
         const load=cableLoad(distance,line.spool,pathSpeed,42000),pull=load.tension;
         line.tension=pull;line.strain=load.strain;line.stalled=line.motor>0&&load.stalled;
         if(pull>0){
+          const reaction=supportReaction(route,pull,line.doubled);truckReaction.add(V(reaction.x,reaction.y,reaction.z));
           const axis=V(Math.cos(target.yaw),0,Math.sin(target.yaw));
           const cx=point.x*Math.cos(target.roll)-point.y*Math.sin(target.roll);
           const cy=point.x*Math.sin(target.roll)+point.y*Math.cos(target.roll);
@@ -458,6 +504,12 @@ export default function TowingGame(){
           yawMoments[line.target]+=recoveryYawMoment(offset,direction,pull);
           forces[line.target].addScaledVector(V(direction.x,0,direction.z),pull);
         }
+      }
+      const support=supportState(truckReaction,truckSurface.traction,s.riggersDeployed);
+      s.supportRatio=support.ratio;
+      if(s.riggersDeployed&&s.parkingBrake){
+       // Bounded creep under excess horizontal reaction; no automatic tip-over.
+       s.vel.x+=support.ax*h;s.vel.z+=support.az*h;
       }
       for(let i=0;i<targets.length;i++)if((i===0&&!s.loaded)||(i===1&&s.secondary.active))targets[i].vel.addScaledVector(forces[i],h/(targets[i].mass*(levelFour?1350:3100)));
       primaryYawMoment=yawMoments[0];
@@ -639,8 +691,9 @@ export default function TowingGame(){
      camera.position.copy(presetFocus).add(V(Math.sin(yaw)*cosPitch*radius,Math.sin(pitch)*radius,Math.cos(yaw)*cosPitch*radius));
      camera.lookAt(presetFocus);
    }
-   if(now-s.lastHud>120){const sp=s.vel.length()*3.6;setHud({speed:sp,gear:s.throttle<-.1?'R':'D',hook:s.hook,tension:s.tension/1000,winch:s.winch?'REELING':'IDLE',parking:s.parkingBrake,riggers:s.riggersDeployed,boom:s.boomDeployed,lift:s.liftDeployed,range:s.pos.distanceTo(s.pickPos),mapX:s.pos.x,mapZ:s.pos.z,mapYaw:s.yaw,roll:s.pickRoll,roll2:s.secondary.roll,secondX:s.secondary.pos.x,secondZ:s.secondary.pos.z,lineTensions:s.recoveryLines.map(l=>l.tension/1000),lineStrains:s.recoveryLines.map(l=>l.strain??0),lineStalls:s.recoveryLines.map(l=>!!l.stalled),cableStrain:s.cableStrain??0,cableStalled:!!s.cableStalled,carX:s.pickPos.x,carZ:s.pickPos.z,carYaw:s.pickYaw,loaded:s.loaded,liftHeight:s.liftHeight,armsClosed:s.armsClosed,strapsOn:s.strapsOn,gridContact:tireGridContact(s),recoverySurface:surfaceAt(s.pickPos).name,secondarySurface:s.secondary.active?surfaceAt(s.secondary.pos).name:null,truckSurface:surfaceAt(s.pos).name});s.lastHud=now;}
+   if(now-s.lastHud>120){const sp=s.vel.length()*3.6;setHud({speed:sp,gear:s.throttle<-.1?'R':'D',hook:s.hook,tension:s.tension/1000,winch:s.winch?'REELING':'IDLE',parking:s.parkingBrake,riggers:s.riggersDeployed,boom:s.boomDeployed,lift:s.liftDeployed,range:s.pos.distanceTo(s.pickPos),mapX:s.pos.x,mapZ:s.pos.z,mapYaw:s.yaw,roll:s.pickRoll,roll2:s.secondary.roll,secondX:s.secondary.pos.x,secondZ:s.secondary.pos.z,lineTensions:s.recoveryLines.map(l=>l.tension/1000),lineStrains:s.recoveryLines.map(l=>l.strain??0),lineStalls:s.recoveryLines.map(l=>!!l.stalled),cableStrain:s.cableStrain??0,cableStalled:!!s.cableStalled,carX:s.pickPos.x,carZ:s.pickPos.z,carYaw:s.pickYaw,loaded:s.loaded,liftHeight:s.liftHeight,armsClosed:s.armsClosed,strapsOn:s.strapsOn,gridContact:tireGridContact(s),recoverySurface:surfaceAt(s.pickPos).name,secondarySurface:s.secondary.active?surfaceAt(s.secondary.pos).name:null,truckSurface:surfaceAt(s.pos).name,supportRatio:s.supportRatio??0});s.lastHud=now;}
    audioRef.current?.update(s,dt,surfaceAt(s.pos),settingsRef.current.soundVolume,settingsRef.current.soundMuted,document.hidden||!document.hasFocus());
+   const shadowFocus=s.pos.clone().lerp(s.pickPos,s.heavyRecovery?.30:.12);sun.target.position.copy(shadowFocus);sun.position.copy(shadowFocus).add(V(-25,38,20));
    renderer.render(scene,camera);raf=requestAnimationFrame(update);
   };raf=requestAnimationFrame(update);
   const onKey=(e)=>{const down=e.type==='keydown';if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();if(e.key==='w'||e.key==='ArrowUp')s.throttle=down?1:0;if(e.key==='s'||e.key==='ArrowDown')s.throttle=down?-.55:0;if(e.key==='a'||e.key==='ArrowLeft')s.steer=down?-1:0;if(e.key==='d'||e.key==='ArrowRight')s.steer=down?1:0;if(e.key.toLowerCase()==='r'){s.winch=down&&(s.boomDeployed||(s.type.id==='flatbed'&&s.hook&&s.bedTilt))&&(!s.heavyRecovery||s.riggersDeployed)&&s.parkingBrake;if(!down){s.pickVel.set(0,0,0);s.tension=0;}}if(down&&e.key.toLowerCase()==='h'&&s.type.id!=='flatbed')s.hook=!s.hook;};
@@ -943,7 +996,7 @@ export default function TowingGame(){
  const currentJob=JOBS[career.job%JOBS.length];
  return <main className={'game-shell'+(menuOpen?' menu-active':'')+(cameraPanelOpen?' camera-active':'')}><div className={'scene'+(placingAnchor?' anchor-placement-scene':'')} ref={mount}/>
    {placingAnchor&&<div className="anchor-placement-hint" role="status"><b>{s?.customHookPlacement!==null?'SELECT CUSTOM HOOK':'PLACE GROUND ANCHOR'}</b><span>{s?.customHookPlacement!==null?'Tap a frame edge or bumper on the recovery vehicle.':'Tap open ground off the road, 4–32 m from truck and 3–32 m from vehicle.'}</span><button type="button" onClick={s?.customHookPlacement!==null?cancelCustomHook:cancelAnchorPlacement}>CANCEL PLACEMENT</button></div>}
-  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .66 • ROLLBACK PHYSICS</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
+  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .67 • VEHICLE DETAIL</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
   <div className={'game-minimap '+(mapOpen?'map-expanded':'map-collapsed')} style={{position:'absolute',left:12,bottom:195,zIndex:9,width:mapOpen?146:106,height:mapOpen?166:36,pointerEvents:'auto',border:'2px solid #f3c851',borderRadius:12,background:'rgba(9,20,30,.88)',color:'#fff',boxShadow:'0 3px 14px #0008',padding:6,boxSizing:'border-box'}}>
    <button type="button" aria-expanded={mapOpen} onClick={()=>setMapOpen(v=>!v)} style={{fontSize:11,fontWeight:800,width:'100%',background:'transparent',border:0,color:'white'}}>{mapOpen?'MAP −':'MAP +'}</button>
    {mapOpen&&<svg viewBox="0 0 140 140" width="132" height="132" aria-label="Map of recovery vehicles and destination">
@@ -987,7 +1040,7 @@ export default function TowingGame(){
       <div className="tension-track" role="meter" aria-label={(s.type.id==='rotator'?'Line '+(i===0?'A':'B'):'Winch')+' load'} aria-valuemin={0} aria-valuemax={limit} aria-valuenow={Math.min(limit,Math.max(0,tension))}><div className={'tension-fill '+load.level} style={{width:(load.fraction*100).toFixed(0)+'%'}}/></div>
      </div>;
     })}
-    <small title="Simulated cable strain; yellow 60%, red 85% of rated line load">{s.type.id==='rotator'?[0,1].map(i=>{const l=s.recoveryLines[i];return (i===0?'A':'B')+' '+(l.doubled?'2:1':'1:1')+' '+(hud.lineStalls?.[i]?'STALL':(hud.lineStrains?.[i]??0).toFixed(1)+'%');}).join(' · '):(hud.cableStalled?'STALL · ':winchSpeed.toUpperCase()+' · ')+'STRAIN '+(hud.cableStrain??0).toFixed(1)+'%'}</small>
+    <small title="Simulated cable strain; yellow 60%, red 85% of rated line load">{s.type.id==='rotator'?[0,1].map(i=>{const l=s.recoveryLines[i];return (i===0?'A':'B')+' '+(l.doubled?'2:1':'1:1')+' '+(hud.lineStalls?.[i]?'STALL':(hud.lineStrains?.[i]??0).toFixed(1)+'%');}).join(' · ')+(hud.riggers?' · '+((hud.supportRatio??0)>=1?'GRIP LIMIT':'GRIP '+Math.round((hud.supportRatio??0)*100)+'%'):''):(hud.cableStalled?'STALL · ':winchSpeed.toUpperCase()+' · ')+'STRAIN '+(hud.cableStrain??0).toFixed(1)+'%'}</small>
    </div>}
   <div className="bottom-ui">{settings.driveMode==='joystick'?<div className="joystick" onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);joystickMove(e);}} onPointerMove={e=>{if(e.buttons)joystickMove(e);}} onPointerUp={joystickStop} onPointerCancel={joystickStop}><div className="stick-knob" style={{transform:`translateX(${steerVisual*23}px)`}}>●</div><span>STEER</span></div>:<div className="joystick steering-arrows"><Hold label="◀ LEFT" onDown={press('steer',-1)} onUp={press('steer',0)}/><Hold label="RIGHT ▶" onDown={press('steer',1)} onUp={press('steer',0)}/></div>}<div className={'equipment-stack'+(s?.tools.includes('boom')&&(hud.parking||hud.riggers)?' has-boom':'')+(s?.tools.includes('boom')?' single-line-stack':'')}>{s?.tools.includes('boom')&&(hud.parking||hud.riggers)&&<div className="boom-float"><div className="boom-control-cluster">
  <div className="boom-status">{(hud.parking||hud.riggers)?'BOOM READY':'PARK OR RIGGERS'} · UP/DOWN + {boomMode==='extend'?'IN/OUT':'SWING'}</div>

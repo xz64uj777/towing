@@ -484,3 +484,10 @@ test('secured load follows deck during leveling',()=>{
  const p=rollbackPose(a,rollbackStop(a),.92),q=rollbackPose(b,rollbackStop(b),.92);
  assert.ok(p.pitch>0);assert.equal(q.pitch,0);assert.equal(q.height,1.56);
 });
+
+import {supportReaction,supportState} from './supportPhysics.js';
+test('truck reaction follows the first segment of a redirected line',()=>{const r=supportReaction([{x:0,y:0,z:0},{x:3,y:0,z:0},{x:3,y:0,z:4}],10000);assert.equal(r.x,10000);assert.equal(r.z,0);});
+test('moving block return leg also loads truck',()=>{const r=supportReaction([{x:0,y:0,z:0},{x:5,y:0,z:0},{x:0,y:0,z:0}],10000,true);assert.equal(r.x,19000);});
+test('opposed pulls cancel truck translation',()=>{const a=supportReaction([{x:0,y:0,z:0},{x:5,y:0,z:0}],10000),b=supportReaction([{x:0,y:0,z:0},{x:-5,y:0,z:0}],10000);assert.equal(supportState({x:a.x+b.x,y:0,z:0},1,true).ratio,0);});
+test('riggers and dry terrain increase holding capacity',()=>{const f={x:80000,y:0,z:0};assert.equal(supportState(f,1,true).ax,0);assert.ok(supportState(f,.48,true).ax>0);assert.ok(supportState(f,1,false).ratio>supportState(f,1,true).ratio);});
+test('upward reaction reduces grip and creep is bounded',()=>{const f={x:1e6,y:90000,z:0};assert.ok(supportState(f,1,true).ratio>supportState({...f,y:0},1,true).ratio);assert.equal(supportState(f,1,true).ax,.8);});
