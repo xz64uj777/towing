@@ -381,3 +381,14 @@
  .heavy-compact .heavy-section .line-summary{font-size:8px;padding:0}
  .bottom-ui .recovery.equipment-compact.heavy-compact.is-open{bottom:calc(54px + env(safe-area-inset-bottom))}
 }
+
+/* Build .57: avoid the upper-right MENU overlap in short landscape viewports. */
+.heavy-compact .heavy-safety-row{grid-template-columns:repeat(3,minmax(0,1fr))}
+.heavy-compact .heavy-safety-row>.action{font-size:9px}
+.heavy-compact .heavy-speed-cycle{background:#254f64;border:1px solid #88bfd0}
+.heavy-compact .heavy-section .equipment-row>.action{min-height:32px}
+@media(orientation:landscape) and (max-height:540px){
+ .heavy-compact .heavy-safety-row>.action{min-height:31px;font-size:8px}
+ .bottom-ui .recovery.equipment-compact.heavy-compact.is-open{gap:3px}
+ .heavy-compact .heavy-section .equipment-row>.action{min-height:29px}
+}
