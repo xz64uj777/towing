@@ -38,3 +38,9 @@ export function cableReelStep(spool,motor,baseSpeed,seconds,tension,limit,min=3,
  return motor>0?Math.max(Math.min(min,spool),spool-baseSpeed*factor*seconds):
   Math.min(Math.max(max,spool),spool+baseSpeed*factor*seconds);
 }
+
+export function stepCable(distance, spool, pathSpeed, motor, speed, seconds, limit, minimum) {
+ const prior=cableLoad(distance,spool,pathSpeed,limit);
+ const next=cableReelStep(spool,motor,speed,seconds,prior.tension,limit,minimum);
+ return {spool:next,...cableLoad(distance,next,pathSpeed,limit)};
+}
