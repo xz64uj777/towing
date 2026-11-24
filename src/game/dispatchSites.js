@@ -5,6 +5,8 @@ export const siteConfig=i=>i===5?{
  kind:'terminal',start:{x:0,z:-73},goals:[{x:8,z:-88,r:4.1}],anchors:[{x:-19,z:-79,label:'YARD ANCHOR A'},{x:14,z:-96,label:'YARD ANCHOR B'}],bounds:{minX:-21,maxX:21,minZ:-114,maxZ:-62}
 }:i===6?{
  kind:'bridge',start:{x:0,z:-78},goals:[{x:0,z:-85,r:3.0},{x:0,z:-75,r:3.0}],anchors:[{x:-6.1,z:-87,label:'LEFT DECK ANCHOR'},{x:6.1,z:-91,label:'RIGHT DECK ANCHOR'}],bounds:{minX:-4.85,maxX:4.85,minZ:-124,maxZ:-54}
+}:i===7?{
+ kind:'quarry',start:{x:7,z:-83},goals:[{x:7,z:-93,r:4.2}],anchors:[{x:-17,z:-90,label:'QUARRY ANCHOR A'},{x:15,z:-102,label:'QUARRY ANCHOR B'}],bounds:{minX:-22,maxX:22,minZ:-120,maxZ:-59}
 }:null;
 const smooth=(a,b,x)=>{const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*(3-2*t);};
 export function bridgeGround(x,z){
@@ -12,12 +14,12 @@ export function bridgeGround(x,z){
  return -.12-6.2*channel+.10*Math.sin(x*.12)*channel;
 }
 export function siteHeight(i,x,z){
- if(i===5)return .04;
+ if(i===5||i===7)return .04;
  if(i===6)return Math.abs(x)<=6.6&&z>=-128&&z<=-52?.04:bridgeGround(x,z);
  return 0;
 }
 export function siteSlope(i,x,z){
- if(i===5||Math.abs(x)<=6.2)return {x:0,z:0};
+ if(i===5||i===7||Math.abs(x)<=6.2)return {x:0,z:0};
  const h=.25;return {x:(siteHeight(i,x+h,z)-siteHeight(i,x-h,z))/(2*h),z:(siteHeight(i,x,z+h)-siteHeight(i,x,z-h))/(2*h)};
 }
 export function siteGravity(i,x,z,strength=1){
@@ -30,6 +32,7 @@ export function siteSurface(i,x,z){
   if(paved&&Math.abs(x)>12&&!(x>0&&z>=-93&&z<=-83))return {name:'PACKED SNOW',traction:.56,lateralGrip:.55,drag:1.15,depth:0};
   if(paved)return {name:'CONCRETE',traction:.94,lateralGrip:.92,drag:.42,depth:0};
  }
+ if(i===7)return {name:Math.abs(x)<10?'COMPACTED GRAVEL':'LOOSE GRAVEL',traction:Math.abs(x)<10?.86:.68,lateralGrip:Math.abs(x)<10?.85:.64,drag:Math.abs(x)<10?.70:1.05,depth:0};
  if(i===6&&Math.abs(x)<=6.6&&z>=-128&&z<=-52)return {name:'BRIDGE DECK',traction:.92,lateralGrip:.90,drag:.40,depth:0};
  return {name:'GRAVEL',traction:.78,lateralGrip:.75,drag:.8,depth:0};
 }
@@ -109,6 +112,27 @@ export function createDispatchSite(T,scene,i){
   for(const x of [-20,20])for(const z of [-111,-65]){
    box('yard floodlight pole',[.16,7,.16],[x,3.54,z],steel);box('yard floodlight head',[.82,.27,.35],[x,7.07,z],white);
   }
+  return {ground,obstacles};
+ }
+ if(i===7){
+  const gravel=mat(0x93836a);gravel.map=surfaceMap(T,38,35,90);
+  const ground=box('quarry gravel staging yard',[54,.18,70],[0,-.05,-90],gravel);
+  const compact=mat(0xa59a84);paint('compacted gravel recovery lane',[20,.014,62],[0,.049,-90],compact);
+  const stone=mat(0x77746a),ore=mat(0x8d8270),sand=mat(0xb3a080);
+  for(const side of [-1,1])for(let j=0;j<8;j++){
+   const x=side*(27+j%2*3),z=-116+j*7.4;
+   const pile=make('quarry aggregate pile',new T.ConeGeometry(4.2+(j%3)*.6,4.8+(j%4)*.7,9),j%2?stone:ore,x,2.4,z);
+   pile.scale.set(1.15,1,.84);pile.rotation.y=j*.7;
+  }
+  for(let j=0;j<9;j++){const z=-121+j*7.5;box('quarry concrete retaining block',[.85,.75,3.0],[-23,.42,z],concrete);}
+  box('quarry scale house',[5,3.2,5.6],[18,1.64,-119],steel);
+  box('scale house roof',[5.4,.18,6],[18,3.34,-119],dark);
+  box('scale house window',[2.1,1.1,.08],[18,2.15,-116.17],mat(0x45626e,.2,.25));
+  for(const [x,z] of [[-18,-113],[18,-77]]){box('quarry concrete block',[2.4,.85,2.4],[x,.465,z],concrete);obstacles.push({x,z,r:1.25});}
+  for(const x of [-20,20])for(const z of [-113,-64])box('yellow quarry boundary bollard',[.24,1.05,.24],[x,.56,z],yellow);
+  for(let j=0;j<30;j++){const x=-24+(j*17%48),z=-120+(j*11%60);if(Math.abs(x)<15)continue;const rock=make('loose aggregate',new T.DodecahedronGeometry(.12+(j%4)*.06,0),sand,x,.09,z);rock.scale.y=.65;}
+  for(const x of [-14,-10])paint('support truck staging lines',[.12,.018,7],[x,.065,-108],yellow);
+  const g=config.goals[0];for(const side of [-1,1])paint('quarry safe bay marking',[.12,.02,8.4],[g.x+side*3.4,.062,g.z],white);
   return {ground,obstacles};
  }
  // Elevated bridge over a transverse river, with continuous approach roads.

@@ -1,5 +1,6 @@
 // Device-local snapshot for an unfinished dispatch. This never replaces career storage.
 import {SITE_REVISION} from './dispatchSites.js';
+import {migrateJobIndex} from './tandemRecovery.js';
 import {parkingBrakeForRiggers} from './gameRules.js';
 export const RECOVERY_SAVE_KEY='towing-in-progress-v1';
 const vec=v=>v?{x:v.x,y:v.y,z:v.z}:null;
@@ -7,7 +8,8 @@ const validVec=v=>v&&[v.x,v.y,v.z].every(Number.isFinite);
 const validNum=n=>typeof n==='number'&&Number.isFinite(n);
 const index=(n,max)=>Number.isInteger(n)&&n>=0&&n<=max;
 export function captureRecoverySave(career,s){
- return {version:1,siteRevision:SITE_REVISION,savedAt:Date.now(),jobIndex:s.jobIndex,
+ return {version:1,siteRevision:SITE_REVISION,savedAt:Date.now(),jobIndex:s.jobIndex,jobCount:career.jobCount??7,
+ tandemUsed:s.tandemHelper?[...s.tandemUsed]:null,
  career:{...career,job:s.jobIndex,selected:s.type.id},
  truck:{pos:vec(s.pos),yaw:s.yaw},
  vehicle:{pos:vec(s.pickPos),yaw:s.pickYaw,roll:s.pickRoll},
@@ -37,6 +39,7 @@ export function parseRecoverySave(raw,jobCount){
     index(l.redirect,4)&&index(l.secondRedirect,4)&&(l.doubled===undefined||typeof l.doubled==='boolean')&&validNum(l.spool)&&l.spool>=0&&l.spool<=100&&
     (!l.customPoint||[l.customPoint.x,l.customPoint.y,l.customPoint.z].every(validNum)))||
   !s.camera||!validNum(s.camera.zoom))return null;
+  if(jobCount===8){const jobIndex=migrateJobIndex(s.jobIndex,s.jobCount??7,jobCount);return {...s,jobCount,jobIndex,career:{...s.career,job:jobIndex,jobCount}};}
   return s;
  }catch{return null;}
 }
@@ -61,6 +64,7 @@ export function restoreRecoverySave(s,saved,V){
  }
  for(const [key,min,max] of [['rollbackLoadX',-.27,.27],['rollbackLoadYaw',-.15,.15],['rollbackLoadZ',0,.18]])s[key]=validNum(saved.equipment[key])?Math.max(min,Math.min(max,saved.equipment[key])):0;
  s.recoveryDamage=validNum(saved.equipment.recoveryDamage)?Math.max(0,Math.min(750,saved.equipment.recoveryDamage)):0;s.bedContactLatch=false;
+ if(s.tandemHelper){s.tandemUsed=[!!saved.tandemUsed?.[0],!!saved.tandemUsed?.[1]];s.tandemSelected=0;}
  s.hookPoint=index(s.hookPoint,9)?s.hookPoint:0;
  s.hookRedirect=index(s.hookRedirect,4)?s.hookRedirect:0;
  s.winch=false;s.winchOut=false;s.throttle=0;s.brake=0;s.steer=0;s.tension=0;s.previousCableDistance=null;s.cableStrain=0;s.cableStalled=false;

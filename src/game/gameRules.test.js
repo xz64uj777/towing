@@ -875,3 +875,24 @@ test('actual model contact includes roof and tires, ignores hidden geometry, and
  assert.ok(hull.length>4);assert.ok(rollContactOffset(hull,2.66)>2.5);assert.ok(rollContactOffset(hull,Math.PI)<4);
  for(let i=0;i<100;i++){const a=i*Math.PI/99,shift=rollContactOffset(hull,a);assert.ok(hull.every(p=>shift+p.x*Math.sin(a)+p.y*Math.cos(a)>=.007999));}
 });
+
+import {TANDEM_HELPER,isSupportLine,lineLimit,tandemComplete,noteTandemUse,switchTandemControl,migrateJobIndex} from './tandemRecovery.js';
+test('intro tandem uses separate winch limits and requires both powered cables',()=>{
+ const s={tandemHelper:{},tandemUsed:[false,false]};
+ assert.equal(lineLimit(s,0),42000);assert.equal(lineLimit(s,1),TANDEM_HELPER.limit);
+ noteTandemUse(s.tandemUsed,0,1,2000);noteTandemUse(s.tandemUsed,1,0,5000);
+ assert.ok(!tandemComplete(s.tandemUsed,true));
+ noteTandemUse(s.tandemUsed,1,1,1500);assert.ok(tandemComplete(s.tandemUsed,true));
+ assert.ok(!tandemComplete(s.tandemUsed,false));
+});
+test('switching tandem operators stops motors but preserves both cable connections and spool lengths',()=>{
+ const s={tandemHelper:{},throttle:1,steer:.5,recoveryLines:[{connected:true,motor:1,spool:8},{connected:true,motor:-1,spool:12}]};
+ switchTandemControl(s,1);assert.equal(s.tandemSelected,1);assert.equal(s.throttle,0);
+ assert.ok(s.recoveryLines.every(l=>l.connected&&l.motor===0));assert.equal(s.recoveryLines[1].spool,12);
+});
+test('quarry is a separate dry site and older seven-job careers retain dispatch index',()=>{
+ assert.equal(siteConfig(7).kind,'quarry');assert.equal(sampleSurface(7,0,-93).name,'COMPACTED GRAVEL');
+ assert.equal(migrateJobIndex(13,7,8),14);assert.equal(migrateJobIndex(7,7,8),8);
+ assert.equal(migrateJobIndex(7,8,8),7);
+ const scene=new THREE.Scene();const site=createDispatchSite(THREE,scene,7);assert.ok(site.ground);assert.ok(scene.getObjectByName('quarry aggregate pile'));
+});
