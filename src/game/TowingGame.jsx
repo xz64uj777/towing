@@ -166,7 +166,7 @@ export default function TowingGame(){
   try{return parseRecoverySave(localStorage.getItem(RECOVERY_SAVE_KEY),JOBS.length)}catch{return null}
  });
  const [settingsOpen,setSettingsOpen]=useState(false),[mapOpen,setMapOpen]=useState(()=>typeof window==='undefined'||window.innerHeight>520),[menuOpen,setMenuOpen]=useState(false),[recoveryOpen,setRecoveryOpen]=useState(true);const [settings,setSettings]=useState(()=>{try{return {steering:1,boom:1,winch:1,driveMode:'joystick',...JSON.parse(localStorage.getItem('towing-controls')||'{}')}}catch{return {steering:1,boom:1,winch:1,driveMode:'joystick'}}});const settingsRef=useRef(settings);settingsRef.current=settings;const changeSetting=(key,value)=>setSettings(old=>{const next={...old,[key]:value};settingsRef.current=next;try{localStorage.setItem('towing-controls',JSON.stringify(next))}catch{}return next;});
- const [equipmentTab,setEquipmentTab]=useState('quick'),[activeRecoveryLine,setActiveRecoveryLine]=useState(0),[winchSpeed,setWinchSpeed]=useState('medium'),[placingAnchor,setPlacingAnchor]=useState(false);const [garage,setGarage]=useState(false),[notice,setNotice]=useState(''),[hydraulic,setHydraulic]=useState({x:0,y:0}),[boomStick,setBoomStick]=useState({x:0,y:0}),[boomMode,setBoomMode]=useState('extend'),[cameraMode,setCameraMode]=useState('orbit'),[cameraPanelOpen,setCameraPanelOpen]=useState(false);
+ const [equipmentTab,setEquipmentTab]=useState('quick'),[heavyTab,setHeavyTab]=useState('operate'),[activeRecoveryLine,setActiveRecoveryLine]=useState(0),[winchSpeed,setWinchSpeed]=useState('medium'),[placingAnchor,setPlacingAnchor]=useState(false);const [garage,setGarage]=useState(false),[notice,setNotice]=useState(''),[hydraulic,setHydraulic]=useState({x:0,y:0}),[boomStick,setBoomStick]=useState({x:0,y:0}),[boomMode,setBoomMode]=useState('extend'),[cameraMode,setCameraMode]=useState('orbit'),[cameraPanelOpen,setCameraPanelOpen]=useState(false);
  const saveCareer=fn=>setCareer(old=>{const next=fn(old);careerRef.current=next;try{localStorage.setItem('towing-career',JSON.stringify(next))}catch{}return next;});
  const mount=useRef(null),sim=useRef(null),[hud,setHud]=useState({speed:0,gear:'D',hook:false,tension:0,winch:'IDLE'}),[help,setHelp]=useState(false),[steerVisual,setSteerVisual]=useState(0);
  useEffect(()=>{
@@ -847,7 +847,7 @@ export default function TowingGame(){
  const currentJob=JOBS[career.job%JOBS.length];
  return <main className={'game-shell'+(menuOpen?' menu-active':'')+(cameraPanelOpen?' camera-active':'')}><div className={'scene'+(placingAnchor?' anchor-placement-scene':'')} ref={mount}/>
    {placingAnchor&&<div className="anchor-placement-hint" role="status"><b>{s?.customHookPlacement!==null?'SELECT CUSTOM HOOK':'PLACE GROUND ANCHOR'}</b><span>{s?.customHookPlacement!==null?'Tap a frame edge or bumper on the recovery vehicle.':'Tap open ground off the road, 4–32 m from truck and 3–32 m from vehicle.'}</span><button type="button" onClick={s?.customHookPlacement!==null?cancelCustomHook:cancelAnchorPlacement}>CANCEL PLACEMENT</button></div>}
-  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .55 • NO-SCROLL OPTIONS</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
+  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .56 • HEAVY TABS</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
   <div className="game-minimap" style={{position:'absolute',left:12,bottom:195,zIndex:9,width:mapOpen?146:106,height:mapOpen?166:36,pointerEvents:'auto',border:'2px solid #f3c851',borderRadius:12,background:'rgba(9,20,30,.88)',color:'#fff',boxShadow:'0 3px 14px #0008',padding:6,boxSizing:'border-box'}}>
    <button onClick={()=>setMapOpen(v=>!v)} style={{fontSize:11,fontWeight:800,width:'100%',background:'transparent',border:0,color:'white'}}>{mapOpen?'MAP −':'MAP +'}</button>
    {mapOpen&&<svg viewBox="0 0 140 140" width="132" height="132" aria-label="Map of recovery vehicles and destination">
@@ -900,13 +900,16 @@ export default function TowingGame(){
   <span className="boom-label right">{boomMode==='extend'?'OUT':'RIGHT'}</span>
   <div className="boom-knob" style={{transform:`translate(${boomStick.x*29}px,${-boomStick.y*29}px)`}}/>
  </div>
- </div></div>}<div className={'recovery equipment-compact '+(recoveryOpen?'is-open':'is-collapsed')}>
+ </div></div>}<div className={'recovery equipment-compact '+(s?.type.id==='rotator'?'heavy-compact ':'')+(recoveryOpen?'is-open':'is-collapsed')}>
  <button type="button" className="recovery-toggle" onClick={()=>{setRecoveryOpen(v=>!v);setMenuOpen(false);setCameraPanelOpen(false);}}>
   {s?.type.id==='light'?'WHEEL LIFT':s?.type.id==='rotator'?'HEAVY RECOVERY':s?.type.id==='flatbed'?'ROLLBACK':'EQUIPMENT'} {recoveryOpen?'−':'+'}
  </button>
  {recoveryOpen&&<>
-  <button type="button" className={'action brake-button '+(hud.parking?'active':'')} onClick={togglePark}>{hud.parking?'PARK BRAKE ✓':'PARK BRAKE'}</button>
-  {s?.tools.includes('winch')&&<div className="winch-speed-selector" role="group" aria-label="Winch reel speed">{['fine','medium','high'].map(mode=><button key={mode} className={winchSpeed===mode?'selected':''} onClick={()=>selectWinchSpeed(mode)}>{mode.toUpperCase()}</button>)}</div>}
+  {s?.type.id==='rotator'?<div className="equipment-row heavy-safety-row">
+    <button type="button" className={'action brake-button '+(hud.parking?'active':'')} onClick={togglePark}>{hud.parking?'PARK ✓':'PARK BRAKE'}</button>
+    <button type="button" className={'action '+(hud.riggers?'active':'')} onClick={toggleRiggers}>RIGGERS {hud.riggers?'RETRACT':'DEPLOY'}</button>
+   </div>:<button type="button" className={'action brake-button '+(hud.parking?'active':'')} onClick={togglePark}>{hud.parking?'PARK BRAKE ✓':'PARK BRAKE'}</button>}
+  {s?.tools.includes('winch')&&(s?.type.id!=='rotator'||heavyTab==='operate')&&<div className="winch-speed-selector" role="group" aria-label="Winch reel speed">{['fine','medium','high'].map(mode=><button key={mode} className={winchSpeed===mode?'selected':''} onClick={()=>selectWinchSpeed(mode)}>{mode.toUpperCase()}</button>)}</div>}
   {s?.type.id==='light'&&<>
    <div className="equipment-tabs"><button type="button" className={equipmentTab==='quick'?'selected':''} onClick={()=>setEquipmentTab('quick')}>AUTO</button><button type="button" className={equipmentTab==='manual'?'selected':''} onClick={()=>setEquipmentTab('manual')}>MANUAL</button></div>
    {equipmentTab==='quick'?<>
@@ -952,22 +955,52 @@ export default function TowingGame(){
    </>}
   </>}
   {s?.type.id==='rotator'&&<>
-   <button className={'action '+(hud.riggers?'active':'')} onClick={toggleRiggers}>RIGGERS {hud.riggers?'RETRACT':'DEPLOY'}</button>
-   <div className="equipment-tabs recovery-tabs-three"><button type="button" className={'recovery-tab line-a-tab '+(activeRecoveryLine===0?'selected':'')} onClick={()=>setActiveRecoveryLine(0)}>● LINE A</button><button type="button" className={'recovery-tab line-b-tab '+(activeRecoveryLine===1?'selected':'')} onClick={()=>setActiveRecoveryLine(1)}>● LINE B</button><button type="button" className={'recovery-tab '+(activeRecoveryLine==='both'?'selected':'')} onClick={()=>setActiveRecoveryLine('both')}>BOTH</button></div>
-   {activeRecoveryLine==='both'&&<div className="recovery-line-compact dual-recovery-controls">
-     <div className="line-summary dual-line-status"><span className="line-a-label">A: {s.recoveryLines[0].connected?'CONNECTED':'NOT CONNECTED'}</span><span className="line-b-label">B: {s.recoveryLines[1].connected?'CONNECTED':'NOT CONNECTED'}</span></div>
-     {s.recoveryLines.every(line=>line.connected)?<div className="equipment-row"><Hold label="WINCH BOTH" onDown={bothRecoveryPress(1)} onUp={bothRecoveryPress(0)}/><Hold label="PAY BOTH" onDown={bothRecoveryPress(-1)} onUp={bothRecoveryPress(0)}/></div>:<div className="line-summary">Connect A and B from their tabs first.</div>}
+   <div className="equipment-tabs recovery-tabs-three">
+    <button type="button" className={'recovery-tab line-a-tab '+(activeRecoveryLine===0?'selected':'')} onClick={()=>setActiveRecoveryLine(0)}>● LINE A</button>
+    <button type="button" className={'recovery-tab line-b-tab '+(activeRecoveryLine===1?'selected':'')} onClick={()=>setActiveRecoveryLine(1)}>● LINE B</button>
+    <button type="button" className={'recovery-tab '+(activeRecoveryLine==='both'?'selected':'')} onClick={()=>setActiveRecoveryLine('both')}>BOTH</button>
+   </div>
+   <div className="equipment-tabs heavy-tabs" role="tablist" aria-label="Heavy recovery controls">
+    <button type="button" role="tab" aria-selected={heavyTab==='operate'} className={heavyTab==='operate'?'selected':''} onClick={()=>setHeavyTab('operate')}>WINCH</button>
+    <button type="button" role="tab" aria-selected={heavyTab==='hook'} className={heavyTab==='hook'?'selected':''} onClick={()=>setHeavyTab('hook')}>HOOK</button>
+    <button type="button" role="tab" aria-selected={heavyTab==='anchors'} className={heavyTab==='anchors'?'selected':''} onClick={()=>setHeavyTab('anchors')}>ANCHORS</button>
+   </div>
+   {heavyTab==='operate'&&<div className="heavy-section">
+    {activeRecoveryLine==='both'?<>
+      <div className="line-summary dual-line-status"><span className="line-a-label">A: {s.recoveryLines[0].connected?'CONNECTED':'NOT CONNECTED'}</span><span className="line-b-label">B: {s.recoveryLines[1].connected?'CONNECTED':'NOT CONNECTED'}</span></div>
+      {s.recoveryLines.every(line=>line.connected)?<div className="equipment-row">
+       <Hold label="WINCH BOTH" onDown={bothRecoveryPress(1)} onUp={bothRecoveryPress(0)}/>
+       <Hold label="PAY BOTH" onDown={bothRecoveryPress(-1)} onUp={bothRecoveryPress(0)}/>
+      </div>:<div className="line-summary">Select A or B to connect each line first.</div>}
+    </>:s.recoveryLines[activeRecoveryLine]&&<>
+      <div className="line-summary">LINE {activeRecoveryLine===0?'A':'B'} • {s.recoveryLines[activeRecoveryLine].connected?'CONNECTED':'READY TO HOOK'} • {(hud.lineTensions?.[activeRecoveryLine]??0).toFixed(1)} kN</div>
+      <button type="button" className={'action '+(s.recoveryLines[activeRecoveryLine].connected?'active':'')} onClick={()=>toggleRecoveryLine(activeRecoveryLine)}>{s.recoveryLines[activeRecoveryLine].connected?'DISCONNECT LINE':'CONNECT TO VEHICLE'}</button>
+      {s.recoveryLines[activeRecoveryLine].connected?<div className="equipment-row">
+        <Hold label="WINCH IN" onDown={recoveryPress(activeRecoveryLine,1)} onUp={recoveryPress(activeRecoveryLine,0)}/>
+        <Hold label="PAY OUT" onDown={recoveryPress(activeRecoveryLine,-1)} onUp={recoveryPress(activeRecoveryLine,0)}/>
+      </div>:<div className="line-summary">Use HOOK tab for attachment point and cable route.</div>}
+    </>}
    </div>}
-   {s?.type.id==='rotator'&&<><button type="button" className="action" onClick={startDoubleAnchorSetup}>LINE A • TWO REDIRECT POINTS</button><div className="equipment-row">{[3,4].map((slot,i)=><button key={slot} type="button" className="action" disabled={!s.riggingAnchors[slot].pos} onClick={()=>removePlacedAnchor(slot)}>REMOVE ANCHOR {i===0?'A':'B'}</button>)}</div></>}
-   {s?.recoveryLines[activeRecoveryLine]&&<div className={'recovery-line-compact '+(activeRecoveryLine===0?'line-a-controls':'line-b-controls')}>
-    <div className="line-summary">BOOM → {s.riggingAnchors[s.recoveryLines[activeRecoveryLine].redirect].label}{s.recoveryLines[activeRecoveryLine].secondRedirect?' → '+s.riggingAnchors[s.recoveryLines[activeRecoveryLine].secondRedirect].label:''} → {selectedRecoveryPoint(s,s.recoveryLines[activeRecoveryLine]).label}</div>
-    {!s.recoveryLines[activeRecoveryLine].connected&&<div className="equipment-row"><select className="action" aria-label="Choose vehicle attachment point" value={s.recoveryLines[activeRecoveryLine].point} onChange={e=>{const line=s.recoveryLines[activeRecoveryLine];if(!line.connected){line.point=Number(e.target.value);line.customPoint=null;setNotice("Hook position: "+RECOVERY_POINTS[line.point].label);}}}>{RECOVERY_POINTS.map((p,i)=><option key={p.id} value={i}>{p.label}</option>)}</select><button className="action" onClick={()=>changeRecoveryRedirect(activeRecoveryLine)}>{s.riggingAnchors[s.recoveryLines[activeRecoveryLine].redirect].label}</button></div>}
-    {!s.recoveryLines[activeRecoveryLine].connected&&<button className="action" onClick={()=>startCustomHook(activeRecoveryLine)}>CUSTOM HOOK • TAP VEHICLE</button>}
-    {!s.recoveryLines[activeRecoveryLine].connected&&<button className="action" onClick={()=>startAnchorPlacement(activeRecoveryLine)}>PLACE / MOVE ANCHOR</button>}
-     {s.recoveryLines[activeRecoveryLine].connected&&<div className="line-summary">CONNECTED TO VEHICLE • {RECOVERY_POINTS[s.recoveryLines[activeRecoveryLine].point].label}</div>}
-    {s.secondary.active&&<button className="action" onClick={()=>changeRecoveryTarget(activeRecoveryLine)}>TARGET VEHICLE {s.recoveryLines[activeRecoveryLine].target+1}</button>}
-    <button className={'action '+(s.recoveryLines[activeRecoveryLine].connected?'active':'')} onClick={()=>toggleRecoveryLine(activeRecoveryLine)}>{s.recoveryLines[activeRecoveryLine].connected?'DISCONNECT LINE':'CONNECT TO VEHICLE'}</button>
-    {s.recoveryLines[activeRecoveryLine].connected&&<div className="equipment-row"><Hold label="WINCH IN" onDown={recoveryPress(activeRecoveryLine,1)} onUp={recoveryPress(activeRecoveryLine,0)}/><Hold label="PAY OUT" onDown={recoveryPress(activeRecoveryLine,-1)} onUp={recoveryPress(activeRecoveryLine,0)}/></div>}
+   {heavyTab==='hook'&&<div className="heavy-section">
+    {activeRecoveryLine==='both'?<div className="line-summary">Select LINE A or LINE B to set its hook.</div>:s.recoveryLines[activeRecoveryLine]&&<>
+      <div className="line-summary">LINE {activeRecoveryLine===0?'A':'B'} • {selectedRecoveryPoint(s,s.recoveryLines[activeRecoveryLine]).label} • {s.riggingAnchors[s.recoveryLines[activeRecoveryLine].redirect].label}</div>
+      {!s.recoveryLines[activeRecoveryLine].connected?<div className="equipment-row">
+        <select className="action" aria-label="Choose vehicle attachment point" value={s.recoveryLines[activeRecoveryLine].point} onChange={e=>{const line=s.recoveryLines[activeRecoveryLine];if(!line.connected){line.point=Number(e.target.value);line.customPoint=null;setNotice("Hook position: "+RECOVERY_POINTS[line.point].label);}}}>{RECOVERY_POINTS.map((p,i)=><option key={p.id} value={i}>{p.label}</option>)}</select>
+        <button type="button" className="action" onClick={()=>changeRecoveryRedirect(activeRecoveryLine)}>{s.riggingAnchors[s.recoveryLines[activeRecoveryLine].redirect].label}</button>
+       </div>:<div className="line-summary">Disconnect from WINCH tab to change the hook.</div>}
+      <div className="equipment-row">
+        <button type="button" className="action" disabled={s.recoveryLines[activeRecoveryLine].connected} onClick={()=>startCustomHook(activeRecoveryLine)}>CUSTOM HOOK</button>
+        {s.secondary.active?<button type="button" className="action" onClick={()=>changeRecoveryTarget(activeRecoveryLine)}>TARGET VEHICLE {s.recoveryLines[activeRecoveryLine].target+1}</button>:<button type="button" className="action" onClick={()=>setHeavyTab('anchors')}>ANCHOR ROUTE</button>}
+      </div>
+    </>}
+   </div>}
+   {heavyTab==='anchors'&&<div className="heavy-section">
+      <button type="button" className="action" onClick={startDoubleAnchorSetup}>LINE A • TWO REDIRECT POINTS</button>
+      {activeRecoveryLine!=='both'?<button type="button" className="action" onClick={()=>startAnchorPlacement(activeRecoveryLine)}>PLACE / MOVE ANCHOR {activeRecoveryLine===0?'A':'B'}</button>:<div className="line-summary">Choose LINE A or LINE B to place its anchor.</div>}
+      <div className="equipment-row">
+       {[3,4].map((slot,i)=><button key={slot} type="button" className="action" disabled={!s.riggingAnchors[slot].pos} onClick={()=>removePlacedAnchor(slot)}>REMOVE ANCHOR {i===0?'A':'B'}</button>)}
+      </div>
+      <div className="line-summary">Tap HOOK to choose which anchor routes the cable.</div>
    </div>}
   </>}
  </>}
