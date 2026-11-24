@@ -165,7 +165,7 @@ export default function TowingGame(){
  const [savedCheckpoint,setSavedCheckpoint]=useState(()=>{
   try{return parseRecoverySave(localStorage.getItem(RECOVERY_SAVE_KEY),JOBS.length)}catch{return null}
  });
- const [settingsOpen,setSettingsOpen]=useState(false),[mapOpen,setMapOpen]=useState(true),[menuOpen,setMenuOpen]=useState(false),[recoveryOpen,setRecoveryOpen]=useState(true);const [settings,setSettings]=useState(()=>{try{return {steering:1,boom:1,winch:1,driveMode:'joystick',...JSON.parse(localStorage.getItem('towing-controls')||'{}')}}catch{return {steering:1,boom:1,winch:1,driveMode:'joystick'}}});const settingsRef=useRef(settings);settingsRef.current=settings;const changeSetting=(key,value)=>setSettings(old=>{const next={...old,[key]:value};settingsRef.current=next;try{localStorage.setItem('towing-controls',JSON.stringify(next))}catch{}return next;});
+ const [settingsOpen,setSettingsOpen]=useState(false),[mapOpen,setMapOpen]=useState(()=>typeof window==='undefined'||window.innerHeight>520),[menuOpen,setMenuOpen]=useState(false),[recoveryOpen,setRecoveryOpen]=useState(true);const [settings,setSettings]=useState(()=>{try{return {steering:1,boom:1,winch:1,driveMode:'joystick',...JSON.parse(localStorage.getItem('towing-controls')||'{}')}}catch{return {steering:1,boom:1,winch:1,driveMode:'joystick'}}});const settingsRef=useRef(settings);settingsRef.current=settings;const changeSetting=(key,value)=>setSettings(old=>{const next={...old,[key]:value};settingsRef.current=next;try{localStorage.setItem('towing-controls',JSON.stringify(next))}catch{}return next;});
  const [equipmentTab,setEquipmentTab]=useState('quick'),[activeRecoveryLine,setActiveRecoveryLine]=useState(0),[winchSpeed,setWinchSpeed]=useState('medium'),[placingAnchor,setPlacingAnchor]=useState(false);const [garage,setGarage]=useState(false),[notice,setNotice]=useState(''),[hydraulic,setHydraulic]=useState({x:0,y:0}),[boomStick,setBoomStick]=useState({x:0,y:0}),[boomMode,setBoomMode]=useState('extend'),[cameraMode,setCameraMode]=useState('orbit'),[cameraPanelOpen,setCameraPanelOpen]=useState(false);
  const saveCareer=fn=>setCareer(old=>{const next=fn(old);careerRef.current=next;try{localStorage.setItem('towing-career',JSON.stringify(next))}catch{}return next;});
  const mount=useRef(null),sim=useRef(null),[hud,setHud]=useState({speed:0,gear:'D',hook:false,tension:0,winch:'IDLE'}),[help,setHelp]=useState(false),[steerVisual,setSteerVisual]=useState(0);
@@ -845,10 +845,10 @@ export default function TowingGame(){
  const nextCamera=()=>{const index=CAMERA_MODES.findIndex(([id])=>id===cameraMode);changeCamera(CAMERA_MODES[(index+1)%CAMERA_MODES.length][0]);};
  const toggleRearCamera=()=>changeCamera(cameraMode==='reverse'?'orbit':'reverse');
  const currentJob=JOBS[career.job%JOBS.length];
- return <main className="game-shell"><div className={'scene'+(placingAnchor?' anchor-placement-scene':'')} ref={mount}/>
+ return <main className={'game-shell'+(menuOpen?' menu-active':'')+(cameraPanelOpen?' camera-active':'')}><div className={'scene'+(placingAnchor?' anchor-placement-scene':'')} ref={mount}/>
    {placingAnchor&&<div className="anchor-placement-hint" role="status"><b>{s?.customHookPlacement!==null?'SELECT CUSTOM HOOK':'PLACE GROUND ANCHOR'}</b><span>{s?.customHookPlacement!==null?'Tap a frame edge or bumper on the recovery vehicle.':'Tap open ground off the road, 4–32 m from truck and 3–32 m from vehicle.'}</span><button type="button" onClick={s?.customHookPlacement!==null?cancelCustomHook:cancelAnchorPlacement}>CANCEL PLACEMENT</button></div>}
-  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .52 • SAVE IN-PROGRESS</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
-  <div style={{position:'absolute',left:12,bottom:195,zIndex:9,width:mapOpen?146:106,height:mapOpen?166:36,pointerEvents:'auto',border:'2px solid #f3c851',borderRadius:12,background:'rgba(9,20,30,.88)',color:'#fff',boxShadow:'0 3px 14px #0008',padding:6,boxSizing:'border-box'}}>
+  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .53 • CLEAN MOBILE HUD</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
+  <div className="game-minimap" style={{position:'absolute',left:12,bottom:195,zIndex:9,width:mapOpen?146:106,height:mapOpen?166:36,pointerEvents:'auto',border:'2px solid #f3c851',borderRadius:12,background:'rgba(9,20,30,.88)',color:'#fff',boxShadow:'0 3px 14px #0008',padding:6,boxSizing:'border-box'}}>
    <button onClick={()=>setMapOpen(v=>!v)} style={{fontSize:11,fontWeight:800,width:'100%',background:'transparent',border:0,color:'white'}}>{mapOpen?'MAP −':'MAP +'}</button>
    {mapOpen&&<svg viewBox="0 0 140 140" width="132" height="132" aria-label="Map of recovery vehicles and destination">
     <rect width="140" height="140" rx="6" fill="#1b3431"/>
@@ -901,7 +901,7 @@ export default function TowingGame(){
   <div className="boom-knob" style={{transform:`translate(${boomStick.x*29}px,${-boomStick.y*29}px)`}}/>
  </div>
  </div></div>}<div className={'recovery equipment-compact '+(recoveryOpen?'is-open':'is-collapsed')}>
- <button type="button" className="recovery-toggle" onClick={()=>{setRecoveryOpen(v=>!v);setMenuOpen(false);}}>
+ <button type="button" className="recovery-toggle" onClick={()=>{setRecoveryOpen(v=>!v);setMenuOpen(false);setCameraPanelOpen(false);}}>
   {s?.type.id==='light'?'WHEEL LIFT':s?.type.id==='rotator'?'HEAVY RECOVERY':s?.type.id==='flatbed'?'ROLLBACK':'EQUIPMENT'} {recoveryOpen?'−':'+'}
  </button>
  {recoveryOpen&&<>
@@ -972,13 +972,13 @@ export default function TowingGame(){
   </>}
  </>}
  </div><div className="drive"><Hold label="REV" onDown={press('throttle',-.55)} onUp={press('throttle',0)}/><Hold label="BRAKE" onDown={press('brake',1)} onUp={press('brake',0)}/><Hold label="GAS" wide onDown={press('throttle',1)} onUp={press('throttle',0)}/></div></div>
-  <div className="toolbar">
-  <button type="button" className="menu-toggle" onClick={()=>{setMenuOpen(v=>!v);setRecoveryOpen(false);setCameraPanelOpen(false);}}>{menuOpen?'CLOSE MENU ✕':'MENU ☰'}</button>
-  <div className="camera-shortcuts" role="group" aria-label="Camera controls">
+  <div className={'toolbar'+(menuOpen?' menu-open':'')+(cameraPanelOpen?' camera-open':'')}>
+  <button type="button" className="menu-toggle" aria-expanded={menuOpen} onClick={()=>{setMenuOpen(v=>!v);setCameraPanelOpen(false);setSettingsOpen(false);setGarage(false);setHelp(false);}}>{menuOpen?'CLOSE MENU ✕':'MENU ☰'}</button>
+  {!menuOpen&&<div className="camera-shortcuts" role="group" aria-label="Camera controls">
     <button type="button" className="camera-cycle" onClick={nextCamera} title="Cycle camera angles">CAM: {CAMERA_MODES.find(([id])=>id===cameraMode)?.[1]} ↻</button>
     <button type="button" className="camera-angles" onClick={()=>{setCameraPanelOpen(v=>!v);setMenuOpen(false);}} aria-expanded={cameraPanelOpen}>ANGLES {cameraPanelOpen?'−':'+'}</button>
-  </div>
-  {cameraPanelOpen&&<div className="camera-selector" role="group" aria-label="Camera angle presets">
+  </div>}
+  {cameraPanelOpen&&!menuOpen&&<div className="camera-selector" role="group" aria-label="Camera angle presets">
     {CAMERA_MODES.map(([id,label])=><button type="button" key={id} className={cameraMode===id?'selected':''} onClick={()=>changeCamera(id)}>{label}</button>)}
   </div>}
   {menuOpen&&<div className="toolbar-panel"><div className="checkpoint-actions">
