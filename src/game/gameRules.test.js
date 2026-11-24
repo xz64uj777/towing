@@ -131,7 +131,7 @@ test('deep ravine recovery slope and road approach remain physically distinct',(
 });
 
 
-import {captureRecoverySave,parseRecoverySave,restoreRecoverySave} from './progressSave.js';
+import {captureRecoverySave,parseRecoverySave,restoreRecoverySave,pushRecoverySlot,parseRecoverySlots,RECOVERY_SLOT_LIMIT,savedAgo} from './progressSave.js';
 const checkpointVector=(x,y,z)=>({x,y,z,set(a,b,c){this.x=a;this.y=b;this.z=c;}});
 function checkpointFixture(){
  const marker=()=>({visible:false,position:checkpointVector(0,0,0)});
@@ -166,6 +166,41 @@ test('resume restores positions, line tension settings, brakes without restartin
  assert.equal(fresh.recoveryLines[0].motor,0);assert.equal(fresh.recoveryLines[1].motor,0);
  assert.equal(fresh.riggingAnchors[3].marker.visible,true);
  assert.ok(Math.abs(fresh.riggingAnchors[3].marker.position.y-.15)<1e-8);
+});
+test('autosave keeps one slot per dispatch and drops the oldest',()=>{
+ const fixture=checkpointFixture();
+ let slots=[];
+ for(const jobIndex of [0,1,2,3]){
+  fixture.jobIndex=jobIndex;
+  slots=pushRecoverySlot(slots,captureRecoverySave({job:jobIndex},fixture));
+ }
+ assert.equal(slots.length,RECOVERY_SLOT_LIMIT);
+ assert.deepEqual(slots.map(slot=>slot.jobIndex),[3,2,1]);
+});
+test('repeated autosaves refresh one dispatch instead of filling the ring',()=>{
+ const fixture=checkpointFixture();
+ let slots=pushRecoverySlot([],captureRecoverySave({job:4},fixture));
+ fixture.pos.set(1.5,0,-70);
+ slots=pushRecoverySlot(slots,captureRecoverySave({job:4},fixture));
+ slots=pushRecoverySlot(slots,captureRecoverySave({job:4},fixture));
+ assert.equal(slots.length,1);
+ assert.equal(slots[0].truck.pos.x,1.5);
+});
+test('stored autosaves are revalidated, de-duplicated and capped on load',()=>{
+ const good=captureRecoverySave({job:4},checkpointFixture());
+ const other={...good,jobIndex:2,career:{...good.career,job:2}};
+ const parsed=parseRecoverySlots(JSON.stringify([good,other,{...good,jobIndex:1},null,'junk']),7,2);
+ assert.deepEqual(parsed.map(slot=>slot.jobIndex),[4,2]);
+ assert.deepEqual(parseRecoverySlots('{',7),[]);
+ assert.deepEqual(parseRecoverySlots(null,7),[]);
+ assert.deepEqual(parseRecoverySlots([{...good,version:2}],7),[]);
+});
+test('autosave age is shown in plain language',()=>{
+ const now=1000000000000;
+ assert.equal(savedAgo(now,now),'just now');
+ assert.equal(savedAgo(now-90000,now),'2 minutes ago');
+ assert.equal(savedAgo(now-3*3600000,now),'3 hours ago');
+ assert.equal(savedAgo(undefined,now),'just now');
 });
 test('invalid saved games are ignored rather than crashing startup',()=>{
  assert.equal(parseRecoverySave('{',7),null);

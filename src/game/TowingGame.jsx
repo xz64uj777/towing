@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import {levelFourHeight,levelFourSlope,levelFourDownhillAcceleration,LEVEL_FOUR_STAGING} from './levelFourTerrain.js';
 import {createLevelFourScene} from './levelFourScene.js';
 import {createLakeScene,lakeHeight,lakeSlope,lakeDownhillAcceleration,LAKE_SURFACE} from './lakeScene.js';
-import {RECOVERY_SAVE_KEY,captureRecoverySave,parseRecoverySave,restoreRecoverySave} from './progressSave.js';
+import {RECOVERY_SAVE_KEY,RECOVERY_SLOTS_KEY,RECOVERY_SLOT_LIMIT,captureRecoverySave,parseRecoverySave,parseRecoverySlots,pushRecoverySlot,restoreRecoverySave,savedAgo} from './progressSave.js';
 import {sampleSurface,recoverySurfaceVelocity} from './terrainPhysics.js';
 import {createGameAudio} from './gameAudio.js';
 import {ROLLBACK_LENGTH,rollbackDeck,rollbackPose,rollbackStop,rollbackTravel,rollbackReady,rollbackCanConnect,rollbackAligned,rollbackGroundLimit,rollbackApproachStep,rollbackCanUnhook,rollbackRampReady,rollbackStowed,rollbackHydraulicStep,rollbackTransportReady,rollbackContactHeight,rollbackTieDownPath} from './rollbackPhysics.js';
@@ -203,9 +203,17 @@ export default function TowingGame(){
  const careerRef=useRef(career);careerRef.current=career;
  const pendingRestore=useRef(null);
  const [restoreSequence,setRestoreSequence]=useState(0);
- const [savedCheckpoint,setSavedCheckpoint]=useState(()=>{
-  try{return parseRecoverySave(localStorage.getItem(RECOVERY_SAVE_KEY),JOBS.length)}catch{return null}
+ // Autosaved dispatches, newest first. An older single-slot checkpoint is imported once.
+ const [savedSlots,setSavedSlots]=useState(()=>{
+  try{
+   const slots=parseRecoverySlots(localStorage.getItem(RECOVERY_SLOTS_KEY),JOBS.length);
+   if(slots.length)return slots;
+   const legacy=parseRecoverySave(localStorage.getItem(RECOVERY_SAVE_KEY),JOBS.length);
+   return legacy?[legacy]:[];
+  }catch{return []}
  });
+ const slotsRef=useRef(savedSlots);slotsRef.current=savedSlots;
+ const [resumePromptOpen,setResumePromptOpen]=useState(()=>savedSlots.length>0);
  const [settingsOpen,setSettingsOpen]=useState(false),[mapOpen,setMapOpen]=useState(false),[menuOpen,setMenuOpen]=useState(false),[recoveryOpen,setRecoveryOpen]=useState(true);const [settings,setSettings]=useState(()=>{try{return {steering:1,boom:1,winch:1,driveMode:'joystick',soundMuted:false,soundVolume:.7,...JSON.parse(localStorage.getItem('towing-controls')||'{}')}}catch{return {steering:1,boom:1,winch:1,driveMode:'joystick',soundMuted:false,soundVolume:.7}}});const settingsRef=useRef(settings);settingsRef.current=settings;const changeSetting=(key,value)=>setSettings(old=>{const next={...old,[key]:value};settingsRef.current=next;try{localStorage.setItem('towing-controls',JSON.stringify(next))}catch{}return next;});
  const [activeRecoveryLine,setActiveRecoveryLine]=useState(0),[winchSpeed,setWinchSpeed]=useState('medium'),[placingAnchor,setPlacingAnchor]=useState(false);const [garage,setGarage]=useState(false),[notice,setNotice]=useState(''),[hydraulic,setHydraulic]=useState({x:0,y:0}),[boomStick,setBoomStick]=useState({x:0,y:0}),[boomMode,setBoomMode]=useState('extend'),[cameraMode,setCameraMode]=useState('orbit'),[cameraPanelOpen,setCameraPanelOpen]=useState(false);
  const saveCareer=fn=>setCareer(old=>{const next=fn(old);careerRef.current=next;try{localStorage.setItem('towing-career',JSON.stringify(next))}catch{}return next;});
@@ -219,6 +227,19 @@ export default function TowingGame(){
   return()=>{window.removeEventListener('pointerup',unlock,true);window.removeEventListener('click',unlock,true);window.removeEventListener('keydown',unlock,true);document.removeEventListener('visibilitychange',hide);window.removeEventListener('blur',audio.silence);audio.close();audioRef.current=null;};
  },[]);
  const mount=useRef(null),sim=useRef(null),[hud,setHud]=useState({speed:0,gear:'D',hook:false,tension:0,winch:'IDLE'}),[help,setHelp]=useState(false),[steerVisual,setSteerVisual]=useState(0);
+ const AUTOSAVE_MS=6000;
+ // Autosave on a short timer and again when the tab is hidden, so a reload or a switched app keeps the recovery.
+ useEffect(()=>{
+  const save=()=>{
+   const game=sim.current;
+   if(!game||game.jobDone||pendingRestore.current)return;
+   try{persistSlots(pushRecoverySlot(slotsRef.current,captureRecoverySave(careerRef.current,game),RECOVERY_SLOT_LIMIT));}catch{}
+  };
+  const timer=setInterval(save,AUTOSAVE_MS);
+  const onVisibility=()=>{if(document.hidden)save();};
+  document.addEventListener('visibilitychange',onVisibility);window.addEventListener('pagehide',save);
+  return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',onVisibility);window.removeEventListener('pagehide',save);};
+ },[]);
  useEffect(()=>{
   const host=mount.current;if(!host)return;
   const scene=new THREE.Scene();scene.environment=reflectionSky(THREE);scene.environmentIntensity=.55;scene.background=new THREE.Color(0x9db2c2);scene.fog=new THREE.Fog(0x9db2c2,55,180);
@@ -679,10 +700,13 @@ export default function TowingGame(){
       s.jobDone=true;s.winch=false;s.winchOut=false;s.hook=false;
       for(const line of s.recoveryLines){line.connected=false;line.motor=0;line.tension=0;}
       const reward=JOBS[s.jobIndex%JOBS.length].pay;
-      // Completed jobs must not accidentally load an obsolete recovery checkpoint.
-      try{const oldSave=parseRecoverySave(localStorage.getItem(RECOVERY_SAVE_KEY),JOBS.length);
-       if(oldSave?.jobIndex===s.jobIndex){localStorage.removeItem(RECOVERY_SAVE_KEY);setSavedCheckpoint(null);}}
-      catch{}
+      // A completed dispatch must not come back as a resumable autosave.
+      try{
+       const kept=parseRecoverySlots(localStorage.getItem(RECOVERY_SLOTS_KEY),JOBS.length).filter(slot=>slot.jobIndex!==s.jobIndex);
+       persistSlots(kept);
+       const oldSave=parseRecoverySave(localStorage.getItem(RECOVERY_SAVE_KEY),JOBS.length);
+       if(oldSave?.jobIndex===s.jobIndex)localStorage.removeItem(RECOVERY_SAVE_KEY);
+      }catch{}
       saveCareer(p=>({...p,cash:p.cash+reward,completed:p.completed+1,job:p.job+1,selected:JOBS[(p.job+1)%JOBS.length].truck}));
       setNotice('JOB COMPLETE +$'+reward+'! Next dispatch automatically loaded.');
     }
@@ -879,29 +903,28 @@ export default function TowingGame(){
 };
  const toggleHook=()=>{const s=sim.current;if(!s)return;if(!s.hook&&s.hookRedirect&&!s.riggingAnchors[s.hookRedirect].pos){setNotice('Place the selected anchor before connecting to the vehicle.');return;}if(!s.hook&&!s.boomDeployed&&s.tools.includes('boom')){setNotice('Apply PARK BRAKE to activate the boom before hooking.');return;}if(!s.hook&&!s.tools.includes('winch')){setNotice('This truck has no winch.');return;}if(s.type.id==='flatbed'){const deck=deckFor(s),local=rollbackLocal(s),scale=s.pickup.userData.scale;if(s.loaded){setNotice('Release the secured load before connecting.');return;}if(s.hook&&!rollbackCanUnhook(deck,local.z,scale,s.parkingBrake,s.vel.length()<.25)){setNotice('Park and pay out until all tires are on the ground before disconnecting.');return;}if(!s.hook&&(!s.parkingBrake||!rampReady(s)||s.hookRedirect||Math.abs(RECOVERY_POINTS[s.hookPoint].z)<1.5||!rollbackCanConnect(deck,local.x,local.z,rollbackYawError(s),scale))){setNotice('Park, deploy bed, align car behind ramp and select its facing front/rear eye with DIRECT LINE.');return;}}if(!s.hook&&s.pos.distanceTo(s.pickPos)>24){setNotice('Move within 24 m to hook the vehicle.');return;}s.hook=!s.hook;s.previousCableDistance=null;s.cableStrain=0;s.cableStalled=false;s.rollbackBlocked=false;if(s.type.id==='flatbed'){s.winch=false;s.winchOut=false;s.pickVel.set(0,0,0);s.pickYawVel=0;if(!s.hook&&s.dropoffArrived&&s.pos.distanceTo(V(0,0,23))<5&&!s.loaded&&!s.strapsOn){s.dropoffComplete=true;setNotice('Vehicle unloaded. Hold TILT UP, then SLIDE IN to stow the deck and finish.');}else if(s.hook)s.dropoffComplete=false;}if(s.hook){const f=V(Math.sin(s.yaw),0,-Math.cos(s.yaw));const a=s.pos.clone().add(f.multiplyScalar(-2.3));const head=s.type.id==='flatbed'?rollbackHead(s):s.tools.includes('boom')&&s.truck.userData.boomTip?s.truck.userData.boomTip.getWorldPosition(V()):a;const eye=s.type.id==='flatbed'?rollbackEye(s):ordinaryEye(s);s.cableLength=linePathLength(head,eye,s.riggingAnchors[s.hookRedirect].pos);if(s.type.id==='medium')setNotice('Cable connected. Hold WINCH IN to pull the vehicle along the ground.');}else if(s.type.id==='medium'){s.winch=false;s.winchOut=false;s.tension=0;s.pickVel.set(0,0,0);setNotice('Cable disconnected.');}};
  const reset=()=>{const s=sim.current;if(!s)return;s.pos.set(0,s.levelFour?terrainHeight(0,Math.min(-49,JOBS[careerRef.current.job%JOBS.length].z+15)):0,s.levelFour?Math.min(-49,JOBS[careerRef.current.job%JOBS.length].z+15):7);s.vel.set(0,0,0);s.yaw=0;const job=JOBS[careerRef.current.job%JOBS.length];s.pickPos.set(job.x,s.levelFour?terrainHeight(job.x,job.z):0,job.z);s.pickYaw=-.18;s.pickYawVel=0;s.pickRoll=job.roll??0;s.pickRollVel=0;s.secondary.active=!!job.second;s.secondary.mesh.visible=!!job.second;s.secondary.pos.set(job.second?.x??-22,s.levelFour?terrainHeight(job.second?.x??-22,job.second?.z??-106):0,job.second?.z??-106);s.secondary.vel.set(0,0,0);s.secondary.roll=job.second?.roll??0;s.secondary.rollVel=0;s.secondary.yaw=job.second?.yaw??-.1;s.secondary.yawVel=0;for(const line of s.recoveryLines){line.connected=false;line.spool=20;line.motor=0;line.tension=0;line.target=0;line.point=0;line.redirect=0;line.secondRedirect=0;line.customPoint=null;line.doubled=false;line.strain=0;line.stalled=false;line.previousDistance=null;}s.anchorPlacement=null;setPlacingAnchor(false);for(const anchor of s.riggingAnchors){if(anchor.marker){anchor.pos=null;anchor.marker.visible=false;}}s.hookPoint=0;s.hookRedirect=0;for(const rope of s.recoveryCables)rope.visible=false;s.jobIndex=careerRef.current.job;s.jobDone=false;s.dropoffArrived=false;s.dropoffComplete=false;s.autoUnload=false;s.autoLoad=false;s.heavyRecovery=job.kind==='heavy';s.loaded=false;s.prevHitch=null;s.strapsOn=false;s.bedTilt=false;s.bedSlide=0;s.bedProgress=0;s.bedSlideControl=0;s.bedTiltControl=0;s.rollbackLoadX=0;s.rollbackLoadYaw=0;s.rollbackLoadZ=0;s.rollbackBlocked=false;s.zone.position.set(job.kind==='tow'||job.kind==='flatbed'?0:2,.12,job.kind==='tow'||job.kind==='flatbed'?23:job.z);s.pickVel.set(0,0,0);s.hook=false;s.winch=false;s.winchOut=false;s.parkingBrake=false;s.boomDeployed=false;s.boomAngle=.36;s.boomSwing=0;s.boomExtension=0;s.boomControl=0;s.boomExtendControl=0;s.boomSwingControl=0;s.liftDeployed=false;s.liftHeight=0;s.liftExtension=0;s.liftControl=0;s.liftExtendControl=0;s.liftHydraulicX=0;s.liftHydraulicY=0;s.gridWidth=0;s.armsClosed=false;s.riggersDeployed=false;s.cableLength=14;s.previousCableDistance=null;s.cableStrain=0;s.cableStalled=false;};
+ const persistSlots=slots=>{slotsRef.current=slots;setSavedSlots(slots);try{localStorage.setItem(RECOVERY_SLOTS_KEY,JSON.stringify(slots))}catch{}};
  const saveInProgress=()=>{
   const game=sim.current;
   if(!game||game.jobDone){setNotice('Wait for the next dispatch before saving.');return;}
   try{
-   const checkpoint=captureRecoverySave(careerRef.current,game);
-   localStorage.setItem(RECOVERY_SAVE_KEY,JSON.stringify(checkpoint));
-   setSavedCheckpoint(checkpoint);setMenuOpen(false);
-   setNotice('LEVEL '+(game.jobIndex%JOBS.length+1)+' SAVED. Open MENU to RESUME SAVED JOB later.');
+   persistSlots(pushRecoverySlot(slotsRef.current,captureRecoverySave(careerRef.current,game),RECOVERY_SLOT_LIMIT));
+   setMenuOpen(false);setResumePromptOpen(false);
+   setNotice('DISPATCH '+(game.jobIndex%JOBS.length+1)+' SAVED. The last '+RECOVERY_SLOT_LIMIT+' dispatches stay saved; resume from MENU.');
   }catch{setNotice('Could not save. Check browser storage settings.');}
  };
- const resumeSavedJob=()=>{
-  let checkpoint=null;
-  try{checkpoint=parseRecoverySave(localStorage.getItem(RECOVERY_SAVE_KEY),JOBS.length)}catch{}
-  if(!checkpoint){setSavedCheckpoint(null);setNotice('No valid saved job on this device.');return;}
-  pendingRestore.current=checkpoint;
-  saveCareer(old=>({...old,...checkpoint.career,job:checkpoint.jobIndex,selected:checkpoint.career.selected}));
+ const resumeSlot=slot=>{
+  if(!Number.isInteger(slot?.jobIndex)||!slot?.career){setNotice('No valid saved job on this device.');return;}
+  pendingRestore.current=slot;
+  saveCareer(old=>({...old,...slot.career,job:slot.jobIndex,selected:slot.career.selected}));
   setRestoreSequence(n=>n+1);
   setMenuOpen(false);setGarage(false);setHelp(false);setPlacingAnchor(false);setRecoveryOpen(true);
+  setResumePromptOpen(false);
  };
  const deleteSavedJob=()=>{
-  try{localStorage.removeItem(RECOVERY_SAVE_KEY);setSavedCheckpoint(null);
-   setNotice('Checkpoint deleted. The current job is unchanged.');
-  }catch{setNotice('Could not delete checkpoint from this browser.');}
+  try{persistSlots([]);localStorage.removeItem(RECOVERY_SAVE_KEY);
+   setNotice('Autosaves cleared. The current job is unchanged.');
+  }catch{setNotice('Could not clear autosaves from this browser.');}
  };
  const upgrade=type=>{const lvl=careerRef.current[type],price=(lvl+1)*500;if(lvl>=3||careerRef.current.cash<price){setNotice(lvl>=3?'Fully upgraded':'Not enough cash: $'+price);return;}saveCareer(p=>({...p,cash:p.cash-price,[type]:p[type]+1}));setNotice(type.toUpperCase()+' upgraded!');};
  // Wheel-lift capture uses the front tire positions, not the distance between vehicle centers.
@@ -1204,11 +1227,21 @@ export default function TowingGame(){
   <div className={'toolbar'+(menuOpen?' menu-open':'')}>
   <button type="button" className="menu-toggle" aria-expanded={menuOpen} onClick={()=>{setMenuOpen(v=>!v);setCameraPanelOpen(false);setSettingsOpen(false);setGarage(false);setHelp(false);}}>{menuOpen?'CLOSE MENU ✕':'MENU ☰'}</button>
   {menuOpen&&<div className="toolbar-panel" role="dialog" aria-label="Options menu" aria-modal="true"><div className="checkpoint-actions">
-   <div className="checkpoint-caption">{savedCheckpoint?'SAVED: LEVEL '+(savedCheckpoint.jobIndex%JOBS.length+1)+' • '+JOBS[savedCheckpoint.jobIndex%JOBS.length].name:'NO IN-PROGRESS SAVE'}</div>
-   <button className="checkpoint-save" onClick={saveInProgress}>SAVE IN-PROGRESS</button>
-   {savedCheckpoint&&<><button className="checkpoint-resume" onClick={resumeSavedJob}>RESUME SAVED JOB</button><button className="checkpoint-delete" onClick={deleteSavedJob}>DELETE SAVED JOB</button></>}
+   <div className="checkpoint-caption">{savedSlots.length?'AUTOSAVE: '+savedSlots.length+' OF '+RECOVERY_SLOT_LIMIT+' DISPATCHES':'NO IN-PROGRESS SAVE'}</div>
+   <button className="checkpoint-save" onClick={saveInProgress}>SAVE NOW</button>
+   {savedSlots.map(slot=><button key={slot.jobIndex+'-'+slot.career.selected} className="checkpoint-resume" onClick={()=>resumeSlot(slot)}>RESUME {slot.jobIndex%JOBS.length+1} · {JOBS[slot.jobIndex%JOBS.length].name}</button>)}
+   {savedSlots.length>0&&<button className="checkpoint-delete" onClick={deleteSavedJob}>CLEAR AUTOSAVES</button>}
   </div><select aria-label="Select test job" value={career.job%JOBS.length} onChange={e=>selectTestJob(Number(e.target.value))} style={{background:"#153c43",color:"#fff",border:"2px solid #f3c851",borderRadius:7,padding:"8px",fontWeight:800,maxWidth:190}}>{JOBS.map((job,index)=><option key={job.name} value={index}>{index+1}. {job.name}</option>)}</select><button onClick={()=>{setMenuOpen(false);reset();setNotice('Dispatch: '+JOBS[careerRef.current.job%JOBS.length].name);}}>RESTART JOB</button><button onClick={()=>{setMenuOpen(false);setGarage(v=>!v);setHelp(false);}}>FLEET / GARAGE</button><button onClick={()=>{setMenuOpen(false);reset();}}>RESET</button><button onClick={()=>{setMenuOpen(false);changeCamera('orbit');}}>RESET CAMERA</button><button onClick={()=>{setMenuOpen(false);setSettingsOpen(v=>!v);}}>SETTINGS</button><button aria-pressed={!settings.soundMuted} onClick={()=>{const muted=!settings.soundMuted;if(!muted)audioRef.current?.unlock();else audioRef.current?.silence();changeSetting('soundMuted',muted);}}>{settings.soundMuted?'SOUND OFF':'SOUND ON'}</button><button onClick={()=>{setMenuOpen(false);setHelp(v=>!v);}}>CONTROLS</button></div>}</div>
-  {settingsOpen&&<aside className="help" style={{zIndex:30,maxWidth:310}}><button onClick={()=>setSettingsOpen(false)}>×</button><b>CONTROL SETTINGS</b>{[['steering','Driving sensitivity',0.4,1.6],['boom','Boom / hydraulic sensitivity',0.3,2],['winch','Winch speed',0.3,2]].map(([key,label,min,max])=><label key={key}>{label}: {settings[key].toFixed(1)}× <input type="range" min={min} max={max} step="0.1" value={settings[key]} onChange={e=>changeSetting(key,Number(e.target.value))}/></label>)}<label>Sound <input type="checkbox" checked={!settings.soundMuted} onChange={e=>{if(e.target.checked)audioRef.current?.unlock();else audioRef.current?.silence();changeSetting('soundMuted',!e.target.checked);}}/></label><label>Sound volume: {Math.round((settings.soundVolume??.7)*100)}% <input type="range" min="0" max="1" step="0.05" value={settings.soundVolume??.7} onChange={e=>changeSetting('soundVolume',Number(e.target.value))}/></label><label>Steering <select value={settings.driveMode} onChange={e=>changeSetting('driveMode',e.target.value)}><option value="joystick">Joystick</option><option value="arrows">Arrows</option></select></label><small>Saved on this device.</small></aside>}{notice&&<div className="game-notice" onClick={()=>setNotice('')}>{notice} ✕</div>}
+  {settingsOpen&&<aside className="help" style={{zIndex:30,maxWidth:310}}><button onClick={()=>setSettingsOpen(false)}>×</button><b>CONTROL SETTINGS</b>{[['steering','Driving sensitivity',0.4,1.6],['boom','Boom / hydraulic sensitivity',0.3,2],['winch','Winch speed',0.3,2]].map(([key,label,min,max])=><label key={key}>{label}: {settings[key].toFixed(1)}× <input type="range" min={min} max={max} step="0.1" value={settings[key]} onChange={e=>changeSetting(key,Number(e.target.value))}/></label>)}<label>Sound <input type="checkbox" checked={!settings.soundMuted} onChange={e=>{if(e.target.checked)audioRef.current?.unlock();else audioRef.current?.silence();changeSetting('soundMuted',!e.target.checked);}}/></label><label>Sound volume: {Math.round((settings.soundVolume??.7)*100)}% <input type="range" min="0" max="1" step="0.05" value={settings.soundVolume??.7} onChange={e=>changeSetting('soundVolume',Number(e.target.value))}/></label><label>Steering <select value={settings.driveMode} onChange={e=>changeSetting('driveMode',e.target.value)}><option value="joystick">Joystick</option><option value="arrows">Arrows</option></select></label><small>Saved on this device.</small></aside>}  {resumePromptOpen&&savedSlots.length>0&&<aside className="resume-prompt" role="dialog" aria-label="Resume unfinished dispatch">
+   <b>UNFINISHED DISPATCH</b>
+   <span>{savedSlots[0].jobIndex%JOBS.length+1}. {JOBS[savedSlots[0].jobIndex%JOBS.length].name} · {savedAgo(savedSlots[0].savedAt)}</span>
+   <span className="resume-hint">Autosaved on this device. Resume where you left off, or start the dispatch again.</span>
+   <div className="resume-actions">
+    <button type="button" className="resume-go" onClick={()=>resumeSlot(savedSlots[0])}>RESUME</button>
+    <button type="button" className="resume-skip" onClick={()=>setResumePromptOpen(false)}>START FRESH</button>
+   </div>
+  </aside>}
+  {notice&&<div className="game-notice" onClick={()=>setNotice('')}>{notice} ✕</div>}
   {garage&&<aside className="help garage"><button onClick={()=>setGarage(false)}>×</button><b>RECOVERY GARAGE</b><span>TEST MODE: All jobs and trucks unlocked. Choose any job from the bottom toolbar.</span><span>Balance: ${career.cash}</span><div className="fleet-list">{FLEET.map(t=><button key={t.id} className="garage-buy" onClick={()=>chooseTruck(t.id)}>{t.name} · {career.selected===t.id?'SELECTED':'TEST DRIVE'}</button>)}</div><button className="garage-buy" onClick={()=>upgrade('engine')}>ENGINE LV {career.engine}/3 · {'$'+(career.engine+1)*500}</button><button className="garage-buy" onClick={()=>upgrade('winch')}>WINCH LV {career.winch}/3 · {'$'+(career.winch+1)*500}</button><small>Progress saves on this device.</small></aside>}
   {help&&<aside className="help instructions-panel" role="dialog" aria-label="Game instructions"><button type="button" className="instructions-close" onClick={()=>setHelp(false)} aria-label="Close instructions">×</button><button type="button" className="instructions-start" onClick={()=>setHelp(false)}>▶ START GAME</button><b>HOW TO OPERATE</b><span>Use the left joystick to steer. Reverse and gas are on the right. Release the gas to slow down; use PARK BRAKE to stop and secure the truck. Deploy the boom and parking brake before winching. The heavy boom joystick appears on the left side of the screen when either PARK BRAKE or RIGGERS is engaged and the truck is stopped. Winching heavy recoveries still requires both park brake and riggers. Park brake is required for capturing the tires and all heavy recovery operations; both light and medium wheel lifts can be deployed and adjusted at walking speed without the park brake while unloaded. Use CAM to cycle camera views or ANGLES for RAVINE, FREE, CHASE, REAR, FRONT, LEFT, RIGHT, TOP, HOOK and WIDE views. Drag to orbit; pinch to zoom any view. Drive within 24 m to hook the pickup. Light wheel-lift: tap LOWER WHEEL LIFT while moving slowly, reverse beneath the front tires until the status says TIRES ALIGNED, stop and apply PARK BRAKE, tap CLOSE L-ARMS, hold LIFT UP, tap FIT TIRE STRAPS, release brake and tow. Open WHEEL LIFT on the right to access these buttons. MENU opens separately at the top right. Flatbed: park and hold SLIDE OUT, then TILT DOWN. Hook and winch aboard; FIT 4 STRAPS. Hold TILT UP, then SLIDE IN before driving. At depot deploy the ramp manually, REMOVE 4 STRAPS, winch out, unhook on the ground and stow the deck. If misaligned, unhook and reposition. Medium wrecker: fixed rear boom raises/lowers and telescopes but does not swing. Deploy the separate wheel lift while stopped or creeping in reverse. Hold LIFT UP/DOWN and adjust GRID width while lining up. Stop and apply PARK BRAKE to close L-arms, raise the captured axle and FIT STRAPS. At the green recovery circle, park, REMOVE STRAPS, lower the lift and release the tires. Only the heavy rotator can swing its boom with the riggers deployed. For a heavy rollover: deploy riggers and boom, connect LINE A and B to suitable simulated frame points, hold each independent winch (or use WINCH BOTH / PAY BOTH to operate them together) and watch the roll angle and tension. A connected idle line holds its length and can gain tension when another line pulls against it. Some jobs have two trucks; select TARGET VEHICLE 1 or 2 for each line and bring both upright into the recovery zone. Game forces are simplified and not real-world rigging instructions. Buy trucks in FLEET / GARAGE.</span><small>Keyboard: W/S drive & reverse · A/D steer · H hook · R winch</small></aside>}
  </main>;
