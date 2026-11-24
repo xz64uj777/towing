@@ -847,7 +847,7 @@ export default function TowingGame(){
  const currentJob=JOBS[career.job%JOBS.length];
  return <main className={'game-shell'+(menuOpen?' menu-active':'')+(cameraPanelOpen?' camera-active':'')}><div className={'scene'+(placingAnchor?' anchor-placement-scene':'')} ref={mount}/>
    {placingAnchor&&<div className="anchor-placement-hint" role="status"><b>{s?.customHookPlacement!==null?'SELECT CUSTOM HOOK':'PLACE GROUND ANCHOR'}</b><span>{s?.customHookPlacement!==null?'Tap a frame edge or bumper on the recovery vehicle.':'Tap open ground off the road, 4–32 m from truck and 3–32 m from vehicle.'}</span><button type="button" onClick={s?.customHookPlacement!==null?cancelCustomHook:cancelAnchorPlacement}>CANCEL PLACEMENT</button></div>}
-  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .54 • OPTIONS GRID</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
+  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .55 • NO-SCROLL OPTIONS</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
   <div className="game-minimap" style={{position:'absolute',left:12,bottom:195,zIndex:9,width:mapOpen?146:106,height:mapOpen?166:36,pointerEvents:'auto',border:'2px solid #f3c851',borderRadius:12,background:'rgba(9,20,30,.88)',color:'#fff',boxShadow:'0 3px 14px #0008',padding:6,boxSizing:'border-box'}}>
    <button onClick={()=>setMapOpen(v=>!v)} style={{fontSize:11,fontWeight:800,width:'100%',background:'transparent',border:0,color:'white'}}>{mapOpen?'MAP −':'MAP +'}</button>
    {mapOpen&&<svg viewBox="0 0 140 140" width="132" height="132" aria-label="Map of recovery vehicles and destination">
@@ -972,8 +972,7 @@ export default function TowingGame(){
   </>}
  </>}
  </div><div className="drive"><Hold label="REV" onDown={press('throttle',-.55)} onUp={press('throttle',0)}/><Hold label="BRAKE" onDown={press('brake',1)} onUp={press('brake',0)}/><Hold label="GAS" wide onDown={press('throttle',1)} onUp={press('throttle',0)}/></div></div>
-  <div className={'toolbar'+(menuOpen?' menu-open':'')+(cameraPanelOpen?' camera-open':'')}>
-  <button type="button" className="menu-toggle" aria-expanded={menuOpen} onClick={()=>{setMenuOpen(v=>!v);setCameraPanelOpen(false);setSettingsOpen(false);setGarage(false);setHelp(false);}}>{menuOpen?'CLOSE MENU ✕':'MENU ☰'}</button>
+  <div className={'camera-dock'+(cameraPanelOpen?' camera-open':'')}>
   {!menuOpen&&<div className="camera-shortcuts" role="group" aria-label="Camera controls">
     <button type="button" className="camera-cycle" onClick={nextCamera} title="Cycle camera angles">CAM: {CAMERA_MODES.find(([id])=>id===cameraMode)?.[1]} ↻</button>
     <button type="button" className="camera-angles" onClick={()=>{setCameraPanelOpen(v=>!v);setMenuOpen(false);}} aria-expanded={cameraPanelOpen}>ANGLES {cameraPanelOpen?'−':'+'}</button>
@@ -981,7 +980,10 @@ export default function TowingGame(){
   {cameraPanelOpen&&!menuOpen&&<div className="camera-selector" role="group" aria-label="Camera angle presets">
     {CAMERA_MODES.map(([id,label])=><button type="button" key={id} className={cameraMode===id?'selected':''} onClick={()=>changeCamera(id)}>{label}</button>)}
   </div>}
-  {menuOpen&&<div className="toolbar-panel"><div className="checkpoint-actions">
+  </div>
+  <div className={'toolbar'+(menuOpen?' menu-open':'')}>
+  <button type="button" className="menu-toggle" aria-expanded={menuOpen} onClick={()=>{setMenuOpen(v=>!v);setCameraPanelOpen(false);setSettingsOpen(false);setGarage(false);setHelp(false);}}>{menuOpen?'CLOSE MENU ✕':'MENU ☰'}</button>
+  {menuOpen&&<div className="toolbar-panel" role="dialog" aria-label="Options menu" aria-modal="true"><div className="checkpoint-actions">
    <div className="checkpoint-caption">{savedCheckpoint?'SAVED: LEVEL '+(savedCheckpoint.jobIndex%JOBS.length+1)+' • '+JOBS[savedCheckpoint.jobIndex%JOBS.length].name:'NO IN-PROGRESS SAVE'}</div>
    <button className="checkpoint-save" onClick={saveInProgress}>SAVE IN-PROGRESS</button>
    {savedCheckpoint&&<><button className="checkpoint-resume" onClick={resumeSavedJob}>RESUME SAVED JOB</button><button className="checkpoint-delete" onClick={deleteSavedJob}>DELETE SAVED JOB</button></>}
