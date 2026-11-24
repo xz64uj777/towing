@@ -629,3 +629,37 @@ test('wheel-lift straps require captured tires, raised lift, and stationary park
  assert.equal(wheelLiftStrapReady(ready),true);
  for(const change of [{hasLift:false},{deployed:false},{loaded:false},{armsClosed:false},{height:.44},{speed:.25},{parkingBrake:false}])assert.equal(wheelLiftStrapReady({...ready,...change}),false);
 });
+
+import {rollbackHydraulicStep,rollbackRampReady,rollbackStowed,rollbackTransportReady,rollbackContactHeight,rollbackTieDownPath} from './rollbackPhysics.js';
+test('rollback slide and tilt are separate momentary controls with lockout',()=>{
+ let d=rollbackHydraulicStep(0,0,0,1,1,true);assert.deepEqual(d,{slide:0,tilt:0});
+ d=rollbackHydraulicStep(0,0,1,0,2,true);assert.deepEqual(d,{slide:1,tilt:0});
+ assert.equal(rollbackDeck(1,0).angle,0);
+ d=rollbackHydraulicStep(1,0,0,1,1,true);assert.ok(d.tilt>.4&&d.tilt<1);
+ assert.deepEqual(rollbackHydraulicStep(d.slide,d.tilt,0,0,2,true),d);
+ assert.deepEqual(rollbackHydraulicStep(d.slide,d.tilt,-1,0,2,true),d);
+ assert.deepEqual(rollbackHydraulicStep(1,0,0,1,2,false),{slide:1,tilt:0});
+ assert.ok(rollbackRampReady(1,1));assert.ok(!rollbackRampReady(1,0));
+});
+test('manual stow and securement are required for transport',()=>{
+ assert.ok(!rollbackTransportReady(1,1,true,true,false));assert.ok(!rollbackTransportReady(1,0,true,true,false));
+ assert.ok(!rollbackTransportReady(0,0,true,false,false));assert.ok(!rollbackTransportReady(0,0,false,false,true));
+ assert.ok(rollbackTransportReady(0,0,true,true,false));assert.ok(rollbackStowed(0,0));
+});
+test('rollback tires sit on deck instead of hovering',()=>{
+ const d=rollbackDeck(0,0),pose=rollbackPose(d,rollbackStop(d),.92);
+ assert.ok(Math.abs(rollbackContactHeight(pose,.92)+.14*.92-d.frontY)<1e-9);
+});
+test('each wheel strap crosses its tire and ends on the deck',()=>{
+ for(const x of [-.98,.98])for(const z of [-1.5,1.5]){
+  const path=rollbackTieDownPath(x,.56,z,.92);assert.equal(path.length,15);
+  assert.equal(path[0].y,.125);assert.equal(path.at(-1).y,.125);assert.ok(path[7].y>.99);
+  assert.ok(path[0].z<z&&path.at(-1).z>z);
+ }
+});
+test('manual hydraulic positions survive a checkpoint and old bed saves migrate',()=>{
+ const f=checkpointFixture();f.type.id='flatbed';Object.assign(f,{bedSlide:1,bedProgress:.42,bedTilt:true});
+ const snap=captureRecoverySave({job:4},f),fresh=checkpointFixture();fresh.type.id='flatbed';
+ restoreRecoverySave(fresh,snap,checkpointVector);assert.equal(fresh.bedSlide,1);assert.equal(fresh.bedProgress,.42);assert.equal(fresh.bedTiltControl,0);
+ delete snap.equipment.bedSlide;delete snap.equipment.bedProgress;restoreRecoverySave(fresh,snap,checkpointVector);assert.equal(fresh.bedProgress,1);
+});

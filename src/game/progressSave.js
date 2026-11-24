@@ -12,7 +12,7 @@ export function captureRecoverySave(career,s){
  vehicle:{pos:vec(s.pickPos),yaw:s.pickYaw,roll:s.pickRoll},
  secondary:{pos:vec(s.secondary.pos),yaw:s.secondary.yaw,roll:s.secondary.roll,active:s.secondary.active},
  equipment:Object.fromEntries(['parkingBrake','riggersDeployed','boomDeployed','boomAngle','boomSwing','boomExtension',
- 'liftDeployed','liftHeight','liftExtension','gridWidth','armsClosed','loaded','strapsOn','bedTilt','hook',
+ 'liftDeployed','liftHeight','liftExtension','gridWidth','armsClosed','loaded','strapsOn','bedTilt','bedSlide','bedProgress','hook',
  'hookPoint','hookRedirect','cableLength','rollbackLoadX','rollbackLoadYaw','rollbackLoadZ','autoLoad','autoUnload','dropoffArrived','dropoffComplete','winchSpeed']
  .map(k=>[k,s[k]])),
  anchors:s.riggingAnchors.slice(3,5).map(a=>vec(a.pos)),
@@ -50,6 +50,7 @@ export function restoreRecoverySave(s,saved,V){
  s.secondary.active=!!saved.secondary.active;s.secondary.mesh.visible=s.secondary.active;
  for(const [key,value] of Object.entries(saved.equipment))if(key in s)s[key]=value;
  s.parkingBrake=parkingBrakeForRiggers(s.parkingBrake,s.riggersDeployed);
+ if(s.type.id==='flatbed'){const legacy=saved.equipment.bedTilt?1:0;const limit=n=>Math.max(0,Math.min(1,n));s.bedSlide=validNum(saved.equipment.bedSlide)?limit(saved.equipment.bedSlide):legacy;s.bedProgress=validNum(saved.equipment.bedProgress)?limit(saved.equipment.bedProgress):legacy;if(s.bedProgress>.001)s.bedSlide=1;s.bedTilt=s.bedProgress>.001;s.bedSlideControl=0;s.bedTiltControl=0;if(s.bedSlide>.001||s.bedProgress>.001||s.hook)s.parkingBrake=true;}
  for(let i=0;i<2;i++){
   const point=saved.anchors[i],anchor=s.riggingAnchors[i+3];
   anchor.pos=point?V(point.x,point.y,point.z):null;

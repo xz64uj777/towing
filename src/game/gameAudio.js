@@ -24,10 +24,10 @@ export function soundState(s,previous,dt,surface){
   boom:[s.boomAngle,s.boomExtension,s.boomSwing],lift:[s.liftHeight,s.liftExtension],
   spools:s.recoveryLines.map(l=>l.spool),length:s.cableLength,park:!!s.parkingBrake,riggers:!!s.riggersDeployed,
   hook:!!s.hook,connected:s.recoveryLines.map(l=>!!l.connected),arms:!!s.armsClosed,straps:!!s.strapsOn,
-  bed:!!s.bedTilt,liftDeployed:!!s.liftDeployed,loaded:!!s.loaded,stalled,load,jobDone:!!s.jobDone,reverse:s.vel.x*Math.sin(s.yaw)-s.vel.z*Math.cos(s.yaw)<-.25};
+  bed:!!s.bedTilt,deck:[s.bedSlide||0,s.bedProgress||0],liftDeployed:!!s.liftDeployed,loaded:!!s.loaded,stalled,load,jobDone:!!s.jobDone,reverse:s.vel.x*Math.sin(s.yaw)-s.vel.z*Math.cos(s.yaw)<-.25};
  const valid=same&&Math.hypot(current.x-previous.x,current.z-previous.z)<5;
  const motion=valid?clamp((current.boom.reduce((n,v,i)=>n+delta(v,previous.boom[i]),0)+
- current.lift.reduce((n,v,i)=>n+delta(v,previous.lift[i]),0))/dt,0,2):0;
+ current.lift.reduce((n,v,i)=>n+delta(v,previous.lift[i]),0)+current.deck.reduce((n,v,i)=>n+delta(v,previous.deck?.[i]),0))/dt,0,2):0;
  const hydraulic=clamp(motion*.95);
  const reelSpeed=valid&&winchOn?clamp((heavy?current.spools.reduce((n,v,i)=>n+(active.includes(s.recoveryLines[i])?delta(v,previous.spools[i]):0),0):
  delta(current.length,previous.length))/dt,0,6):0;
