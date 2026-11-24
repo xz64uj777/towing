@@ -457,3 +457,30 @@ test('audio graph initializes on unlock, mutes smoothly and closes its context',
   a.close();assert.equal(closed,1);
  }finally{if(prev===undefined)delete globalThis.AudioContext;else globalThis.AudioContext=prev;}
 });
+
+import {rollbackDeck,rollbackPose,rollbackHeight,rollbackCanConnect,rollbackReady,rollbackStop,rollbackTravel} from './rollbackPhysics.js';
+test('rollback slides rearward and lowers rear edge to ground',()=>{
+ const a=rollbackDeck(0),b=rollbackDeck(1);
+ assert.equal(a.angle,0);assert.ok(b.angle>0&&b.frontZ>a.frontZ&&b.rearZ>a.rearZ);
+ assert.ok(b.rearY<.05&&b.frontY>b.rearY);
+});
+test('front axle climbs first and rear axle follows; reverse pitch mirrors',()=>{
+ const d=rollbackDeck(1),z=d.rearZ,a=rollbackPose(d,z,.92),b=rollbackPose(d,z-2,.92);
+ assert.ok(a.height>0&&a.pitch>0&&b.height>a.height);
+ assert.equal(rollbackPose(d,z,.92,true).pitch,-a.pitch);
+ assert.equal(rollbackHeight(d,d.rearZ+1),0);
+});
+test('rollback connection excludes side approaches and premature capture',()=>{
+ const d=rollbackDeck(1),z=d.rearZ+2;
+ assert.ok(rollbackCanConnect(d,0,z,0,.92));assert.ok(!rollbackCanConnect(d,2,z,0,.92));
+ assert.ok(!rollbackCanConnect(d,0,z,1,.92));assert.ok(!rollbackCanConnect(d,0,d.rearZ-1,0,.92));
+ assert.ok(!rollbackReady(d,0,z,0,.92));assert.ok(rollbackReady(d,0,rollbackStop(d),0,.92));
+});
+test('winch cannot pull a car beyond the deck stop into the cab',()=>{
+ for(const t of [0,.5,1]){const d=rollbackDeck(t),z=rollbackTravel(d,d.rearZ+3,100);assert.equal(z,rollbackStop(d));assert.ok(z-d.frontZ>=3.18-1e-10);}
+});
+test('secured load follows deck during leveling',()=>{
+ const a=rollbackDeck(1),b=rollbackDeck(0);
+ const p=rollbackPose(a,rollbackStop(a),.92),q=rollbackPose(b,rollbackStop(b),.92);
+ assert.ok(p.pitch>0);assert.equal(q.pitch,0);assert.equal(q.height,1.56);
+});
