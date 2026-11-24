@@ -1201,7 +1201,7 @@ export default function TowingGame(){
   <span className="boom-label right">{boomMode==='extend'?'OUT':'RIGHT'}</span>
   <div className="boom-knob" style={{transform:`translate(${boomStick.x*20}px,${-boomStick.y*20}px)`}}/>
  </div>
- </div></div>}<div className={'recovery equipment-compact all-controls '+(s?.type.id==='rotator'?'heavy-compact single-line-menu ':'')+(recoveryOpen?'is-open':'is-collapsed')}>
+ </div></div>}<div className={'recovery equipment-compact all-controls '+(s?.type.id==='rotator'?'heavy-compact single-line-menu ':'')+(s?.tools.includes('winch')?'winch-equipped ':'')+(recoveryOpen?'is-open':'is-collapsed')}>
  <div className="equipment-header">
   <button type="button" className="recovery-toggle" aria-expanded={recoveryOpen} onClick={()=>{setRecoveryOpen(v=>!v);setMenuOpen(false);setCameraPanelOpen(false);}}>
    {s?.type.id==='light'?'WHEEL LIFT':s?.type.id==='rotator'?'RECOVERY':s?.type.id==='flatbed'?'ROLLBACK':'EQUIPMENT'} {recoveryOpen?'−':'+'}
@@ -1232,13 +1232,13 @@ export default function TowingGame(){
    <div className="lift-status">{rollbackStowed(s.bedSlide,s.bedProgress)?'BED LOCKED':creepReady(s)&&!s.parkingBrake?'CREEP FORWARD • 4 KM/H':rampReady(s)?'RAMP ON GROUND':'SLIDE '+Math.round(s.bedSlide*100)+'% · TILT '+Math.round(s.bedProgress*100)+'%'}</div>
    {!hud.hook&&!hud.loaded&&<><div className="equipment-row"><select className="action" aria-label="Choose winch hook position" value={s?.hookPoint??0} onChange={e=>{if(s&&!s.hook&&!s.loaded){s.hookPoint=Number(e.target.value);setNotice("Hook position: "+RECOVERY_POINTS[s.hookPoint].label);}}}>{RECOVERY_POINTS.slice(0,2).map((p,i)=><option key={p.id} value={i}>{p.label}</option>)}</select><button className="action" onClick={()=>{if(s&&!s.hook){s.hookRedirect=0;setNotice('DIRECT LINE selected.');}}}>DIRECT LINE</button></div></>}
    {!s.loaded&&<button className={'action '+(hud.hook?'active':'')} onClick={toggleHook}>{hud.hook?'UNHOOK VEHICLE':'CONNECT TO VEHICLE'}</button>}
-   {hud.hook&&<div className="equipment-row"><Hold label="WINCH IN" onDown={press('winch',true)} onUp={press('winch',false)}/><Hold label="WINCH OUT" onDown={press('winchOut',true)} onUp={press('winchOut',false)}/></div>}
+   {hud.hook&&<div className="equipment-row winch-row"><Hold label="WINCH IN" onDown={press('winch',true)} onUp={press('winch',false)}/><Hold label="WINCH OUT" onDown={press('winchOut',true)} onUp={press('winchOut',false)}/></div>}
    <button className={'action priority-action '+(s.strapsOn?'active':'')} onClick={secureLoad}>{s.loaded?'REMOVE 4 STRAPS':'FIT 4 STRAPS'}</button>
   </>}
   {s?.type.id==='medium'&&<>
     {!hud.hook&&<><div className="equipment-row"><select className="action" aria-label="Choose winch hook position" value={s?.hookPoint??0} onChange={e=>{if(s&&!s.hook){s.hookPoint=Number(e.target.value);setNotice("Hook position: "+RECOVERY_POINTS[s.hookPoint].label);}}}>{RECOVERY_POINTS.map((p,i)=><option key={p.id} value={i}>{p.label}</option>)}</select><button className="action" onClick={changeHookRedirect}>{s?.riggingAnchors[s.hookRedirect].label??'DIRECT LINE'}</button></div><button className="action" onClick={()=>startAnchorPlacement(null)}>PLACE / MOVE ANCHOR</button></>}
     <button className={'action '+(hud.hook?'active':'')} onClick={toggleHook}>{hud.hook?'DISCONNECT HOOK':'CONNECT TO VEHICLE'}</button>
-    {hud.hook&&<div className="equipment-row"><Hold label="WINCH IN" onDown={press('winch',true)} onUp={press('winch',false)}/><Hold label="WINCH OUT" onDown={press('winchOut',true)} onUp={press('winchOut',false)}/></div>}
+    {hud.hook&&<div className="equipment-row winch-row"><Hold label="WINCH IN" onDown={press('winch',true)} onUp={press('winch',false)}/><Hold label="WINCH OUT" onDown={press('winchOut',true)} onUp={press('winchOut',false)}/></div>}
     <div className="equipment-section-label">WHEEL LIFT</div>
     <button className={'action '+(s?.liftDeployed?'active':'')} onClick={toggleLift}>{s?.liftDeployed?'FOLD WHEEL LIFT':'LOWER WHEEL LIFT'}</button>
     {s?.liftDeployed&&<>
@@ -1251,12 +1251,12 @@ export default function TowingGame(){
   {s?.type.id==='rotator'&&(()=>{
     const i=activeRecoveryLine,line=s.recoveryLines[i],letter=i===0?'A':'B',both=s.recoveryLines.every(l=>l.connected);
     return <>
-     <div className="equipment-row three-controls">
+     <div className="equipment-row three-controls winch-row">
       <button type="button" className={'action '+(line.connected?'active':'')} onClick={()=>toggleRecoveryLine(i)}>{line.connected?'UNHOOK':'CONNECT'}</button>
       <Hold key={'in-'+i} disabled={!line.connected} label="WINCH IN" onDown={recoveryPress(i,1)} onUp={recoveryPress(i,0)}/>
       <Hold key={'out-'+i} disabled={!line.connected} label="PAY OUT" onDown={recoveryPress(i,-1)} onUp={recoveryPress(i,0)}/>
      </div>
-     {s.tandemHelper?<div className="equipment-row all-both-row"><small style={{color:'#ffe07a'}}>LOAD A {s.tandemUsed[0]?'✓':'—'} · B {s.tandemUsed[1]?'✓':'—'} · {i===1?'SUPPORT PARKED':'ROTATOR'}</small></div>:<div className="equipment-row all-both-row">
+     {s.tandemHelper?<div className="equipment-row all-both-row"><small style={{color:'#ffe07a'}}>LOAD A {s.tandemUsed[0]?'✓':'—'} · B {s.tandemUsed[1]?'✓':'—'} · {i===1?'SUPPORT PARKED':'ROTATOR'}</small></div>:<div className="equipment-row all-both-row winch-row">
       <Hold disabled={!both} label="WINCH BOTH" onDown={bothRecoveryPress(1)} onUp={bothRecoveryPress(0)}/>
       <Hold disabled={!both} label="PAY BOTH" onDown={bothRecoveryPress(-1)} onUp={bothRecoveryPress(0)}/>
      </div>}

@@ -577,7 +577,7 @@
 .camera-dock .camera-selector button{min-height:27px;font-size:9px;padding:2px}
 .bottom-ui .recovery.all-controls.single-line-menu.is-open{
  --row:clamp(19px,calc((100dvh - 181px - env(safe-area-inset-top) - env(safe-area-inset-bottom))/8),27px);
- width:min(198px,39vw)!important;gap:2px;padding:3px;
+ width:min(222px,43vw)!important;gap:2px;padding:3px;
 }
 .bottom-ui .recovery.single-line-menu .equipment-header,
 .bottom-ui .recovery.single-line-menu .equipment-row{gap:2px}
@@ -588,7 +588,7 @@
 }
 .bottom-ui .recovery.single-line-menu.is-collapsed .recovery-toggle{min-height:26px;height:26px;font-size:9px}
 @media(orientation:portrait) and (max-width:650px){
- .bottom-ui .recovery.all-controls.single-line-menu.is-open{width:min(186px,47vw)!important}
+ .bottom-ui .recovery.all-controls.single-line-menu.is-open{width:min(210px,53vw)!important}
 }
 @media(orientation:landscape) and (max-height:540px){
  .toolbar.menu-open .toolbar-panel{
@@ -603,4 +603,17 @@
  .bottom-ui .recovery.single-line-menu.is-open .action,
  .bottom-ui .recovery.single-line-menu.is-open .control,
  .bottom-ui .recovery.single-line-menu.is-open .recovery-toggle{font-size:8px!important}
+}
+
+.bottom-ui .recovery.equipment-compact.winch-equipped.is-open:not(.single-line-menu){
+ width:min(198px,49vw)!important;
+}
+.equipment-compact .winch-row>.control{
+ min-height:41px;font-size:11px;
+}
+.bottom-ui .recovery.single-line-menu.is-open .winch-row>.control{
+ height:calc(var(--row) + 6px)!important;
+ min-height:calc(var(--row) + 6px)!important;
+ max-height:calc(var(--row) + 6px)!important;
+ font-size:10px!important;
 }
