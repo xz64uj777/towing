@@ -392,3 +392,57 @@
  .bottom-ui .recovery.equipment-compact.heavy-compact.is-open{gap:3px}
  .heavy-compact .heavy-section .equipment-row>.action{min-height:29px}
 }
+
+/* Build .62: keep the boom and equipment on the same right-edge stack.
+   The boom stays above the menu as tabs change height. Short screens scroll
+   only the equipment panel, never the held hydraulic joystick. */
+.bottom-ui>.equipment-stack{display:contents}
+.bottom-ui>.equipment-stack.has-boom{
+ position:absolute;right:9px;bottom:75px;display:flex;flex-direction:column;
+ align-items:stretch;gap:5px;width:min(178px,45vw);
+ max-height:max(120px,calc(100dvh - 210px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
+ pointer-events:none;
+}
+.bottom-ui>.equipment-stack.has-boom.wide-stack{width:min(355px,53vw);bottom:calc(65px + env(safe-area-inset-bottom))}
+.bottom-ui .equipment-stack.has-boom .boom-float{
+ position:static!important;right:auto!important;bottom:auto!important;width:100%!important;max-width:none!important;
+ flex:0 0 auto;padding:4px;pointer-events:auto;
+}
+.bottom-ui .equipment-stack.has-boom .boom-control-cluster{
+ display:grid;grid-template-columns:minmax(0,1fr) 88px;grid-template-rows:auto auto;align-items:center;gap:3px;
+}
+.bottom-ui .equipment-stack.has-boom .boom-status{grid-column:1;grid-row:1;font-size:9px;line-height:1.15;padding:2px;overflow-wrap:anywhere}
+.bottom-ui .equipment-stack.has-boom .boom-control-cluster>.action{
+ grid-column:1;grid-row:2;min-width:0;min-height:27px;font-size:9px;padding:2px;line-height:1.1
+}
+.bottom-ui .equipment-stack.has-boom .boom-joystick{grid-column:2;grid-row:1 / span 2;width:88px;height:88px;border-radius:14px}
+.bottom-ui .equipment-stack.has-boom .boom-knob{width:28px;height:28px}
+.bottom-ui .equipment-stack.has-boom .boom-label{font-size:8px}
+.bottom-ui .equipment-stack.has-boom .recovery.equipment-compact{
+ position:static!important;right:auto!important;bottom:auto!important;width:100%!important;min-height:0;
+ max-height:none!important;flex:0 1 auto;overflow-y:auto!important;overflow-x:hidden!important;
+ overscroll-behavior:contain;pointer-events:auto;
+}
+.bottom-ui .equipment-stack.has-boom .recovery.equipment-compact.is-collapsed{flex-shrink:0;overflow:hidden!important}
+@media(max-width:520px){
+ .bottom-ui>.equipment-stack.has-boom{width:min(158px,44vw);bottom:73px}
+ .bottom-ui .equipment-stack.has-boom .boom-control-cluster{grid-template-columns:minmax(0,1fr) 82px}
+ .bottom-ui .equipment-stack.has-boom .boom-joystick{width:82px;height:82px}
+ .bottom-ui .equipment-stack.has-boom .boom-status{font-size:8px}
+}
+@media(orientation:portrait) and (max-width:650px){
+ .bottom-ui>.equipment-stack.has-boom.wide-stack{width:min(250px,64vw);bottom:calc(84px + env(safe-area-inset-bottom))}
+ .bottom-ui>.equipment-stack.has-boom{max-height:max(120px,calc(100dvh - 310px - env(safe-area-inset-top) - env(safe-area-inset-bottom)))}
+}
+@media(orientation:landscape) and (max-height:540px){
+ .bottom-ui>.equipment-stack.has-boom{bottom:65px;max-height:max(118px,calc(100dvh - 164px - env(safe-area-inset-top) - env(safe-area-inset-bottom)))}
+ .bottom-ui>.equipment-stack.has-boom.wide-stack{bottom:calc(59px + env(safe-area-inset-bottom))}
+ .bottom-ui .equipment-stack.has-boom .boom-control-cluster{grid-template-columns:minmax(0,1fr) 76px}
+ .bottom-ui .equipment-stack.has-boom .boom-joystick{width:76px;height:76px}
+ .bottom-ui .equipment-stack.has-boom .boom-control-cluster>.action{min-height:23px}
+ .bottom-ui .equipment-stack.has-boom .boom-knob{width:24px;height:24px}
+}
+@media(orientation:landscape) and (max-height:360px){
+ .bottom-ui>.equipment-stack.has-boom.wide-stack{bottom:calc(54px + env(safe-area-inset-bottom))}
+}
+.game-shell.menu-active .equipment-stack.has-boom,.game-shell.camera-active .equipment-stack.has-boom{visibility:hidden;pointer-events:none}
