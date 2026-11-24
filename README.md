@@ -8,7 +8,7 @@ https://xz64uj777.github.io/towing/
 ## Current prototype
 - 3D medium-duty wrecker and disabled pickup in a roadside ditch
 - Live driving, steering, braking, and basic vehicle inertia
-- Winch cable with spring/damper tension, hook/unhook, and overload release
+- Winch cable with spring/damper tension, hook/unhook, and an overload stall at rated line load
 - Touch controls, keyboard controls, orbit camera, and pinch zoom
 
 This is an early physics prototype. Suspension, tire-ground contact, terrain-dependent traction, detailed rigging, and recovery scenarios are still being developed. The Android/Godot experiment is retained while the browser prototype becomes the main development target.
