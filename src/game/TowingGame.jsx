@@ -11,7 +11,7 @@ import {cableGeometry,cablePathSpeed,cableLoad,cableReelStep} from './cablePhysi
 import {supportReaction,supportState} from './supportPhysics.js';
 import {ditchContactPose,ditchGroundStep,groundCableDelta} from './ditchPhysics.js';
 import {addVehicleShell,surfaceMap,reflectionSky,addRoadsideDetails} from './visualQuality.js';
-import { canCompleteJob, minimapX, minimapY, wheelLiftCaptureReady, wheelLiftMotionReady, wheelLiftLockReady, winchLoadBand, stopWinchCoast, canPowerBothRecoveryLines, parkingBrakeForRiggers, cameraPresetPose, recoveryYawMoment, recoveryYawStep } from './gameRules.js';
+import { canCompleteJob, minimapX, minimapY, wheelLiftCaptureReady, wheelLiftMotionReady, wheelLiftLockReady, wheelLiftStrapReady, winchLoadBand, stopWinchCoast, canPowerBothRecoveryLines, parkingBrakeForRiggers, cameraPresetPose, recoveryYawMoment, recoveryYawStep } from './gameRules.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const V=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
@@ -80,11 +80,12 @@ function makeVehicle(scene,{name,color,pos,scale=1,kind='pickup'}) {
   box(body,'frame',[2.05*scale,.48*scale,4.8*scale],[0,.95*scale,0],0x252a2e);
   addVehicleShell(THREE,body,{kind,scale,color});
   const rearDeck=box(body,'bed',[2.0*scale,.3*scale,1.5*scale],[0,1.35*scale,1.15*scale],0x333a40);rearDeck.visible=kind!=='suv';
-  const wheels=[],tireMap=surfaceMap(THREE,16,1,65,'tire');
+  const wheels=[],tireBands=[],tireMap=surfaceMap(THREE,16,1,65,'tire');
   for(const z of [-1.55,1.55]) for(const x of [-1.06,1.06]) {
     const profile=[[.19,-.16],[.35,-.16],[.43,-.145],[.475,-.10],[.48,-.055],[.48,.055],[.475,.10],[.43,.145],[.35,.16],[.19,.16],[.19,-.16]].map(([r,y])=>new THREE.Vector2(r*scale,y*scale));
     const tire=new THREE.Mesh(new THREE.LatheGeometry(profile,28),new THREE.MeshStandardMaterial({color:0x27292a,roughness:.94,map:tireMap}));
     tire.rotation.z=Math.PI/2; tire.position.set(x,.62*scale,z); tire.castShadow=true; root.add(tire); wheels.push(tire);
+    if(name!=='wrecker'&&z<0){const band=new THREE.Mesh(new THREE.CylinderGeometry(.491*scale,.491*scale,.12*scale,32,1,true),new THREE.MeshStandardMaterial({color:0xf2b832,roughness:.86,side:THREE.DoubleSide}));band.name='front tire webbing';band.visible=false;tire.add(band);tireBands.push(band);}
     const hub=new THREE.Mesh(new THREE.CylinderGeometry(.25*scale,.25*scale,.325*scale,20),new THREE.MeshStandardMaterial({color:0x8b9297,metalness:.7,roughness:.35}));
     tire.add(hub);
     const outer=x>0?-1:1;
@@ -169,7 +170,7 @@ function makeVehicle(scene,{name,color,pos,scale=1,kind='pickup'}) {
       }
     }
   }
-  root.userData={body,wheels,scale,towPitchPivot,bed,straps,recoveryStructure,boomPivot,boomTilt,boomSleeve,boomTip,boomCylinders,underliftPivot,underliftInner,underliftHead,liftCross,liftCylinders,forks,outriggers};
+  root.userData={body,wheels,tireBands,scale,towPitchPivot,bed,straps,recoveryStructure,boomPivot,boomTilt,boomSleeve,boomTip,boomCylinders,underliftPivot,underliftInner,underliftHead,liftCross,liftCylinders,forks,outriggers};
   return root;
 }
 
@@ -347,7 +348,7 @@ export default function TowingGame(){
     }
     // Both wheel lifts can be positioned at walking speed before capturing an axle.
     if(s.liftDeployed&&liftMotionReady(s)){
-      s.liftHeight=clamp(s.liftHeight+(s.liftControl+s.liftHydraulicY)*h*.70*settingsRef.current.boom,0,1.25);
+      s.liftHeight=clamp(s.liftHeight+(s.liftControl+s.liftHydraulicY)*h*.70*settingsRef.current.boom,s.strapsOn&&s.loaded?Math.min(.45,s.liftHeight):0,1.25);
       if(s.type.id!=='light')s.liftExtension=clamp(s.liftExtension+(s.liftExtendControl+s.liftHydraulicX)*h*.90*settingsRef.current.boom,0,1.5);
     }
     // After positioning the tire grids, one-tap loading raises the captured axle
@@ -641,7 +642,9 @@ export default function TowingGame(){
     s.pickup.rotation.y=-s.pickYaw;s.pickup.rotation.z=s.type.id==='rotator'?s.pickRoll:0;
     if(isDitchPull(s)){const pose=ditchContactPose(s.pickPos.x,s.pickPos.z,s.pickYaw,s.pickup.userData.scale);s.pickup.rotation.order='YXZ';s.pickup.rotation.x=pose.pitch;s.pickup.rotation.z=pose.roll;}
     else if(!isRollback)s.pickup.rotation.x=0;
+    for(const band of s.pickup.userData.tireBands)band.visible=s.loaded&&s.strapsOn&&s.tools.includes('lift');
     const job=JOBS[s.jobIndex%JOBS.length];
+    if(job.kind==='recovery'&&s.loaded&&s.strapsOn&&!s.dropoffArrived&&Math.hypot(s.pickPos.x-2,s.pickPos.z-job.z)<4.2&&s.vel.length()<.25){s.dropoffArrived=true;setNotice('AT RECOVERY ZONE: Park, remove straps, lower lift, then open L-arms.');}
     if((job.kind==='tow'||job.kind==='flatbed')&&!s.dropoffArrived&&s.loaded&&s.strapsOn&&s.pos.distanceTo(V(0,0,23))<5&&s.vel.length()<.9){
       s.dropoffArrived=true;
       setNotice(job.kind==='flatbed'?'AT DEPOT: Park, tilt bed, release vehicle, winch out until all tires are on the ground, then unhook.':'AT DEPOT: Park, remove straps, lower the lift, then open L-arms to finish.');
@@ -826,11 +829,13 @@ export default function TowingGame(){
  const toggleArms=()=>{const s=sim.current;if(!s||!s.liftDeployed||!liftLockReady(s)){setNotice('Deploy lift, stop and engage PARK BRAKE before closing or opening L-arms.');return;}if(s.autoLoad||s.autoUnload){setNotice('Wait for the automatic lift cycle to finish.');return;}if(s.loaded&&s.strapsOn){setNotice('Remove straps before opening L-arms.');return;}if(s.loaded&&s.liftHeight>.25){setNotice('Lower the lift before opening L-arms.');return;}if(!s.armsClosed){const contact=tireGridContact(s);if(!contact.ok){setNotice(contact.facing<.60?'Align the tow truck straight with the car before closing L-arms.':s.liftHeight>=.38?'Lower the wheel lift before closing L-arms.':'Back farther beneath both FRONT tires. Grid alignment: '+contact.error.toFixed(1)+' m away.');return;}}const releasing=s.armsClosed&&s.loaded;
  s.armsClosed=!s.armsClosed;s.loaded=s.armsClosed;
  if(s.armsClosed){
-   s.pickYaw=s.yaw;s.prevHitch=null;
+   s.dropoffArrived=false;s.dropoffComplete=false;s.pickYaw=s.yaw;s.prevHitch=null;
    setNotice('Tires captured. Raise lift, then apply tire straps.');
  }else{
    s.prevHitch=null;s.pickVel.set(0,0,0);
-   if(releasing&&s.dropoffArrived&&s.pos.distanceTo(V(0,0,23))<5&&s.parkingBrake){
+   const job=JOBS[s.jobIndex%JOBS.length];
+   const atDestination=job.kind==='recovery'?Math.hypot(s.pickPos.x-2,s.pickPos.z-job.z)<4.2:s.pos.distanceTo(V(0,0,23))<5;
+   if(releasing&&s.dropoffArrived&&atDestination&&s.parkingBrake){
      s.dropoffComplete=true;
      setNotice('Vehicle safely unloaded. Dispatch complete!');
    }else setNotice('L-arms opened. Vehicle released.');
@@ -892,7 +897,22 @@ export default function TowingGame(){
   const facing=carForward.dot(forward),error=Math.max(...errors);
    return {ok:wheelLiftCaptureReady({leftError:errors[0],rightError:errors[1],facing,height:s.liftHeight}),error,facing};
  };
- const strapTires=()=>{const s=sim.current;if(!s)return;if(s.autoLoad||s.autoUnload){setNotice('Wait for the automatic cycle to finish.');return;}if(!s.tools.includes('lift')){setNotice('This truck has no wheel lift.');return;}if(s.strapsOn){if(!s.parkingBrake){setNotice('Apply PARK BRAKE before removing tire straps.');return;}s.strapsOn=false;setNotice('Straps removed. Hold LIFT DOWN until on the ground, then open L-arms.');return;}if(!s.loaded||!s.armsClosed){setNotice('Close L-arms around both tires first.');return;}if(s.liftHeight<.45){setNotice('Raise wheel lift before applying straps.');return;}if(!s.liftDeployed){setNotice('Lower the wheel lift first.');return;}const job=JOBS[s.jobIndex%JOBS.length];if(job.kind!=='tow'){setNotice('This dispatch requires '+FLEET.find(t=>t.id===job.truck).name+'.');return;}if(!s.parkingBrake){setNotice('Apply PARK BRAKE before securing tire straps.');return;}s.vel.set(0,0,0);s.throttle=0;s.strapsOn=true;s.hook=false;s.winch=false;setNotice('Tires strapped. Release PARK BRAKE and tow to depot.');};
+ const strapTires=()=>{
+  const s=sim.current;if(!s)return;
+  if(s.autoLoad||s.autoUnload){setNotice('Wait for the automatic cycle to finish.');return;}
+  if(!s.tools.includes('lift')){setNotice('This truck has no wheel lift.');return;}
+  if(!liftLockReady(s)){setNotice('Stop and apply PARK BRAKE before fitting or removing tire straps.');return;}
+  const job=JOBS[s.jobIndex%JOBS.length];
+  if(s.strapsOn){
+   if(job.kind==='recovery'&&s.loaded&&Math.hypot(s.pickPos.x-2,s.pickPos.z-job.z)<4.2)s.dropoffArrived=true;
+   s.strapsOn=false;setNotice('Straps removed. Hold LIFT DOWN until on the ground, then open L-arms.');return;
+  }
+  if(!wheelLiftStrapReady({hasLift:s.tools.includes('lift'),deployed:s.liftDeployed,loaded:s.loaded,armsClosed:s.armsClosed,height:s.liftHeight,speed:s.vel.length(),parkingBrake:s.parkingBrake})){
+   setNotice(!s.loaded||!s.armsClosed?'Close L-arms around both tires first.':!s.liftDeployed?'Deploy the wheel lift first.':'Raise wheel lift before applying straps.');return;
+  }
+  s.vel.set(0,0,0);s.throttle=0;s.strapsOn=true;s.hook=false;s.winch=false;s.winchOut=false;s.tension=0;s.previousCableDistance=null;
+  setNotice(job.kind==='recovery'?'Tires strapped. Release PARK BRAKE and tow to the green recovery circle.':'Tires strapped. Release PARK BRAKE and tow to depot.');
+ };
  const autoLoadVehicle=()=>{
   const s=sim.current;
   if(!s||s.type.id!=='light'||s.loaded||s.autoLoad){setNotice('This vehicle is already captured.');return;}
@@ -999,7 +1019,7 @@ export default function TowingGame(){
  const currentJob=JOBS[career.job%JOBS.length];
  return <main className={'game-shell'+(menuOpen?' menu-active':'')+(cameraPanelOpen?' camera-active':'')}><div className={'scene'+(placingAnchor?' anchor-placement-scene':'')} ref={mount}/>
    {placingAnchor&&<div className="anchor-placement-hint" role="status"><b>{s?.customHookPlacement!==null?'SELECT CUSTOM HOOK':'PLACE GROUND ANCHOR'}</b><span>{s?.customHookPlacement!==null?'Tap a frame edge or bumper on the recovery vehicle.':'Tap open ground off the road, 4–32 m from truck and 3–32 m from vehicle.'}</span><button type="button" onClick={s?.customHookPlacement!==null?cancelCustomHook:cancelAnchorPlacement}>CANCEL PLACEMENT</button></div>}
-  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .71 • WHEEL LIFT POSITIONING</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
+  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .72 • TIRE STRAPS</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
   <div className={'game-minimap '+(mapOpen?'map-expanded':'map-collapsed')} style={{position:'absolute',left:12,bottom:195,zIndex:9,width:mapOpen?146:106,height:mapOpen?166:36,pointerEvents:'auto',border:'2px solid #f3c851',borderRadius:12,background:'rgba(9,20,30,.88)',color:'#fff',boxShadow:'0 3px 14px #0008',padding:6,boxSizing:'border-box'}}>
    <button type="button" aria-expanded={mapOpen} onClick={()=>setMapOpen(v=>!v)} style={{fontSize:11,fontWeight:800,width:'100%',background:'transparent',border:0,color:'white'}}>{mapOpen?'MAP −':'MAP +'}</button>
    {mapOpen&&<svg viewBox="0 0 140 140" width="132" height="132" aria-label="Map of recovery vehicles and destination">
@@ -1095,7 +1115,7 @@ export default function TowingGame(){
     {s?.liftDeployed&&<>
       <div className="equipment-row"><Hold label="LIFT UP" onDown={liftPress('liftControl',1)} onUp={liftPress('liftControl',0)}/><Hold label="LIFT DOWN" onDown={liftPress('liftControl',-1)} onUp={liftPress('liftControl',0)}/></div>
       <div className="equipment-row"><button className="action" onClick={()=>adjustGrid(-.1)}>GRID −</button><button className="action" onClick={()=>adjustGrid(.1)}>GRID +</button></div>
-      <button className="action" onClick={toggleArms}>{s?.armsClosed?'OPEN L-ARMS':'CLOSE L-ARMS'}</button>
+      <div className="equipment-row"><button className="action" onClick={toggleArms}>{s?.armsClosed?'OPEN L-ARMS':'CLOSE L-ARMS'}</button><button className={'action '+(hud.strapsOn?'active':'')} disabled={!s.loaded} onClick={strapTires}>{hud.strapsOn?'REMOVE STRAPS':'FIT STRAPS'}</button></div>
       {!s.loaded&&<div className={'lift-status '+(hud.gridContact?.ok?'aligned':'')}>{hud.gridContact?.ok?'TIRES ALIGNED • PARK':'ALIGN FRONT TIRES • '+(hud.gridContact?.error?.toFixed(1)??'--')+' m'}</div>}
     </>}
   </>}
@@ -1151,6 +1171,6 @@ export default function TowingGame(){
   </div><select aria-label="Select test job" value={career.job%JOBS.length} onChange={e=>selectTestJob(Number(e.target.value))} style={{background:"#153c43",color:"#fff",border:"2px solid #f3c851",borderRadius:7,padding:"8px",fontWeight:800,maxWidth:190}}>{JOBS.map((job,index)=><option key={job.name} value={index}>{index+1}. {job.name}</option>)}</select><button onClick={()=>{setMenuOpen(false);reset();setNotice('Dispatch: '+JOBS[careerRef.current.job%JOBS.length].name);}}>RESTART JOB</button><button onClick={()=>{setMenuOpen(false);setGarage(v=>!v);setHelp(false);}}>FLEET / GARAGE</button><button onClick={()=>{setMenuOpen(false);reset();}}>RESET</button><button onClick={()=>{setMenuOpen(false);changeCamera('orbit');}}>RESET CAMERA</button><button onClick={()=>{setMenuOpen(false);setSettingsOpen(v=>!v);}}>SETTINGS</button><button aria-pressed={!settings.soundMuted} onClick={()=>{const muted=!settings.soundMuted;if(!muted)audioRef.current?.unlock();else audioRef.current?.silence();changeSetting('soundMuted',muted);}}>{settings.soundMuted?'SOUND OFF':'SOUND ON'}</button><button onClick={()=>{setMenuOpen(false);setHelp(v=>!v);}}>CONTROLS</button></div>}</div>
   {settingsOpen&&<aside className="help" style={{zIndex:30,maxWidth:310}}><button onClick={()=>setSettingsOpen(false)}>×</button><b>CONTROL SETTINGS</b>{[['steering','Driving sensitivity',0.4,1.6],['boom','Boom / hydraulic sensitivity',0.3,2],['winch','Winch speed',0.3,2]].map(([key,label,min,max])=><label key={key}>{label}: {settings[key].toFixed(1)}× <input type="range" min={min} max={max} step="0.1" value={settings[key]} onChange={e=>changeSetting(key,Number(e.target.value))}/></label>)}<label>Sound <input type="checkbox" checked={!settings.soundMuted} onChange={e=>{if(e.target.checked)audioRef.current?.unlock();else audioRef.current?.silence();changeSetting('soundMuted',!e.target.checked);}}/></label><label>Sound volume: {Math.round((settings.soundVolume??.7)*100)}% <input type="range" min="0" max="1" step="0.05" value={settings.soundVolume??.7} onChange={e=>changeSetting('soundVolume',Number(e.target.value))}/></label><label>Steering <select value={settings.driveMode} onChange={e=>changeSetting('driveMode',e.target.value)}><option value="joystick">Joystick</option><option value="arrows">Arrows</option></select></label><small>Saved on this device.</small></aside>}{notice&&<div className="game-notice" onClick={()=>setNotice('')}>{notice} ✕</div>}
   {garage&&<aside className="help garage"><button onClick={()=>setGarage(false)}>×</button><b>RECOVERY GARAGE</b><span>TEST MODE: All jobs and trucks unlocked. Choose any job from the bottom toolbar.</span><span>Balance: ${career.cash}</span><div className="fleet-list">{FLEET.map(t=><button key={t.id} className="garage-buy" onClick={()=>chooseTruck(t.id)}>{t.name} · {career.selected===t.id?'SELECTED':'TEST DRIVE'}</button>)}</div><button className="garage-buy" onClick={()=>upgrade('engine')}>ENGINE LV {career.engine}/3 · {'$'+(career.engine+1)*500}</button><button className="garage-buy" onClick={()=>upgrade('winch')}>WINCH LV {career.winch}/3 · {'$'+(career.winch+1)*500}</button><small>Progress saves on this device.</small></aside>}
-  {help&&<aside className="help instructions-panel" role="dialog" aria-label="Game instructions"><button type="button" className="instructions-close" onClick={()=>setHelp(false)} aria-label="Close instructions">×</button><button type="button" className="instructions-start" onClick={()=>setHelp(false)}>▶ START GAME</button><b>HOW TO OPERATE</b><span>Use the left joystick to steer. Reverse and gas are on the right. Release the gas to slow down; use PARK BRAKE to stop and secure the truck. Deploy the boom and parking brake before winching. The heavy boom joystick appears on the left side of the screen when either PARK BRAKE or RIGGERS is engaged and the truck is stopped. Winching heavy recoveries still requires both park brake and riggers. Park brake is required for capturing the tires and all heavy recovery operations; both light and medium wheel lifts can be deployed and adjusted at walking speed without the park brake while unloaded. Use CAM to cycle camera views or ANGLES for RAVINE, FREE, CHASE, REAR, FRONT, LEFT, RIGHT, TOP, HOOK and WIDE views. Drag to orbit; pinch to zoom any view. Drive within 24 m to hook the pickup. Light wheel-lift: tap LOWER WHEEL LIFT while moving slowly, reverse beneath the front tires until the status says TIRES ALIGNED, stop and apply PARK BRAKE, tap CLOSE L-ARMS, hold LIFT UP, tap FIT TIRE STRAPS, release brake and tow. Open WHEEL LIFT on the right to access these buttons. MENU opens separately at the top right. Flatbed: align behind the truck, deploy bed, hook and winch aboard. If the ramp is misaligned, unhook on the ground and reposition. Secure, level bed, deliver to depot, park, deploy bed, release vehicle, winch out and disconnect once all tires are on the ground. Medium wrecker: fixed rear boom raises/lowers and telescopes but does not swing. Deploy the separate wheel lift while stopped or creeping in reverse. Hold LIFT UP/DOWN and adjust GRID width while lining up. Stop and apply PARK BRAKE only to close L-arms or move the captured axle. Only the heavy rotator can swing its boom with the riggers deployed. For a heavy rollover: deploy riggers and boom, connect LINE A and B to suitable simulated frame points, hold each independent winch (or use WINCH BOTH / PAY BOTH to operate them together) and watch the roll angle and tension. A connected idle line holds its length and can gain tension when another line pulls against it. Some jobs have two trucks; select TARGET VEHICLE 1 or 2 for each line and bring both upright into the recovery zone. Game forces are simplified and not real-world rigging instructions. Buy trucks in FLEET / GARAGE.</span><small>Keyboard: W/S drive & reverse · A/D steer · H hook · R winch</small></aside>}
+  {help&&<aside className="help instructions-panel" role="dialog" aria-label="Game instructions"><button type="button" className="instructions-close" onClick={()=>setHelp(false)} aria-label="Close instructions">×</button><button type="button" className="instructions-start" onClick={()=>setHelp(false)}>▶ START GAME</button><b>HOW TO OPERATE</b><span>Use the left joystick to steer. Reverse and gas are on the right. Release the gas to slow down; use PARK BRAKE to stop and secure the truck. Deploy the boom and parking brake before winching. The heavy boom joystick appears on the left side of the screen when either PARK BRAKE or RIGGERS is engaged and the truck is stopped. Winching heavy recoveries still requires both park brake and riggers. Park brake is required for capturing the tires and all heavy recovery operations; both light and medium wheel lifts can be deployed and adjusted at walking speed without the park brake while unloaded. Use CAM to cycle camera views or ANGLES for RAVINE, FREE, CHASE, REAR, FRONT, LEFT, RIGHT, TOP, HOOK and WIDE views. Drag to orbit; pinch to zoom any view. Drive within 24 m to hook the pickup. Light wheel-lift: tap LOWER WHEEL LIFT while moving slowly, reverse beneath the front tires until the status says TIRES ALIGNED, stop and apply PARK BRAKE, tap CLOSE L-ARMS, hold LIFT UP, tap FIT TIRE STRAPS, release brake and tow. Open WHEEL LIFT on the right to access these buttons. MENU opens separately at the top right. Flatbed: align behind the truck, deploy bed, hook and winch aboard. If the ramp is misaligned, unhook on the ground and reposition. Secure, level bed, deliver to depot, park, deploy bed, release vehicle, winch out and disconnect once all tires are on the ground. Medium wrecker: fixed rear boom raises/lowers and telescopes but does not swing. Deploy the separate wheel lift while stopped or creeping in reverse. Hold LIFT UP/DOWN and adjust GRID width while lining up. Stop and apply PARK BRAKE to close L-arms, raise the captured axle and FIT STRAPS. At the green recovery circle, park, REMOVE STRAPS, lower the lift and release the tires. Only the heavy rotator can swing its boom with the riggers deployed. For a heavy rollover: deploy riggers and boom, connect LINE A and B to suitable simulated frame points, hold each independent winch (or use WINCH BOTH / PAY BOTH to operate them together) and watch the roll angle and tension. A connected idle line holds its length and can gain tension when another line pulls against it. Some jobs have two trucks; select TARGET VEHICLE 1 or 2 for each line and bring both upright into the recovery zone. Game forces are simplified and not real-world rigging instructions. Buy trucks in FLEET / GARAGE.</span><small>Keyboard: W/S drive & reverse · A/D steer · H hook · R winch</small></aside>}
  </main>;
 }

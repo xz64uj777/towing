@@ -19,9 +19,12 @@ test('rollback pays only after unloading and disconnecting at depot',()=>{
  for(const change of [{reached:false},{delivered:false},{loaded:true},{strapped:true},{hook:true}])assert.equal(canCompleteJob('flatbed',{...done,...change}),false);
  assert.equal(canCompleteJob('flatbed',done),true);
 });
-test('medium recovery requires hook',()=>{
+test('medium recovery permits original winch route or completed wheel-lift unloading',()=>{
  assert.equal(canCompleteJob('recovery',{reached:true,hook:false}),false);
  assert.equal(canCompleteJob('recovery',{reached:true,hook:true}),true);
+ assert.equal(canCompleteJob('recovery',{reached:true,hook:true,loaded:true}),false);
+ assert.equal(canCompleteJob('recovery',{reached:true,delivered:true,loaded:true,strapped:true}),false);
+ assert.equal(canCompleteJob('recovery',{reached:true,delivered:true,loaded:false,strapped:false}),true);
 });
 test('heavy recovery uses its independent winch lines, not legacy hook',()=>{
  assert.equal(canCompleteJob('heavy',{reached:true,recoveryConnected:false,hook:true}),false);
@@ -618,4 +621,11 @@ test('closing or opening L-arms requires stationary parked truck',()=>{
  assert.equal(wheelLiftLockReady({speed:0,parkingBrake:false}),false);
  assert.equal(wheelLiftLockReady({speed:1,parkingBrake:true}),false);
  assert.equal(wheelLiftLockReady({speed:0,parkingBrake:true}),true);
+});
+
+import {wheelLiftStrapReady} from './gameRules.js';
+test('wheel-lift straps require captured tires, raised lift, and stationary parked truck',()=>{
+ const ready={hasLift:true,deployed:true,loaded:true,armsClosed:true,height:.7,speed:0,parkingBrake:true};
+ assert.equal(wheelLiftStrapReady(ready),true);
+ for(const change of [{hasLift:false},{deployed:false},{loaded:false},{armsClosed:false},{height:.44},{speed:.25},{parkingBrake:false}])assert.equal(wheelLiftStrapReady({...ready,...change}),false);
 });

@@ -4,6 +4,7 @@ export function canCompleteJob(kind,{reached,loaded,strapped,hook,recoveryConnec
  if(kind==='tow') return Boolean(delivered&&!loaded&&!strapped);
  if(kind==='flatbed') return Boolean(delivered&&!loaded&&!strapped&&!hook);
  if(kind==='heavy') return Boolean(recoveryConnected);
+ if(kind==='recovery') return Boolean(!loaded&&!strapped&&(hook||delivered));
  return Boolean(hook);
 }
 export const minimapX=x=>70+x*1.5;
@@ -101,4 +102,9 @@ export function wheelLiftMotionReady({speed,loaded,parkingBrake}){
 }
 export function wheelLiftLockReady({speed,parkingBrake}){
  return Boolean(parkingBrake)&&Number.isFinite(speed)&&speed>=0&&speed<.25;
+}
+
+// Both wheel-lift trucks use the same capture/secure interlocks.
+export function wheelLiftStrapReady({hasLift,deployed,loaded,armsClosed,height,speed,parkingBrake}){
+ return Boolean(hasLift&&deployed&&loaded&&armsClosed&&Number.isFinite(height)&&height>=.45&&wheelLiftLockReady({speed,parkingBrake}));
 }
