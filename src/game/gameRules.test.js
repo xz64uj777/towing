@@ -245,3 +245,69 @@ test("a sustained side pull aligns the front with the guide",()=>{
  }
  assert.ok(yaw>1.3&&yaw<2&&x>3&&Math.abs(rate)<.08);
 });
+
+import {sampleSurface,recoverySurfaceVelocity} from './terrainPhysics.js';
+
+test("surface follows actual road, parking lot, gravel bay and grass footprints",()=>{
+ assert.equal(sampleSurface(0,0,-19).name,'PAVEMENT');
+ assert.equal(sampleSurface(0,9,-19).name,'PAVEMENT');
+ assert.equal(sampleSurface(1,6,-42).name,'GRAVEL');
+ assert.equal(sampleSurface(1,20,-42).name,'GRASS');
+ assert.equal(sampleSurface(4,2,-76).name,'PAVEMENT');
+});
+
+test("ditch mud replaces gravel only inside the cut",()=>{
+ assert.equal(sampleSurface(2,11,-28).name,'MUD');
+ assert.equal(sampleSurface(2,7,-28).name,'GRAVEL');
+ assert.equal(sampleSurface(2,11,0).name,'GRASS');
+});
+
+test("lake depth comes from the visible basin and not the entire mission",()=>{
+ const deep=sampleSurface(4,-19,-76),shore=sampleSurface(4,-9,-76);
+ assert.equal(deep.name,'SUBMERGED');
+ assert.ok(deep.depth>1.2);
+ assert.equal(shore.name,'MUD');
+ assert.equal(shore.depth,0);
+ assert.equal(sampleSurface(4,-19,-25).depth,0);
+ assert.equal(sampleSurface(3,-18,-63).depth,0);
+});
+
+test("traction decreases and longitudinal drag increases from road to grass to mud to lake",()=>{
+ const surfaces=[sampleSurface(4,0,-76),sampleSurface(4,20,-76),sampleSurface(4,-9,-76),sampleSurface(4,-19,-76)];
+ const speeds=surfaces.map(s=>recoverySurfaceVelocity(0,3,0,0,1,s).z);
+ for(let i=1;i<surfaces.length;i++){
+  assert.ok(surfaces[i].traction<surfaces[i-1].traction);
+  assert.ok(surfaces[i].drag>surfaces[i-1].drag);
+  assert.ok(speeds[i]>0&&speeds[i]<speeds[i-1]);
+ }
+});
+
+test("pavement to shoulder blends continuously without a speed discontinuity",()=>{
+ const a=sampleSurface(3,4.99,-63),b=sampleSurface(3,5.01,-63);
+ assert.ok(Math.abs(a.traction-b.traction)<.05);
+ assert.ok(Math.abs(a.drag-b.drag)<.05);
+});
+
+test("submerged vehicles remain movable; opposite velocities damp symmetrically",()=>{
+ const s=sampleSurface(4,-19,-76),h=1/120;
+ let v=0,x=0;
+ for(let i=0;i<1200;i++){v+=1.5*h;v=recoverySurfaceVelocity(v,0,Math.PI/2,0,h,s).x;x+=v*h;}
+ assert.ok(x>4&&v>0&&v<1);
+ const a=recoverySurfaceVelocity(2,3,.2,.9,.1,s),b=recoverySurfaceVelocity(-2,-3,.2,.9,.1,s);
+ assert.ok(Math.abs(a.x+b.x)<1e-10&&Math.abs(a.z+b.z)<1e-10);
+});
+
+test("terrain drag is frame-rate independent and never creates motion",()=>{
+ const s=sampleSurface(4,-19,-76);
+ const a=recoverySurfaceVelocity(2,3,.5,0,.2,s);
+ let b={x:2,z:3};
+ for(let i=0;i<24;i++)b=recoverySurfaceVelocity(b.x,b.z,.5,0,1/120,s);
+ assert.ok(Math.abs(a.x-b.x)<1e-10&&Math.abs(a.z-b.z)<1e-10);
+ assert.deepEqual(recoverySurfaceVelocity(0,0,0,0,.2,s),{x:0,z:0});
+});
+
+test("each recovery target samples its own location and improves as it exits the lake",()=>{
+ const deep=sampleSurface(4,-19,-76),bank=sampleSurface(4,-9,-76),road=sampleSurface(4,0,-76);
+ assert.ok(deep.drag>bank.drag&&bank.drag>road.drag);
+ assert.ok(deep.lateralGrip<bank.lateralGrip&&bank.lateralGrip<road.lateralGrip);
+});
