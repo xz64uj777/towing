@@ -187,3 +187,61 @@ test('restoring a saved rigged recovery always engages parking brake',()=>{
  assert.equal(fresh.riggersDeployed,true);
  assert.equal(fresh.parkingBrake,true);
 });
+
+import {recoveryYawMoment,recoveryEyeSpeed,recoveryYawStep,recoveryGroundVelocity} from './gameRules.js';
+
+test("front and rear eyes pivot oppositely; centered pull has no yaw",()=>{
+ assert.ok(recoveryYawMoment({x:0,z:-1.85},{x:1,z:0},10000)>0);
+ assert.ok(recoveryYawMoment({x:0,z:1.83},{x:1,z:0},10000)<0);
+ assert.equal(recoveryYawMoment({x:0,z:-1.85},{x:0,z:-1},10000),0);
+});
+
+test("mirror corner hooks balance; unequal dual pulls rotate",()=>{
+ const a=recoveryYawMoment({x:-.86,z:-1.65},{x:0,z:-1},24000),b=recoveryYawMoment({x:.86,z:-1.65},{x:0,z:-1},24000);
+ assert.ok(a>0&&b<0&&Math.abs(a+b)<1e-8);
+ assert.equal(recoveryYawStep(0,a+b,14,1/120,true),0);
+ assert.ok(recoveryYawStep(0,a+b/2,14,1/120,true)>0);
+});
+
+test("rolled and rotated world-space eyes respond to the final redirect",()=>{
+ const rolled={x:-.73,z:-1.85};
+ assert.ok(recoveryYawMoment(rolled,{x:0,z:-1},10000)>0);
+ assert.ok(recoveryYawMoment({x:1.85,z:0},{x:0,z:1},10000)>0);
+ assert.ok(recoveryYawMoment(rolled,{x:0,z:1},10000)<0);
+});
+
+test("yaw and roll eye velocity change cable approach speed",()=>{
+ const zero={x:0,y:0,z:0},front={x:0,y:0,z:-2},right={x:1,y:0,z:0};
+ assert.equal(recoveryEyeSpeed(zero,front,right,.5),1);
+ assert.equal(recoveryEyeSpeed(zero,front,right,-.5),-1);
+ assert.equal(recoveryEyeSpeed(zero,{x:0,y:1,z:0},right,0,.5,0),-.5);
+});
+
+test("upright tires scrub sideways but preserve longitudinal motion",()=>{
+ const u=recoveryGroundVelocity(2,3,0,0,.2),r=recoveryGroundVelocity(2,3,0,Math.PI/2,.2);
+ assert.ok(u.x>0&&u.x<r.x&&r.x<2&&u.z===3);
+ const t=recoveryGroundVelocity(3,2,Math.PI/2,0,.2);
+ assert.ok(Math.abs(t.x-3)<1e-8&&t.z<2);
+});
+
+test("yaw response is mass-sensitive, time-step stable and bounded",()=>{
+ const torque=30000,light=recoveryYawStep(0,torque,4,.1,true),heavy=recoveryYawStep(0,torque,14,.1,true);
+ assert.ok(light>heavy&&heavy>0);
+ let rate=0;for(let i=0;i<12;i++)rate=recoveryYawStep(rate,torque,14,1/120,true);
+ assert.ok(Math.abs(rate-heavy)<1e-10);
+ assert.equal(recoveryYawStep(0,1e9,1,.1,true),1.8);
+ assert.ok(recoveryYawStep(.8,0,14,.2,false)<recoveryYawStep(.8,0,14,.2,true));
+});
+
+test("a sustained side pull aligns the front with the guide",()=>{
+ let yaw=0,rate=0,x=0,z=0,vx=0,vz=0;const h=1/120;
+ for(let i=0;i<1200;i++){
+  const eye={x:1.85*Math.sin(yaw),z:-1.85*Math.cos(yaw)};
+  const dx=20-x-eye.x,dz=-z-eye.z,d=Math.hypot(dx,dz),dir={x:dx/d,z:dz/d};
+  rate=recoveryYawStep(rate,recoveryYawMoment(eye,dir,15000),12,h,true);
+  yaw+=rate*h;vx+=dir.x*h;vz+=dir.z*h;
+  const ground=recoveryGroundVelocity(vx,vz,yaw,0,h);
+  vx=ground.x*Math.exp(-h);vz=ground.z*Math.exp(-h);x+=vx*h;z+=vz*h;
+ }
+ assert.ok(yaw>1.3&&yaw<2&&x>3&&Math.abs(rate)<.08);
+});

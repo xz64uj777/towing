@@ -62,3 +62,34 @@ export function cameraPresetPose(mode,truck,yaw,vehicle,zoom=13){
 
 // Outrigger deployment engages the parking brake; stowing riggers does not release it.
 export const parkingBrakeForRiggers=(parkingBrake,riggersDeployed)=>Boolean(parkingBrake||riggersDeployed);
+
+// Positive game yaw rotates the front (-Z) toward +X. Pure helpers for both winch systems.
+export function recoveryYawMoment(offset,direction,pull){
+ return (offset.x*direction.z-offset.z*direction.x)*Math.max(0,pull);
+}
+
+export function recoveryEyeSpeed(velocity,offset,direction,yawRate,rollRate=0,yaw=0){
+ // The cable responds to the moving eye, not just the chassis center.
+ const wx=-Math.sin(yaw)*rollRate, wz=Math.cos(yaw)*rollRate;
+ return (velocity.x-yawRate*offset.z-wz*offset.y)*direction.x+
+        (velocity.y+wz*offset.x-wx*offset.z)*direction.y+
+        (velocity.z+yawRate*offset.x+wx*offset.y)*direction.z;
+}
+
+export function recoveryYawStep(rate,moment,mass,seconds,powered){
+ // Game-tuned yaw inertia (dispatch tonnes), viscous damping and a speed limit.
+ // Braked drums still exert torque; idle winches damp residual movement more strongly.
+ const damping=powered?2.6:9;
+ const decay=Math.exp(-damping*seconds);
+ const next=rate*decay+(moment/(Math.max(1,mass)*1450))*(1-decay)/damping;
+ return Math.abs(next)<.0001?0:Math.max(-1.8,Math.min(1.8,next));
+}
+
+export function recoveryGroundVelocity(x,z,yaw,roll,seconds){
+ // Upright tires resist lateral scrub more than an overturned chassis.
+ const rightX=Math.cos(yaw),rightZ=Math.sin(yaw);
+ const side=x*rightX+z*rightZ;
+ const lateralDrag=3.2+4.8*Math.pow(Math.max(0,Math.cos(roll)),4);
+ const removed=side*(1-Math.exp(-lateralDrag*seconds));
+ return {x:x-removed*rightX,z:z-removed*rightZ};
+}
