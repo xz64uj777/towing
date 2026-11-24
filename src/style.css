@@ -252,12 +252,12 @@
   max-height:max(88px,calc(100dvh - 205px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
  }
  .game-minimap:has(svg){
-  width:124px!important;
-  height:132px!important;
-  bottom:calc(117px + env(safe-area-inset-bottom))!important;
+  width:116px!important;
+  height:108px!important;
+  bottom:calc(128px + env(safe-area-inset-bottom))!important;
   overflow:hidden;
  }
- .game-minimap svg{width:110px;height:110px}
+ .game-minimap svg{width:100px;height:82px}
  .game-shell:has(.game-minimap svg) .tension-readout{
   visibility:hidden;
   pointer-events:none;
