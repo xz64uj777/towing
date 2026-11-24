@@ -93,3 +93,12 @@ export function recoveryGroundVelocity(x,z,yaw,roll,seconds){
  const removed=side*(1-Math.exp(-lateralDrag*seconds));
  return {x:x-removed*rightX,z:z-removed*rightZ};
 }
+
+// Unloaded lift positioning is independent of the parking brake at walking speed.
+// A captured axle may only be raised/lowered while stopped and parked.
+export function wheelLiftMotionReady({speed,loaded,parkingBrake}){
+ return Number.isFinite(speed)&&speed>=0&&(loaded?Boolean(parkingBrake)&&speed<.25:speed<=2.3);
+}
+export function wheelLiftLockReady({speed,parkingBrake}){
+ return Boolean(parkingBrake)&&Number.isFinite(speed)&&speed>=0&&speed<.25;
+}

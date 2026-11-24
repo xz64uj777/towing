@@ -602,3 +602,20 @@ test('tire contact transitions continuously from ditch to shoulder and flat pave
  const a=ditchContactPose(5.01,-28,Math.PI/2,1.06),b=ditchContactPose(4.99,-28,Math.PI/2,1.06);
  assert.ok(Math.abs(a.height-b.height)<.01&&Math.abs(a.pitch-b.pitch)<.02);
 });
+
+import {wheelLiftMotionReady,wheelLiftLockReady} from './gameRules.js';
+test('unloaded light and medium lift positioning works without parking brake while reversing slowly',()=>{
+ for(const speed of [0,.1,1,2.3])assert.equal(wheelLiftMotionReady({speed,loaded:false,parkingBrake:false}),true);
+ assert.equal(wheelLiftMotionReady({speed:2.31,loaded:false,parkingBrake:false}),false);
+ assert.equal(wheelLiftMotionReady({speed:NaN,loaded:false,parkingBrake:false}),false);
+});
+test('captured lift requires parking brake and a stopped truck',()=>{
+ assert.equal(wheelLiftMotionReady({speed:0,loaded:true,parkingBrake:false}),false);
+ assert.equal(wheelLiftMotionReady({speed:.24,loaded:true,parkingBrake:true}),true);
+ assert.equal(wheelLiftMotionReady({speed:.25,loaded:true,parkingBrake:true}),false);
+});
+test('closing or opening L-arms requires stationary parked truck',()=>{
+ assert.equal(wheelLiftLockReady({speed:0,parkingBrake:false}),false);
+ assert.equal(wheelLiftLockReady({speed:1,parkingBrake:true}),false);
+ assert.equal(wheelLiftLockReady({speed:0,parkingBrake:true}),true);
+});
