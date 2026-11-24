@@ -13,9 +13,11 @@ test('light wheel-lift pays only after completed depot unloading',()=>{
  assert.equal(canCompleteJob('tow',{reached:true,loaded:false,strapped:false,delivered:false}),false);
  assert.equal(canCompleteJob('tow',{reached:true,loaded:false,strapped:false,delivered:true}),true);
 });
-test('rollback requires secured load',()=>{
- assert.equal(canCompleteJob('flatbed',{reached:true,loaded:false}),false);
- assert.equal(canCompleteJob('flatbed',{reached:true,loaded:true}),true);
+test('rollback pays only after unloading and disconnecting at depot',()=>{
+ const done={reached:true,delivered:true,loaded:false,strapped:false,hook:false};
+ assert.equal(canCompleteJob('flatbed',{reached:true,loaded:true,strapped:true}),false);
+ for(const change of [{reached:false},{delivered:false},{loaded:true},{strapped:true},{hook:true}])assert.equal(canCompleteJob('flatbed',{...done,...change}),false);
+ assert.equal(canCompleteJob('flatbed',done),true);
 });
 test('medium recovery requires hook',()=>{
  assert.equal(canCompleteJob('recovery',{reached:true,hook:false}),false);
@@ -491,3 +493,37 @@ test('moving block return leg also loads truck',()=>{const r=supportReaction([{x
 test('opposed pulls cancel truck translation',()=>{const a=supportReaction([{x:0,y:0,z:0},{x:5,y:0,z:0}],10000),b=supportReaction([{x:0,y:0,z:0},{x:-5,y:0,z:0}],10000);assert.equal(supportState({x:a.x+b.x,y:0,z:0},1,true).ratio,0);});
 test('riggers and dry terrain increase holding capacity',()=>{const f={x:80000,y:0,z:0};assert.equal(supportState(f,1,true).ax,0);assert.ok(supportState(f,.48,true).ax>0);assert.ok(supportState(f,1,false).ratio>supportState(f,1,true).ratio);});
 test('upward reaction reduces grip and creep is bounded',()=>{const f={x:1e6,y:90000,z:0};assert.ok(supportState(f,1,true).ratio>supportState({...f,y:0},1,true).ratio);assert.equal(supportState(f,1,true).ax,.8);});
+
+import {rollbackAligned,rollbackGroundLimit,rollbackApproachStep,rollbackCanUnhook} from './rollbackPhysics.js';
+test('rollback approach uses actual lateral velocity, not automatic centering',()=>{
+ const d=rollbackDeck(1),z=rollbackGroundLimit(d,.92)+4;
+ const a=rollbackApproachStep(d,.6,z,.2,.92,0,-1,.1);
+ assert.equal(a.x,.6);assert.equal(a.z,z-.1);
+ const b=rollbackApproachStep(d,.6,z,.2,.92,-.2,-1,.1);
+ assert.ok(Math.abs(b.x-.58)<1e-9);
+});
+test('misaligned wheels stop at ramp toe without snapping sideways; can unhook to reposition',()=>{
+ const d=rollbackDeck(1),edge=rollbackGroundLimit(d,.92);
+ const a=rollbackApproachStep(d,.6,edge+.05,.2,.92,0,-1,.1);
+ assert.deepEqual(a,{x:.6,z:edge,blocked:true});
+ assert.ok(!rollbackAligned(.1,.3,.92));assert.ok(rollbackAligned(.1,.05,.92));
+ assert.ok(rollbackCanUnhook(d,edge,.92,true,true));
+});
+test('aligned wheels cross to ramp constraint and unhook requires all tires down and parked',()=>{
+ const d=rollbackDeck(1),edge=rollbackGroundLimit(d,.92);
+ assert.deepEqual(rollbackApproachStep(d,.1,edge+.05,0,.92,0,-1,.1),{x:.1,z:edge,blocked:false});
+ assert.ok(!rollbackCanUnhook(d,edge-.01,.92,true,true));
+ assert.ok(!rollbackCanUnhook(d,edge+1,.92,false,true));
+ assert.ok(!rollbackCanUnhook(d,edge+1,.92,true,false));
+ assert.ok(rollbackCanUnhook(d,edge+1,.92,true,true));
+});
+test('rollback captured offset persists in saves; old checkpoints default to centered',()=>{
+ const f=checkpointFixture();Object.assign(f,{rollbackLoadX:.1,rollbackLoadYaw:.04,rollbackLoadZ:.08});
+ const snapshot=captureRecoverySave({job:4},f),fresh=checkpointFixture();
+ Object.assign(fresh,{rollbackLoadX:0,rollbackLoadYaw:0,rollbackLoadZ:0});
+ restoreRecoverySave(fresh,snapshot,checkpointVector);
+ assert.deepEqual([fresh.rollbackLoadX,fresh.rollbackLoadYaw,fresh.rollbackLoadZ],[.1,.04,.08]);
+ delete snapshot.equipment.rollbackLoadX;delete snapshot.equipment.rollbackLoadYaw;delete snapshot.equipment.rollbackLoadZ;
+ const older=checkpointFixture();restoreRecoverySave(older,snapshot,checkpointVector);
+ assert.deepEqual([older.rollbackLoadX,older.rollbackLoadYaw,older.rollbackLoadZ],[0,0,0]);
+});
