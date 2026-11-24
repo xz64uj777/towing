@@ -528,3 +528,21 @@
  .game-shell:has(.single-line-stack .boom-float) .tension-readout{left:calc(108px + env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));width:min(154px,24vw)}
  .game-shell:has(.single-line-stack .boom-float) .bottom-ui>.joystick{width:78px;height:78px}
 }
+
+/* Keep collapsed panels docked even with the boom visible; fit short-screen controls. */
+.bottom-ui .equipment-stack.single-line-stack .recovery.equipment-compact{
+ position:fixed!important;left:auto!important;right:8px!important;bottom:calc(70px + env(safe-area-inset-bottom))!important;
+}
+.bottom-ui .equipment-stack.single-line-stack .recovery.equipment-compact.is-collapsed{width:min(178px,39vw)!important}
+.bottom-ui .equipment-stack.single-line-stack .recovery.equipment-compact:not(.single-line-menu){width:min(178px,43vw)!important}
+@media(orientation:portrait) and (max-width:650px){
+ .bottom-ui .equipment-stack.single-line-stack .recovery.equipment-compact.single-line-menu.is-open{bottom:calc(84px + env(safe-area-inset-bottom))!important}
+}
+@media(orientation:landscape) and (max-height:540px){
+ .bottom-ui .equipment-stack.single-line-stack .recovery.equipment-compact{bottom:calc(57px + env(safe-area-inset-bottom))!important}
+ .bottom-ui .equipment-stack.single-line-stack .boom-float{width:140px!important;max-width:140px!important}
+ .bottom-ui .equipment-stack.single-line-stack .boom-control-cluster{display:grid;grid-template-columns:minmax(0,1fr) 70px;grid-template-rows:auto auto;gap:3px}
+ .bottom-ui .equipment-stack.single-line-stack .boom-joystick{grid-column:2;grid-row:1 / span 2}
+ .bottom-ui .equipment-stack.single-line-stack .boom-status{grid-column:1;grid-row:1}
+ .bottom-ui .equipment-stack.single-line-stack .boom-control-cluster>.action{grid-column:1;grid-row:2;min-height:24px}
+}
