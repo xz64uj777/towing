@@ -576,7 +576,7 @@
 .camera-dock .camera-shortcuts button{min-height:27px;font-size:9px;padding:3px 4px}
 .camera-dock .camera-selector button{min-height:27px;font-size:9px;padding:2px}
 .bottom-ui .recovery.all-controls.single-line-menu.is-open{
- --row:clamp(19px,calc((100dvh - 181px - env(safe-area-inset-top) - env(safe-area-inset-bottom))/8),27px);
+ --row:clamp(19px,calc((100dvh - 181px - env(safe-area-inset-top) - env(safe-area-inset-bottom))/8),36px);
  width:min(222px,43vw)!important;gap:2px;padding:3px;
 }
 .bottom-ui .recovery.single-line-menu .equipment-header,
@@ -584,7 +584,7 @@
 .bottom-ui .recovery.single-line-menu.is-open .action,
 .bottom-ui .recovery.single-line-menu.is-open .control,
 .bottom-ui .recovery.single-line-menu.is-open .recovery-toggle{
- font-size:9px!important;border-radius:5px;
+ font-size:11px!important;border-radius:5px;
 }
 .bottom-ui .recovery.single-line-menu.is-collapsed .recovery-toggle{min-height:26px;height:26px;font-size:9px}
 @media(orientation:portrait) and (max-width:650px){
@@ -598,11 +598,11 @@
  .toolbar.menu-open .toolbar-panel button,.toolbar.menu-open .toolbar-panel select,
  .toolbar.menu-open .toolbar-panel .checkpoint-actions button{height:25px!important}
  .bottom-ui .recovery.all-controls.single-line-menu.is-open{
-  --row:clamp(17px,calc((100dvh - 151px - env(safe-area-inset-top) - env(safe-area-inset-bottom))/8),23px);
+  --row:clamp(17px,calc((100dvh - 151px - env(safe-area-inset-top) - env(safe-area-inset-bottom))/8),26px);
  }
  .bottom-ui .recovery.single-line-menu.is-open .action,
  .bottom-ui .recovery.single-line-menu.is-open .control,
- .bottom-ui .recovery.single-line-menu.is-open .recovery-toggle{font-size:8px!important}
+ .bottom-ui .recovery.single-line-menu.is-open .recovery-toggle{font-size:9px!important}
 }
 
 .bottom-ui .recovery.equipment-compact.winch-equipped.is-open:not(.single-line-menu){
@@ -615,5 +615,9 @@
  height:calc(var(--row) + 6px)!important;
  min-height:calc(var(--row) + 6px)!important;
  max-height:calc(var(--row) + 6px)!important;
- font-size:10px!important;
+ font-size:12px!important;
+}
+@media(orientation:landscape) and (max-height:540px){
+ .bottom-ui .equipment-stack.single-line-stack .recovery.single-line-menu.is-open{bottom:calc(72px + env(safe-area-inset-bottom))!important}
+ .bottom-ui .recovery.single-line-menu.is-open .winch-row>.control{font-size:11px!important}
 }
