@@ -789,3 +789,38 @@ test('detailed rig preserves original pivot, sleeve and line head transforms',()
  assert.deepEqual(boomTip.getWorldPosition(new THREE.Vector3()).toArray(),before);
  assert.ok(recoveryStructure.getObjectByName('slew bearing'));assert.ok(boomTip.getObjectByName('grooved cable pulley'));
 });
+
+import {ROLLBACK_LENGTH} from './rollbackPhysics.js';
+import {VEHICLE_MODEL_KINDS,fleetArchHeight,addFleetBody,detailMediumRig,detailCarrierDeck} from './fleetModels.js';
+test('all six remaining fleet bodies have distinct geometry and finite attributes',()=>{
+ for(const kind of VEHICLE_MODEL_KINDS){
+  const root=addFleetBody(THREE,new THREE.Group(),{kind,scale:kind==='suv'?.92:1,color:0x446688});
+  assert.equal(root.name,'dedicated '+kind+' body');
+  assert.ok(root.getObjectByName(kind+' shaped hood'));assert.ok(root.getObjectByName('integrated front wheel housing'));
+  let count=0;root.traverse(o=>{if(o.geometry){count++;assert.ok(o.geometry.attributes.position.array.every(Number.isFinite));assert.ok(o.geometry.attributes.normal.array.every(Number.isFinite));}});
+  assert.ok(count<140,kind);
+ }
+});
+test('fleet bodies have appropriate recovery and cargo equipment rather than shared slabs',()=>{
+ const model=kind=>addFleetBody(THREE,new THREE.Group(),{kind,color:0x446688});
+ assert.ok(model('medium').getObjectByName('flush wrecker locker door'));
+ const flat=model('flatbed');assert.ok(flat.getObjectByName('rollback subframe rail'));assert.ok(flat.getObjectByName('carrier rear wheel guard'));assert.ok(!flat.getObjectByName('wrecker center equipment deck'));
+ assert.ok(model('suv').getObjectByName('crossover rear hatch glass'));assert.ok(model('pickup').getObjectByName('pickup cargo floor'));assert.ok(model('delivery').getObjectByName('cargo locking rod'));
+});
+test('fleet fenders clear fixed axle locations and crossover fits deck tire envelope',()=>{
+ for(const k of [.92,1,1.06,1.15])for(const axle of [-1.55,1.55])assert.ok(fleetArchHeight(axle,axle,k)>(.62+.48)*k);
+ const suv=addFleetBody(THREE,new THREE.Group(),{kind:'suv',scale:.92});
+ const arch=suv.getObjectByName('integrated front wheel housing').geometry.boundingBox;
+ assert.ok(Math.max(Math.abs(arch.min.x),Math.abs(arch.max.x))<=1.275);
+ const flat=addFleetBody(THREE,new THREE.Group(),{kind:'flatbed'});
+ const rear=flat.getObjectByName('carrier rear wheel guard').geometry.boundingBox;
+ assert.ok(rear.min.z<3.65&&rear.max.z>3.65&&rear.max.y<1.34);
+});
+test('carrier deck details and medium boom retain existing hydraulic transforms',()=>{
+ const bed=new THREE.Mesh(new THREE.BoxGeometry(2.55,.22,ROLLBACK_LENGTH));bed.position.set(0,1.45,3.4);bed.rotation.x=.3;
+ const before=bed.matrixWorld.clone();bed.updateMatrixWorld(true);const pose=bed.matrixWorld.clone();
+ detailCarrierDeck(THREE,bed,ROLLBACK_LENGTH);bed.updateMatrixWorld(true);assert.ok(bed.matrixWorld.equals(pose));assert.ok(bed.getObjectByName('carrier cable spool'));
+ const recoveryStructure=new THREE.Group(),boomPivot=new THREE.Group(),boomTilt=new THREE.Group(),boomTip=new THREE.Group();
+ recoveryStructure.add(boomPivot);boomPivot.add(boomTilt);boomTilt.add(boomTip);boomPivot.position.set(0,2.16,1.13);boomTip.position.set(0,.05,3.25);
+ const eye=boomTip.getWorldPosition(new THREE.Vector3());detailMediumRig(THREE,{recoveryStructure,boomPivot,boomTilt,boomTip});assert.ok(boomTip.getWorldPosition(new THREE.Vector3()).equals(eye));
+});

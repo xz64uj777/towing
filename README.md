@@ -6,7 +6,7 @@ Run your own towing and recovery operation in a mobile-first 3D simulator. Start
 
 Position your truck, operate the hydraulics, rig the recovery, watch cable tension and stability, and finish the dispatch to earn your payout. This is a hands-on equipment simulator: loading, securement, unloading and stowing matter as much as driving.
 
-**Current game: Build .77 — Heavy Rotator.** The browser version includes seven dispatches, four playable trucks, career earnings and upgrades, touch and keyboard controls, and local progress saves. Development is ongoing, with gameplay feedback from the owner's hands-on testing.
+**Current game: Build .78 — Fleet Redesign.** The browser version includes seven dispatches, four playable trucks, career earnings and upgrades, touch and keyboard controls, and local progress saves. Development is ongoing, with gameplay feedback from the owner's hands-on testing.
 
 ## Career and dispatches
 
@@ -76,7 +76,7 @@ Deploy riggers and engage the parking brake before powering the heavy winches. W
 - Cable spring/damper loading, load-dependent winch speed, redirected forces and tension-dependent visual cable sag.
 - Vehicle yaw and rollover response, heavy-truck suspension response, and load distribution across individual outrigger pads.
 - Manual equipment interlocks, simulated rollback collision and payout deductions.
-- Procedural 3D vehicles and terrain, multiple camera views, engine/winch/hydraulic sounds and configurable controls.
+- Dedicated procedural 3D bodies for each truck and disabled vehicle type, textured terrain, multiple camera views, engine/winch/hydraulic sounds and configurable controls.
 
 The game uses simplified, game-tuned physics. It is **not real-world towing or rigging training**, and its simulated load values, equipment capacities and operating sequences must not be used as field guidance.
 

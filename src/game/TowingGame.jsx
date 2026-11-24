@@ -10,8 +10,9 @@ import {ROLLBACK_LENGTH,rollbackDeck,rollbackPose,rollbackStop,rollbackTravel,ro
 import {cableGeometry,cablePathSpeed,cableLoad,cableReelStep,cableRenderPoints} from './cablePhysics.js';
 import {supportReaction,supportState,SUPPORT_PADS,supportWrench,outriggerLoads,padContact,suspensionStep} from './supportPhysics.js';
 import {ditchContactPose,ditchGroundStep,groundCableDelta} from './ditchPhysics.js';
-import {addVehicleShell,surfaceMap,reflectionSky,addRoadsideDetails,addIntegratedChassis} from './visualQuality.js';
+import {surfaceMap,reflectionSky,addRoadsideDetails,addIntegratedChassis} from './visualQuality.js';
 import {addRotatorBody,detailRotatorRig} from './heavyRotatorModel.js';
+import {addFleetBody,detailMediumRig,detailCarrierDeck} from './fleetModels.js';
 import {steeringStep,brakeStep,chassisGrade,cameraGroundClearance} from './drivingPhysics.js';
 import { canCompleteJob, minimapX, minimapY, wheelLiftCaptureReady, wheelLiftMotionReady, wheelLiftLockReady, wheelLiftStrapReady, winchLoadBand, stopWinchCoast, canPowerBothRecoveryLines, parkingBrakeForRiggers, cameraPresetPose, recoveryYawMoment, recoveryYawStep } from './gameRules.js';
 
@@ -88,9 +89,8 @@ function box(parent,name,size,pos,color,opts={}) {
 function makeVehicle(scene,{name,color,pos,scale=1,kind='pickup'}) {
   const root=new THREE.Group(); root.name=name; root.position.copy(pos); scene.add(root);
   const body=new THREE.Group(); root.add(body);
-  addIntegratedChassis(THREE,body,{kind,scale,color,railsOnly:kind==='rotator'});
-  if(kind==='rotator')addRotatorBody(THREE,body,{scale,color});else addVehicleShell(THREE,body,{kind,scale,color});
-  const rearDeck=box(body,'bed',[2.0*scale,.3*scale,1.5*scale],[0,1.35*scale,1.15*scale],0x333a40);rearDeck.visible=kind!=='suv'&&kind!=='rotator';
+  addIntegratedChassis(THREE,body,{kind,scale,color,railsOnly:true});
+  if(kind==='rotator')addRotatorBody(THREE,body,{scale,color});else addFleetBody(THREE,body,{kind,scale,color});
   const wheels=[],tireBands=[],tireMap=surfaceMap(THREE,16,1,65,'tire');
   for(const z of [-1.55,1.55]) for(const x of [-1.06,1.06]) {
     const profile=[[.19,-.16],[.35,-.16],[.43,-.145],[.475,-.10],[.48,-.055],[.48,.055],[.475,.10],[.43,.145],[.35,.16],[.19,.16],[.19,-.16]].map(([r,y])=>new THREE.Vector2(r*scale,y*scale));
@@ -112,11 +112,6 @@ function makeVehicle(scene,{name,color,pos,scale=1,kind='pickup'}) {
   let underliftPivot=null,underliftInner=null,underliftHead=null,liftCross=null;
   if(name==='wrecker') {
     // Fixed recovery boom with a separate articulated underlift. The rotator alone can slew.
-    for(const side of [-1,1]) {
-      box(body,'light-duty cabinet',[.27,.75,1.9],[side*.96,1.55,1.0],color);
-      box(body,'light-duty handle',[.06,.08,.25],[side*1.11,1.66,1],0xb9c2c8);
-    }
-    box(body,'light-duty deck',[2.1,.12,2.4],[0,1.97,1.1],0x343b3f);
     recoveryStructure=new THREE.Group();recoveryStructure.name='fixed recovery assembly';body.add(recoveryStructure);
     box(recoveryStructure,'wrecker tool cabinet',[1.85,.67,2.2],[0,1.68,1.15],color);
     for(const side of [-1,1]){
@@ -137,6 +132,7 @@ function makeVehicle(scene,{name,color,pos,scale=1,kind='pickup'}) {
       const mesh=new THREE.Mesh(new THREE.CylinderGeometry(.09,.11,1,12),new THREE.MeshStandardMaterial({color:0xaab2b9,metalness:.7,roughness:.3}));
       mesh.castShadow=true;recoveryStructure.add(mesh);boomCylinders.push({mesh,side});
     }
+    if(kind==='medium')detailMediumRig(THREE,{recoveryStructure,boomPivot,boomTilt,boomTip});
     if(kind==='rotator'){
       detailRotatorRig(THREE,{recoveryStructure,boomPivot,boomTilt,boomSleeve,boomTip});
       box(recoveryStructure,'rotator bearing pedestal',[1.36,.95,1.26],[0,1.47,1.13],0x36434b,{metalness:.45});
@@ -171,6 +167,7 @@ function makeVehicle(scene,{name,color,pos,scale=1,kind='pickup'}) {
    box(bed,'rollback headboard',[2.55,.48,.12],[0,.35,-ROLLBACK_LENGTH/2+.06],0x404c54);
    box(bed,'rollback winch drum',[.65,.32,.28],[0,.33,-ROLLBACK_LENGTH/2+.29],0x222c31);
    for(const side of [-1,1])box(bed,'deck edge rail',[.06,.055,ROLLBACK_LENGTH],[side*1.24,.13,0],0x8a959c);
+  if(kind==='flatbed')detailCarrierDeck(THREE,bed,ROLLBACK_LENGTH);
   const deckTies=[];
   if(kind==='flatbed')for(let i=0;i<4;i++){
    const geo=new THREE.BufferGeometry(),positions=new Float32Array(15*2*3),indices=[];
@@ -265,8 +262,6 @@ export default function TowingGame(){
   const truck=makeVehicle(scene,{name:'wrecker',kind:type.id,color:type.color,pos:V(0,0,ravineStartZ),scale:type.id==='rotator'?1.13:1});
   const tools=type.tools;truck.userData.bed.visible=tools.includes('bed');
    if(type.id==='flatbed'){
-     const body=truck.userData.body;
-     body.getObjectByName('bed').visible=false;
      for(const wheel of truck.userData.wheels)if(wheel.position.z>0)wheel.position.z=3.65;
    }
   truck.userData.recoveryStructure.visible=tools.includes('boom');truck.userData.underliftPivot.visible=tools.includes('lift');for(const part of truck.userData.outriggers)part.visible=false;if(type.id==='light'){const outer=truck.userData.underliftPivot.getObjectByName('underlift outer stinger');outer.scale.z=.60;outer.position.z=.71;truck.userData.underliftInner.visible=false;}for(const o of truck.userData.body.children){if(o.name.startsWith('light-duty'))o.visible=type.id==='light';if(o.name.startsWith('outrigger'))o.visible=false;if(o.name==='underlift hinge housing')o.visible=tools.includes('lift');}
@@ -287,15 +282,12 @@ export default function TowingGame(){
     box(scene,'loading zone marker',[.6,.10,1.4],[7,.08,-41],0xdec555);
   }else if(firstJob.kind==='recovery'){
     // Off-road pickup sunk into a cut ditch with marker posts and a damaged barrier.
-    box(pickup.userData.body,'recovery cargo tray',[1.96,.24,2.65],[0,1.61,1.16],0x6f7274);
-    box(pickup.userData.body,'recovery brush guard',[2.0,.47,.15],[0,1.18,-2.63],0x24282b);
+
     for(const z of [-36,-30,-24])box(scene,'ditch hazard post',[.14,1.25,.14],[7.3,.53,z],0xe0a435);
     const fallen=box(scene,'damaged guardrail',[.17,.19,6.7],[8,.52,-27],0xb4bab9);fallen.rotation.x=.24;
     const pose=ditchContactPose(firstJob.x,firstJob.z,-.18,pickup.userData.scale);pickup.position.y=pose.height;pickup.rotation.order='YXZ';pickup.rotation.x=pose.pitch;pickup.rotation.z=pose.roll;
   }
-  if(firstJob.boxTruck){const cargo=box(pickup.userData.body,'delivery cargo box',[1.96,1.1,2.55],[0,2.02,.9],0xc8d4dc);cargo.material.roughness=.65;for(const side of [-1,1]){box(cargo,'cargo corner extrusion',[.055,1.10,.065],[side*.96,0,1.24],0x78848a);box(cargo,'cargo door hinge',[.12,.08,.055],[side*.80,.30,1.29],0x68747a);}box(cargo,'cargo door seam',[.028,1.02,.025],[0,0,1.29],0x6e7779);}
   const secondaryPickup=makeVehicle(scene,{name:'second disabled truck',kind:'delivery',color:0x985b3a,pos:V(firstJob.second?.x??-22,levelFour?terrainHeight(firstJob.second?.x??-22,firstJob.second?.z??-106):0,firstJob.second?.z??-106),scale:1.04});
-  box(secondaryPickup.userData.body,'cargo panel',[1.95,.7,2.2],[0,1.94,.7],0xa1a9b0);
   secondaryPickup.visible=!!firstJob.second;
   // Fixed anchor fixtures let each winch line be routed directly or around a ground/tree point.
   const riggingAnchors=[
@@ -1135,7 +1127,7 @@ export default function TowingGame(){
  const currentJob=JOBS[career.job%JOBS.length];
  return <main className={'game-shell'+(menuOpen?' menu-active':'')+(cameraPanelOpen?' camera-active':'')}><div className={'scene'+(placingAnchor?' anchor-placement-scene':'')} ref={mount}/>
    {placingAnchor&&<div className="anchor-placement-hint" role="status"><b>{s?.customHookPlacement!==null?'SELECT CUSTOM HOOK':'PLACE GROUND ANCHOR'}</b><span>{s?.customHookPlacement!==null?'Tap a frame edge or bumper on the recovery vehicle.':'Tap open ground off the road, 4–32 m from truck and 3–32 m from vehicle.'}</span><button type="button" onClick={s?.customHookPlacement!==null?cancelCustomHook:cancelAnchorPlacement}>CANCEL PLACEMENT</button></div>}
-  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .77 • HEAVY ROTATOR</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
+  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .78 • FLEET REDESIGN</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
   <div className={'game-minimap '+(mapOpen?'map-expanded':'map-collapsed')} style={{position:'absolute',left:12,bottom:195,zIndex:9,width:mapOpen?146:106,height:mapOpen?166:36,pointerEvents:'auto',border:'2px solid #f3c851',borderRadius:12,background:'rgba(9,20,30,.88)',color:'#fff',boxShadow:'0 3px 14px #0008',padding:6,boxSizing:'border-box'}}>
    <button type="button" aria-expanded={mapOpen} onClick={()=>setMapOpen(v=>!v)} style={{fontSize:11,fontWeight:800,width:'100%',background:'transparent',border:0,color:'white'}}>{mapOpen?'MAP −':'MAP +'}</button>
    {mapOpen&&<svg viewBox="0 0 140 140" width="132" height="132" aria-label="Map of recovery vehicles and destination">
