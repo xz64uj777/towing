@@ -446,3 +446,36 @@
  .bottom-ui>.equipment-stack.has-boom.wide-stack{bottom:calc(54px + env(safe-area-inset-bottom))}
 }
 .game-shell.menu-active .equipment-stack.has-boom,.game-shell.camera-active .equipment-stack.has-boom{visibility:hidden;pointer-events:none}
+
+/* Build .63: one continuous equipment panel, independent A/B controls. */
+.bottom-ui .recovery.all-controls.is-open{
+ max-height:max(100px,calc(100dvh - 176px - env(safe-area-inset-top) - env(safe-area-inset-bottom)))!important;
+ overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain;scrollbar-width:thin;scroll-padding-top:38px;
+}
+.bottom-ui .recovery.all-controls.heavy-compact.is-open{width:min(355px,49vw)}
+.bottom-ui>.equipment-stack.has-boom.wide-stack{width:min(355px,49vw)}
+.bottom-ui .equipment-stack.has-boom .recovery.all-controls.is-open{max-height:none!important}
+.all-controls .equipment-section-label{flex-shrink:0;color:#f2d393;font-size:10px;font-weight:850;text-align:center;line-height:1.2;padding:3px 2px;letter-spacing:.35px}
+.all-controls .all-line-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;flex-shrink:0;width:100%}
+.all-controls .all-line-column{display:flex;flex-direction:column;gap:4px;min-width:0;padding:4px;border:1px solid #87642e;border-radius:8px;background:#17272d}
+.all-controls .all-line-column.line-b{border-color:#43849c}
+.all-controls .all-line-column.line-a .equipment-section-label{color:#ffc66b}
+.all-controls .all-line-column.line-b .equipment-section-label{color:#7cdef1}
+.all-controls .all-line-column>.action{width:100%;min-width:0;min-height:32px;font-size:9px;white-space:normal}
+.all-controls .all-line-column>select.action{width:100%;max-width:100%;min-height:32px;text-overflow:ellipsis}
+.all-controls .all-line-column .equipment-row .control{min-width:0;min-height:34px;font-size:9px;white-space:normal;padding:3px 1px}
+.all-controls button:disabled,.all-controls select:disabled{opacity:.5;cursor:default}
+.all-controls .all-both-row>.control{background:#254f64;border-color:#88bfd0}
+@media(orientation:portrait) and (max-width:650px){
+ .bottom-ui .recovery.all-controls.heavy-compact.is-open,.bottom-ui>.equipment-stack.has-boom.wide-stack{width:min(260px,64vw)}
+ .bottom-ui .recovery.all-controls.is-open{max-height:max(100px,calc(100dvh - 290px - env(safe-area-inset-top) - env(safe-area-inset-bottom)))!important}
+ .bottom-ui .equipment-stack.has-boom .recovery.all-controls.is-open{max-height:none!important}
+}
+@media(orientation:landscape) and (max-height:540px){
+ .bottom-ui .recovery.all-controls.is-open{max-height:max(88px,calc(100dvh - 159px - env(safe-area-inset-top) - env(safe-area-inset-bottom)))!important}
+ .bottom-ui .equipment-stack.has-boom .recovery.all-controls.is-open{max-height:none!important}
+ .all-controls .all-line-column{gap:3px;padding:3px}
+ .all-controls .all-line-column>.action,.all-controls .all-line-column>select.action{min-height:28px;font-size:8px}
+ .all-controls .all-line-column .equipment-row .control{min-height:29px;font-size:8px}
+ .all-controls .equipment-section-label{font-size:9px;padding:2px}
+}
