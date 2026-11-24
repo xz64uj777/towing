@@ -583,3 +583,6 @@
   --row:clamp(24px,calc((100dvh - 114px - env(safe-area-inset-top) - env(safe-area-inset-bottom))/7),32px);
  }
 }
+@media(orientation:portrait) and (max-width:380px) and (max-height:650px){
+ .game-shell .camera-dock{left:8px;transform:none;width:43vw;max-width:43vw}
+}
