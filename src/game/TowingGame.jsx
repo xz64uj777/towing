@@ -11,6 +11,7 @@ import {cableGeometry,cablePathSpeed,cableLoad,cableReelStep,cableRenderPoints} 
 import {supportReaction,supportState,SUPPORT_PADS,supportWrench,outriggerLoads,padContact,suspensionStep} from './supportPhysics.js';
 import {ditchContactPose,ditchGroundStep,groundCableDelta} from './ditchPhysics.js';
 import {addVehicleShell,surfaceMap,reflectionSky,addRoadsideDetails,addIntegratedChassis} from './visualQuality.js';
+import {addRotatorBody,detailRotatorRig} from './heavyRotatorModel.js';
 import {steeringStep,brakeStep,chassisGrade,cameraGroundClearance} from './drivingPhysics.js';
 import { canCompleteJob, minimapX, minimapY, wheelLiftCaptureReady, wheelLiftMotionReady, wheelLiftLockReady, wheelLiftStrapReady, winchLoadBand, stopWinchCoast, canPowerBothRecoveryLines, parkingBrakeForRiggers, cameraPresetPose, recoveryYawMoment, recoveryYawStep } from './gameRules.js';
 
@@ -87,14 +88,15 @@ function box(parent,name,size,pos,color,opts={}) {
 function makeVehicle(scene,{name,color,pos,scale=1,kind='pickup'}) {
   const root=new THREE.Group(); root.name=name; root.position.copy(pos); scene.add(root);
   const body=new THREE.Group(); root.add(body);
-  addIntegratedChassis(THREE,body,{kind,scale,color});
-  addVehicleShell(THREE,body,{kind,scale,color});
-  const rearDeck=box(body,'bed',[2.0*scale,.3*scale,1.5*scale],[0,1.35*scale,1.15*scale],0x333a40);rearDeck.visible=kind!=='suv';
+  addIntegratedChassis(THREE,body,{kind,scale,color,railsOnly:kind==='rotator'});
+  if(kind==='rotator')addRotatorBody(THREE,body,{scale,color});else addVehicleShell(THREE,body,{kind,scale,color});
+  const rearDeck=box(body,'bed',[2.0*scale,.3*scale,1.5*scale],[0,1.35*scale,1.15*scale],0x333a40);rearDeck.visible=kind!=='suv'&&kind!=='rotator';
   const wheels=[],tireBands=[],tireMap=surfaceMap(THREE,16,1,65,'tire');
   for(const z of [-1.55,1.55]) for(const x of [-1.06,1.06]) {
     const profile=[[.19,-.16],[.35,-.16],[.43,-.145],[.475,-.10],[.48,-.055],[.48,.055],[.475,.10],[.43,.145],[.35,.16],[.19,.16],[.19,-.16]].map(([r,y])=>new THREE.Vector2(r*scale,y*scale));
     const tire=new THREE.Mesh(new THREE.LatheGeometry(profile,28),new THREE.MeshStandardMaterial({color:0x27292a,roughness:.94,map:tireMap}));
     tire.rotation.z=Math.PI/2; tire.position.set(x,.62*scale,z); tire.castShadow=true; root.add(tire); wheels.push(tire);
+    if(kind==='rotator'&&z>0){const inner=new THREE.Mesh(tire.geometry,tire.material);inner.name='inner rear dual tire';inner.position.y=Math.sign(x)*.345*scale;inner.castShadow=true;tire.add(inner);}
     if(name!=='wrecker'&&z<0){const band=new THREE.Mesh(new THREE.CylinderGeometry(.491*scale,.491*scale,.12*scale,32,1,true),new THREE.MeshStandardMaterial({color:0xf2b832,roughness:.86,side:THREE.DoubleSide}));band.name='front tire webbing';band.visible=false;tire.add(band);tireBands.push(band);}
     const hub=new THREE.Mesh(new THREE.CylinderGeometry(.25*scale,.25*scale,.325*scale,20),new THREE.MeshStandardMaterial({color:0x8b9297,metalness:.7,roughness:.35}));
     tire.add(hub);
@@ -134,6 +136,11 @@ function makeVehicle(scene,{name,color,pos,scale=1,kind='pickup'}) {
     for(const side of [-1,1]){
       const mesh=new THREE.Mesh(new THREE.CylinderGeometry(.09,.11,1,12),new THREE.MeshStandardMaterial({color:0xaab2b9,metalness:.7,roughness:.3}));
       mesh.castShadow=true;recoveryStructure.add(mesh);boomCylinders.push({mesh,side});
+    }
+    if(kind==='rotator'){
+      detailRotatorRig(THREE,{recoveryStructure,boomPivot,boomTilt,boomSleeve,boomTip});
+      box(recoveryStructure,'rotator bearing pedestal',[1.36,.95,1.26],[0,1.47,1.13],0x36434b,{metalness:.45});
+      for(const pad of SUPPORT_PADS){const side=Math.sign(pad.x);box(body,'stabilizer beam housing',[.96,.30,.40],[side*.73,.88,pad.z],0x343f46,{metalness:.45});}
     }
     if(kind==='rotator')for(const pad of SUPPORT_PADS){
       const side=Math.sign(pad.x),arm=box(body,'outrigger arm',[1.55,.22,.31],[side*1.75,.88,pad.z],0x4c555a,{metalness:.4});
@@ -1128,7 +1135,7 @@ export default function TowingGame(){
  const currentJob=JOBS[career.job%JOBS.length];
  return <main className={'game-shell'+(menuOpen?' menu-active':'')+(cameraPanelOpen?' camera-active':'')}><div className={'scene'+(placingAnchor?' anchor-placement-scene':'')} ref={mount}/>
    {placingAnchor&&<div className="anchor-placement-hint" role="status"><b>{s?.customHookPlacement!==null?'SELECT CUSTOM HOOK':'PLACE GROUND ANCHOR'}</b><span>{s?.customHookPlacement!==null?'Tap a frame edge or bumper on the recovery vehicle.':'Tap open ground off the road, 4–32 m from truck and 3–32 m from vehicle.'}</span><button type="button" onClick={s?.customHookPlacement!==null?cancelCustomHook:cancelAnchorPlacement}>CANCEL PLACEMENT</button></div>}
-  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .76 • CHASSIS & DRIVING</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
+  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .77 • HEAVY ROTATOR</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
   <div className={'game-minimap '+(mapOpen?'map-expanded':'map-collapsed')} style={{position:'absolute',left:12,bottom:195,zIndex:9,width:mapOpen?146:106,height:mapOpen?166:36,pointerEvents:'auto',border:'2px solid #f3c851',borderRadius:12,background:'rgba(9,20,30,.88)',color:'#fff',boxShadow:'0 3px 14px #0008',padding:6,boxSizing:'border-box'}}>
    <button type="button" aria-expanded={mapOpen} onClick={()=>setMapOpen(v=>!v)} style={{fontSize:11,fontWeight:800,width:'100%',background:'transparent',border:0,color:'white'}}>{mapOpen?'MAP −':'MAP +'}</button>
    {mapOpen&&<svg viewBox="0 0 140 140" width="132" height="132" aria-label="Map of recovery vehicles and destination">

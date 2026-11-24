@@ -762,3 +762,30 @@ test('chassis rails and curved wheel arches replace the solid slab',()=>{
  assert.ok(wheelArchProfile(-1.55,-1.55)>.62+.48);
  assert.equal(wheelArchProfile(0,-1.55),.72);
 });
+
+import {ROTATOR_AXLES,rotatorArchBottom,addRotatorBody,detailRotatorRig} from './heavyRotatorModel.js';
+test('dedicated rotator body has integrated cab, wheel pods and separate recovery compartments',()=>{
+ const parent=new THREE.Group(),body=addRotatorBody(THREE,parent,{scale:1.13,color:0x5e68b0});
+ for(const name of ['rotator contoured engine hood','rotator reinforced cab','integrated front fender','integrated recovery locker and rear fender','flush recovery compartment door','heavy grille surround','rear recovery crossmember','rotator amber lightbar lens'])assert.ok(body.getObjectByName(name),name);
+ assert.ok(!body.getObjectByName('sculpted hood'));assert.deepEqual(ROTATOR_AXLES,[-1.55,1.55]);
+ let meshes=0;body.traverse(o=>{if(o.geometry){meshes++;assert.ok(o.geometry.attributes.position.array.every(Number.isFinite));assert.ok(o.geometry.attributes.normal.array.every(Number.isFinite));}});
+ assert.ok(meshes<150);
+});
+test('rotator wheel openings clear the tire crown and leave room for suspension',()=>{
+ const k=1.13;
+ for(const axle of ROTATOR_AXLES){
+  assert.ok(rotatorArchBottom(axle,axle,k)>=(.62+.48)*k+.24);
+  assert.equal(rotatorArchBottom(axle+1,axle,k),.74*k);
+ }
+ const body=new THREE.Group();addIntegratedChassis(THREE,body,{kind:'rotator',scale:k,color:0x5e68b0,railsOnly:true});
+ assert.ok(body.getObjectByName('longitudinal chassis rail'));assert.ok(!body.getObjectByName('front fender and rocker'));
+});
+test('detailed rig preserves original pivot, sleeve and line head transforms',()=>{
+ const recoveryStructure=new THREE.Group(),boomPivot=new THREE.Group(),boomTilt=new THREE.Group(),boomSleeve=new THREE.Group(),boomTip=new THREE.Group();
+ recoveryStructure.add(boomPivot);boomPivot.add(boomTilt);boomTilt.add(boomSleeve,boomTip);
+ boomPivot.position.set(0,2.16,1.13);boomTilt.rotation.x=-.72;boomSleeve.position.z=3.18;boomTip.position.set(0,.05,4.6);
+ const before=boomTip.getWorldPosition(new THREE.Vector3()).toArray();
+ detailRotatorRig(THREE,{recoveryStructure,boomPivot,boomTilt,boomSleeve,boomTip});
+ assert.deepEqual(boomTip.getWorldPosition(new THREE.Vector3()).toArray(),before);
+ assert.ok(recoveryStructure.getObjectByName('slew bearing'));assert.ok(boomTip.getObjectByName('grooved cable pulley'));
+});

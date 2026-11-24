@@ -160,7 +160,7 @@ export function wheelArchProfile(z,axle,scale=1){
  const radius=.61*scale,offset=z-axle;
  return Math.abs(offset)<radius?.62*scale+Math.sqrt(Math.max(0,radius*radius-offset*offset)):.72*scale;
 }
-export function addIntegratedChassis(T,body,{kind,scale=1,color}){
+export function addIntegratedChassis(T,body,{kind,scale=1,color,railsOnly=false}){
  const flat=kind==='flatbed',heavy=kind==='rotator',commercial=['flatbed','medium','rotator','delivery'].includes(kind);
  const rear=flat?3.65:1.55,front=-1.55,end=flat?5.35:2.34,start=-3.05*scale;
  const frame=paint(T,0x30363b,.82,.28),dark=paint(T,0x22282b,.84,.12),metal=paint(T,0x757e84,.58,.6),bodyMat=paint(T,color,.46,.23);
@@ -177,6 +177,7 @@ export function addIntegratedChassis(T,body,{kind,scale=1,color}){
   const axle=mesh(T,body,'axle tube',new T.CylinderGeometry(.10*scale,.10*scale,1.96,12),dark);axle.rotation.z=Math.PI/2;axle.position.set(0,.62*scale,z);
   const diff=mesh(T,body,'differential housing',new T.SphereGeometry(.22*scale,12,8),frame);diff.scale.set(1.15,.85,.9);diff.position.set(0,.62*scale,z);
  }
+ if(railsOnly)return body;
  // Wheel opening cutouts in each lower side panel. Width matches the
  // tire outer edge; the top connects to the sculpted hood and cabin.
  const section=(side,z0,z1,axles,top,material,name)=>{
