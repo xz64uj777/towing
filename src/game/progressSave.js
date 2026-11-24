@@ -1,4 +1,5 @@
 // Device-local snapshot for an unfinished dispatch. This never replaces career storage.
+import {parkingBrakeForRiggers} from './gameRules.js';
 export const RECOVERY_SAVE_KEY='towing-in-progress-v1';
 const vec=v=>v?{x:v.x,y:v.y,z:v.z}:null;
 const validVec=v=>v&&[v.x,v.y,v.z].every(Number.isFinite);
@@ -48,6 +49,7 @@ export function restoreRecoverySave(s,saved,V){
  s.secondary.roll=saved.secondary.roll;s.secondary.rollVel=0;
  s.secondary.active=!!saved.secondary.active;s.secondary.mesh.visible=s.secondary.active;
  for(const [key,value] of Object.entries(saved.equipment))if(key in s)s[key]=value;
+ s.parkingBrake=parkingBrakeForRiggers(s.parkingBrake,s.riggersDeployed);
  for(let i=0;i<2;i++){
   const point=saved.anchors[i],anchor=s.riggingAnchors[i+3];
   anchor.pos=point?V(point.x,point.y,point.z):null;

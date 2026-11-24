@@ -4,7 +4,7 @@ import {levelFourHeight,levelFourSlope,levelFourDownhillAcceleration,LEVEL_FOUR_
 import {createLevelFourScene} from './levelFourScene.js';
 import {createLakeScene,lakeHeight,lakeSlope,lakeDownhillAcceleration,LAKE_SURFACE} from './lakeScene.js';
 import {RECOVERY_SAVE_KEY,captureRecoverySave,parseRecoverySave,restoreRecoverySave} from './progressSave.js';
-import { canCompleteJob, minimapX, minimapY, wheelLiftCaptureReady, winchLoadBand, poweredWinchForce, stopWinchCoast, recoveryCableTension, canPowerBothRecoveryLines, cameraPresetPose } from './gameRules.js';
+import { canCompleteJob, minimapX, minimapY, wheelLiftCaptureReady, winchLoadBand, poweredWinchForce, stopWinchCoast, recoveryCableTension, canPowerBothRecoveryLines, parkingBrakeForRiggers, cameraPresetPose } from './gameRules.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const V=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
@@ -677,7 +677,18 @@ export default function TowingGame(){
   s.boomSwingControl=boomMode==='swing'?horizontal:0;
   setBoomStick({x:horizontal,y:vertical});
  };
- const toggleRiggers=()=>{const s=sim.current;if(!s||!s.tools.includes('riggers'))return;if(s.vel.length()>.4){setNotice('Stop the truck before deploying riggers.');return;}if(s.riggersDeployed&&s.recoveryLines.some(line=>line.connected)){setNotice('Disconnect recovery lines before retracting riggers.');return;}s.riggersDeployed=!s.riggersDeployed;s.boomDeployed=s.parkingBrake||s.riggersDeployed;boomStickStop();if(!s.boomDeployed){s.boomAngle=.36;s.boomExtension=0;s.boomSwing=0;}};
+ const toggleRiggers=()=>{const s=sim.current;if(!s||!s.tools.includes('riggers'))return;
+ if(s.vel.length()>.4){setNotice('Stop the truck before deploying riggers.');return;}
+ if(s.riggersDeployed&&s.recoveryLines.some(line=>line.connected)){setNotice('Disconnect recovery lines before retracting riggers.');return;}
+ const deploying=!s.riggersDeployed;
+ s.riggersDeployed=deploying;
+ // The brake engages with the riggers, but retracting them never releases it automatically.
+ s.parkingBrake=parkingBrakeForRiggers(s.parkingBrake,s.riggersDeployed);
+ s.boomDeployed=s.parkingBrake||s.riggersDeployed;
+ boomStickStop();
+ if(!s.boomDeployed){s.boomAngle=.36;s.boomExtension=0;s.boomSwing=0;}
+ setNotice(deploying?'RIGGERS DEPLOYED • PARK BRAKE APPLIED AUTOMATICALLY.':'RIGGERS RETRACTED • PARK BRAKE REMAINS ON. RELEASE IT WHEN READY TO DRIVE.');
+};
  const setLiftControl=(axis,d)=>{const s=sim.current;if(!s)return;if(d===0){s[axis]=0;return;}if(!s.tools.includes('lift')||!s.liftDeployed){setNotice('Deploy wheel lift first.');return;}if(s.type.id==='light'){if(s.vel.length()>2.3){setNotice('Slow to walking speed before moving the wheel lift.');return;}if(axis==='liftExtendControl'){setNotice('Starter wheel lift has fixed reach.');return;}}else if(!s.parkingBrake||s.vel.length()>.25){setNotice('Engage PARK BRAKE to move wheel lift.');return;}if(axis==='liftControl'&&d<0&&s.strapsOn&&s.liftHeight<=.45){setNotice('Remove straps before lowering the car.');return;}s[axis]=d;};
  const liftPress=(axis,d)=>e=>{e.preventDefault();setLiftControl(axis,d);};
  const toggleLift=()=>{const s=sim.current;if(!s||!s.tools.includes('lift'))return;if(s.type.id==='light'?s.vel.length()>2.3:(!s.parkingBrake||s.vel.length()>.25)){setNotice(s.type.id==='light'?'Slow to walking speed to lower the lift.':'Stop and apply PARK BRAKE before deploying the lift.');return;}if(s.loaded){setNotice('Lower car and release L-arms before folding lift.');return;}s.liftDeployed=!s.liftDeployed;s.liftControl=0;s.liftExtendControl=0;s.liftHydraulicX=0;s.liftHydraulicY=0;if(s.liftDeployed){s.liftHeight=0;s.armsClosed=false;s.strapsOn=false;setNotice('Wheel lift lowered. Reverse slowly, seat both tires, then PARK and close the L-arms.');}else{s.liftExtension=0;s.liftHeight=0;setNotice('Wheel lift folded upright.');}};
@@ -698,6 +709,7 @@ export default function TowingGame(){
  }};
  const togglePark=()=>{const s=sim.current;if(!s)return;
  if(s.autoLoad||s.autoUnload){setNotice('Wait for the hydraulic cycle to finish before releasing PARK BRAKE.');return;}
+ if(s.parkingBrake&&s.riggersDeployed){setNotice('Retract RIGGERS before releasing PARK BRAKE.');return;}
  if(s.parkingBrake&&s.recoveryLines.some(line=>line.connected)){setNotice('Disconnect recovery lines before driving.');return;}
  s.parkingBrake=!s.parkingBrake;
  if(s.tools.includes('boom')){
@@ -847,7 +859,7 @@ export default function TowingGame(){
  const currentJob=JOBS[career.job%JOBS.length];
  return <main className={'game-shell'+(menuOpen?' menu-active':'')+(cameraPanelOpen?' camera-active':'')}><div className={'scene'+(placingAnchor?' anchor-placement-scene':'')} ref={mount}/>
    {placingAnchor&&<div className="anchor-placement-hint" role="status"><b>{s?.customHookPlacement!==null?'SELECT CUSTOM HOOK':'PLACE GROUND ANCHOR'}</b><span>{s?.customHookPlacement!==null?'Tap a frame edge or bumper on the recovery vehicle.':'Tap open ground off the road, 4–32 m from truck and 3–32 m from vehicle.'}</span><button type="button" onClick={s?.customHookPlacement!==null?cancelCustomHook:cancelAnchorPlacement}>CANCEL PLACEMENT</button></div>}
-  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .57 • COMPACT HEAVY</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
+  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .58 • AUTO PARK RIGGERS</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
   <div className="game-minimap" style={{position:'absolute',left:12,bottom:195,zIndex:9,width:mapOpen?146:106,height:mapOpen?166:36,pointerEvents:'auto',border:'2px solid #f3c851',borderRadius:12,background:'rgba(9,20,30,.88)',color:'#fff',boxShadow:'0 3px 14px #0008',padding:6,boxSizing:'border-box'}}>
    <button onClick={()=>setMapOpen(v=>!v)} style={{fontSize:11,fontWeight:800,width:'100%',background:'transparent',border:0,color:'white'}}>{mapOpen?'MAP −':'MAP +'}</button>
    {mapOpen&&<svg viewBox="0 0 140 140" width="132" height="132" aria-label="Map of recovery vehicles and destination">

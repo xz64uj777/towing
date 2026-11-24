@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {canCompleteJob,minimapX,minimapY,wheelLiftCaptureReady,winchLoadBand,poweredWinchForce,stopWinchCoast,recoveryCableTension,canPowerBothRecoveryLines,cameraPresetPose} from './gameRules.js';
+import {canCompleteJob,minimapX,minimapY,wheelLiftCaptureReady,winchLoadBand,poweredWinchForce,stopWinchCoast,recoveryCableTension,canPowerBothRecoveryLines,parkingBrakeForRiggers,cameraPresetPose} from './gameRules.js';
 import {LEVEL_FOUR_DEPTH_METRES,LEVEL_FOUR_STAGING,levelFourHeight,levelFourSlope,levelFourDownhillAcceleration} from './levelFourTerrain.js';
 
 test('no job finishes before reaching its destination',()=>{
@@ -167,4 +167,23 @@ test('invalid saved games are ignored rather than crashing startup',()=>{
  const saved=captureRecoverySave({job:4},checkpointFixture());
  assert.equal(parseRecoverySave({...saved,version:2},7),null);
  assert.equal(parseRecoverySave({...saved,lines:[{...saved.lines[0],redirect:99},saved.lines[1]]},7),null);
+});
+
+test('deploying riggers engages parking brake automatically',()=>{
+ assert.equal(parkingBrakeForRiggers(false,true),true);
+ assert.equal(parkingBrakeForRiggers(true,true),true);
+});
+test('retracting riggers leaves parking brake engaged until manually released',()=>{
+ assert.equal(parkingBrakeForRiggers(true,false),true);
+ assert.equal(parkingBrakeForRiggers(false,false),false);
+});
+test('restoring a saved rigged recovery always engages parking brake',()=>{
+ const saved=captureRecoverySave({job:4},checkpointFixture());
+ saved.equipment.parkingBrake=false;
+ saved.equipment.riggersDeployed=true;
+ const fresh=checkpointFixture();
+ fresh.parkingBrake=false;fresh.riggersDeployed=false;
+ restoreRecoverySave(fresh,saved,checkpointVector);
+ assert.equal(fresh.riggersDeployed,true);
+ assert.equal(fresh.parkingBrake,true);
 });

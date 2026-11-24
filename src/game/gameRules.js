@@ -59,3 +59,6 @@ export function cameraPresetPose(mode,truck,yaw,vehicle,zoom=13){
   default:return offset(-9,0,5);
  }
 }
+
+// Outrigger deployment engages the parking brake; stowing riggers does not release it.
+export const parkingBrakeForRiggers=(parkingBrake,riggersDeployed)=>Boolean(parkingBrake||riggersDeployed);
