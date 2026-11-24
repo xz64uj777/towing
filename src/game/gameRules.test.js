@@ -570,3 +570,35 @@ test('roadside detail uses three bounded instanced draw batches and deterministi
  const next=addRoadsideDetails(THREE,new THREE.Scene(),()=>0);
  assert.deepEqual(batch[0].instanceMatrix.array,next[0].instanceMatrix.array);
 });
+
+import {ditchGroundHeight,ditchContactPose,ditchGroundStep,groundCableDelta} from './ditchPhysics.js';
+test('medium winch upward pull contributes only horizontal acceleration',()=>{
+ const d=groundCableDelta({x:.6,y:.8,z:0},23500,2350,.1);
+ assert.deepEqual(d,{x:.6,y:0,z:0});
+ assert.deepEqual(groundCableDelta({x:0,y:1,z:0},32000,2350,.1),{x:0,y:0,z:0});
+});
+test('ditch extraction stays grounded even after sustained elevated winch pulls',()=>{
+ let p={x:11,y:0,z:-28},v={x:0,y:0,z:0};const h=1/120,scale=1.06;
+ for(let i=0;i<2400;i++){
+  const delta=groundCableDelta({x:-.6,y:.8,z:0},16000,2350,h);
+  v.x=(v.x+delta.x)*Math.exp(-2*h);v.y+=delta.y;
+  p=ditchGroundStep(p,v,Math.PI/2,scale,h);
+  assert.ok(Math.abs(p.y-ditchContactPose(p.x,p.z,Math.PI/2,scale).height)<1e-9);
+  assert.ok(p.y<.05&&p.y>-.30);
+ }
+ assert.ok(p.x<5);
+});
+test('old floating checkpoint height and residual vertical speed cannot survive ground contact',()=>{
+ const pose=ditchGroundStep({x:2,y:15,z:-28},{x:0,y:30,z:0},0,1.06,1/120);
+ assert.ok(Math.abs(pose.y-(.04-.14*1.06))<1e-9);
+ assert.equal(pose.pitch,0);assert.equal(pose.roll,0);
+});
+test('tire contact transitions continuously from ditch to shoulder and flat pavement',()=>{
+ assert.ok(Math.abs(ditchGroundHeight(0,-28)-.04)<1e-9);
+ assert.ok(Math.abs(ditchGroundHeight(7,-28)-.01)<1e-9);
+ assert.ok(Math.abs(ditchGroundHeight(11,-28)+.105)<1e-9);
+ const onRoad=ditchContactPose(0,-28,.5,1.06);
+ assert.equal(onRoad.pitch,0);assert.equal(onRoad.roll,0);
+ const a=ditchContactPose(5.01,-28,Math.PI/2,1.06),b=ditchContactPose(4.99,-28,Math.PI/2,1.06);
+ assert.ok(Math.abs(a.height-b.height)<.01&&Math.abs(a.pitch-b.pitch)<.02);
+});

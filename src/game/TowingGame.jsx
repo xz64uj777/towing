@@ -9,6 +9,7 @@ import {createGameAudio} from './gameAudio.js';
 import {ROLLBACK_LENGTH,rollbackDeck,rollbackPose,rollbackStop,rollbackTravel,rollbackReady,rollbackCanConnect,rollbackAligned,rollbackGroundLimit,rollbackApproachStep,rollbackCanUnhook} from './rollbackPhysics.js';
 import {cableGeometry,cablePathSpeed,cableLoad,cableReelStep} from './cablePhysics.js';
 import {supportReaction,supportState} from './supportPhysics.js';
+import {ditchContactPose,ditchGroundStep,groundCableDelta} from './ditchPhysics.js';
 import {addVehicleShell,surfaceMap,reflectionSky,addRoadsideDetails} from './visualQuality.js';
 import { canCompleteJob, minimapX, minimapY, wheelLiftCaptureReady, winchLoadBand, stopWinchCoast, canPowerBothRecoveryLines, parkingBrakeForRiggers, cameraPresetPose, recoveryYawMoment, recoveryYawStep } from './gameRules.js';
 
@@ -62,7 +63,9 @@ const recoveryHead=(s,i)=>s.truck.userData.boomTip.getWorldPosition(V()).add(V(i
 const updateWinchLine=(line,points)=>{line.geometry.setFromPoints(points);line.geometry.setDrawRange(0,points.length);line.geometry.computeBoundingSphere();line.visible=true;};
 const nextAnchorSlot=(anchors,current)=>{const choices=anchors.map((a,i)=>a.pos||i===0?i:-1).filter(i=>i>=0);return choices[(Math.max(0,choices.indexOf(current))+1)%choices.length];};
 const winchSpeedFactor=speed=>({fine:.35,medium:1,high:2.4}[speed]??1);
-const jobSceneYOffset=s=>JOBS[s.jobIndex%JOBS.length].kind==='recovery'&&!s.loaded?-.14:0;
+const isDitchPull=s=>s.type.id==='medium'&&JOBS[s.jobIndex%JOBS.length].kind==='recovery'&&!s.loaded;
+// Match the actual rendered pickup's grounded pose and scaled attachment point.
+const ordinaryEye=s=>{const point=RECOVERY_POINTS[s.hookPoint];if(!isDitchPull(s))return recoveryAnchor({pos:s.pickPos,yaw:s.pickYaw,roll:s.type.id==='rotator'?s.pickRoll:0},point);const k=s.pickup.userData.scale,p=ditchContactPose(s.pickPos.x,s.pickPos.z,s.pickYaw,k);return V(s.pickPos.x,p.height,s.pickPos.z).add(V(point.x*k,point.y*k,point.z*k).applyEuler(new THREE.Euler(p.pitch,-s.pickYaw,p.roll,'YXZ')));};
 const loadCareer=()=>{let saved={};try{saved=JSON.parse(localStorage.getItem('towing-career')||'{}')}catch{}const requested=Number(new URLSearchParams(window.location.search).get('level'));return Number.isInteger(requested)&&requested>=1&&requested<=JOBS.length?{...saved,job:requested-1}:saved;};
 
 function box(parent,name,size,pos,color,opts={}) {
@@ -257,7 +260,7 @@ export default function TowingGame(){
     box(pickup.userData.body,'recovery brush guard',[2.0,.47,.15],[0,1.18,-2.63],0x24282b);
     for(const z of [-36,-30,-24])box(scene,'ditch hazard post',[.14,1.25,.14],[7.3,.53,z],0xe0a435);
     const fallen=box(scene,'damaged guardrail',[.17,.19,6.7],[8,.52,-27],0xb4bab9);fallen.rotation.x=.24;
-    pickup.position.y=-.14;pickup.rotation.z=-.15;
+    const pose=ditchContactPose(firstJob.x,firstJob.z,-.18,pickup.userData.scale);pickup.position.y=pose.height;pickup.rotation.order='YXZ';pickup.rotation.x=pose.pitch;pickup.rotation.z=pose.roll;
   }
   if(firstJob.boxTruck){const cargo=box(pickup.userData.body,'delivery cargo box',[1.96,1.1,2.55],[0,2.02,.9],0xc8d4dc);cargo.material.roughness=.65;for(const side of [-1,1]){box(cargo,'cargo corner extrusion',[.055,1.10,.065],[side*.96,0,1.24],0x78848a);box(cargo,'cargo door hinge',[.12,.08,.055],[side*.80,.30,1.29],0x68747a);}box(cargo,'cargo door seam',[.028,1.02,.025],[0,0,1.29],0x6e7779);}
   const secondaryPickup=makeVehicle(scene,{name:'second disabled truck',kind:'delivery',color:0x985b3a,pos:V(firstJob.second?.x??-22,levelFour?terrainHeight(firstJob.second?.x??-22,firstJob.second?.z??-106):0,firstJob.second?.z??-106),scale:1.04});
@@ -306,6 +309,9 @@ export default function TowingGame(){
    for(let n=0;n<steps;n++){
     const forward=V(Math.sin(s.yaw),0,-Math.cos(s.yaw));const right=V(Math.cos(s.yaw),0,Math.sin(s.yaw));
     const truckSurface=surfaceAt(s.pos);
+    // Ordinary driving and grounded winching have no unconstrained vertical velocity.
+    s.vel.y=0;
+    if(isDitchPull(s)){s.pickVel.y=0;s.pickPos.y=ditchContactPose(s.pickPos.x,s.pickPos.z,s.pickYaw,s.pickup.userData.scale).height;}
      const speed=s.vel.dot(forward);const steerAngle=s.steer*settingsRef.current.steering*(.64-.36*clamp(Math.abs(speed)/22,0,1));s.truck.userData.body.rotation.y=0;
     const parked=s.parkingBrake||s.riggersDeployed||s.winch||s.winchOut||(s.type.id==='flatbed'&&(s.bedTilt||s.bedProgress>.01||s.hook));const accel=parked?-Math.sign(speed)*18:s.brake?-Math.sign(speed)*18:s.throttle*(5.8+careerRef.current.engine*1.2)*truckSurface.traction-speed*0.22;
     s.vel.addScaledVector(forward,accel*h);
@@ -500,7 +506,7 @@ export default function TowingGame(){
     }
     // Ditch resistance and recovery vehicle interaction.
     const pa=isRollback?rollbackHead(s):s.boomDeployed&&s.tools.includes('boom')&&equip.boomTip?equip.boomTip.getWorldPosition(V()):s.pos.clone().add(V(0,1.1,0)).add(forward.clone().multiplyScalar(-2.3));
-    const pb=isRollback?rollbackEye(s):recoveryAnchor({pos:s.pickPos,yaw:s.pickYaw,roll:s.type.id==='rotator'?s.pickRoll:0},RECOVERY_POINTS[s.hookPoint]);
+    const pb=isRollback?rollbackEye(s):ordinaryEye(s);
     const guide=s.riggingAnchors[s.hookRedirect].pos;
     const dist=linePathLength(pa,pb,guide);
     const dir=pb.clone().sub(guide||pa).normalize();
@@ -516,7 +522,9 @@ export default function TowingGame(){
        const offset=pb.clone().sub(s.pickPos).sub(V(0,.65,0));
        const load=cableLoad(dist,s.cableLength,pathSpeed,32000);
        s.tension=pulling?load.tension:0;s.cableStrain=pulling?load.strain:0;s.cableStalled=pulling&&load.stalled;
-       if(pulling&&s.tension>0){const force=s.tension;s.pickVel.addScaledVector(dir,-force/2350*h);if(!guide&&!isRollback)s.vel.addScaledVector(dir,force/6200*h);
+       if(pulling&&s.tension>0){const force=s.tension;
+         const pull=groundCableDelta(dir.clone().negate(),force,2350,h);s.pickVel.x+=pull.x;s.pickVel.z+=pull.z;s.pickVel.y=0;
+         if(!guide&&!isRollback){const reaction=groundCableDelta(dir,force,6200,h);s.vel.x+=reaction.x;s.vel.z+=reaction.z;}
          if(!s.loaded&&!isRollback){primaryYawMoment+=recoveryYawMoment(offset,dir.clone().negate(),force);primaryPowered=true;}
        }
        if(!pulling){s.pickVel.x=stopWinchCoast(s.pickVel.x,h);s.pickVel.z=stopWinchCoast(s.pickVel.z,h);}
@@ -592,7 +600,15 @@ export default function TowingGame(){
      if(!s.loaded&&!(isRollback&&s.hook)){
        const ground=recoverySurfaceVelocity(s.pickVel.x,s.pickVel.z,s.pickYaw,s.type.id==='rotator'?s.pickRoll:0,h,surfaceAt(s.pickPos));
       s.pickVel.x=ground.x;s.pickVel.z=ground.z;
-      s.pickPos.addScaledVector(s.pickVel,h);
+      if(isDitchPull(s)){
+        const contact=ditchGroundStep(s.pickPos,s.pickVel,s.pickYaw,s.pickup.userData.scale,h);
+        s.pickPos.set(contact.x,contact.y,contact.z);s.pickVel.y=0;
+        const travel=s.pickVel.dot(V(Math.sin(s.pickYaw),0,-Math.cos(s.pickYaw)))*h;
+        for(const wheel of s.pickup.userData.wheels)wheel.rotation.x+=travel/(.48*s.pickup.userData.scale);
+      }else{
+        s.pickVel.y=0;s.pickPos.addScaledVector(s.pickVel,h);
+        if(!levelFour&&!isRollback)s.pickPos.y=0;
+      }
       if(levelFour){
         for(const rock of terrainScene.obstacles){
           if(Math.hypot(s.pickPos.x-firstJob.x,s.pickPos.z-firstJob.z)<3.2)continue;
@@ -613,14 +629,16 @@ export default function TowingGame(){
      const onDeck=isRollback&&(s.loaded||(s.hook&&rollbackAligned(localCar.x,rollbackYawError(s),s.pickup.userData.scale)&&localCar.z>=rollbackStop(deck)-.1&&localCar.z<=rollbackGroundLimit(deck,s.pickup.userData.scale)));
      const carPose=onDeck?rollbackPose(deck,localCar.z,s.pickup.userData.scale,rollbackReverse(s)):{height:0,pitch:0};
      if(isRollback)s.pickPos.y=s.pos.y+carPose.height;
-     s.pickup.position.y=isRollback?s.pickPos.y:(s.type.id==='rotator'?s.pickPos.y+.5+Math.sin(s.pickRoll)*.16:s.pickPos.y+jobSceneYOffset(s));
+     s.pickup.position.y=isRollback?s.pickPos.y:(s.type.id==='rotator'?s.pickPos.y+.5+Math.sin(s.pickRoll)*.16:s.pickPos.y);
      if(isRollback){s.pickup.rotation.order='YXZ';s.pickup.rotation.x=carPose.pitch;}
     if(s.pickup.userData.towPitchPivot){
       const frontAxleLift=s.loaded&&s.type.id!=='flatbed'?.20+s.liftHeight*.58:0;
       const wheelbase=3.10*s.pickup.userData.scale;
       s.pickup.userData.towPitchPivot.rotation.x=Math.atan2(frontAxleLift,wheelbase);
     }
-    s.pickup.rotation.y=-s.pickYaw;s.pickup.rotation.z=s.type.id==='rotator'?s.pickRoll:(!s.loaded&&JOBS[s.jobIndex%JOBS.length].kind==='recovery'?.15:0);
+    s.pickup.rotation.y=-s.pickYaw;s.pickup.rotation.z=s.type.id==='rotator'?s.pickRoll:0;
+    if(isDitchPull(s)){const pose=ditchContactPose(s.pickPos.x,s.pickPos.z,s.pickYaw,s.pickup.userData.scale);s.pickup.rotation.order='YXZ';s.pickup.rotation.x=pose.pitch;s.pickup.rotation.z=pose.roll;}
+    else if(!isRollback)s.pickup.rotation.x=0;
     const job=JOBS[s.jobIndex%JOBS.length];
     if((job.kind==='tow'||job.kind==='flatbed')&&!s.dropoffArrived&&s.loaded&&s.strapsOn&&s.pos.distanceTo(V(0,0,23))<5&&s.vel.length()<.9){
       s.dropoffArrived=true;
@@ -638,7 +656,7 @@ export default function TowingGame(){
       saveCareer(p=>({...p,cash:p.cash+reward,completed:p.completed+1,job:p.job+1,selected:JOBS[(p.job+1)%JOBS.length].truck}));
       setNotice('JOB COMPLETE +$'+reward+'! Next dispatch automatically loaded.');
     }
-    if(s.hook){const eye=isRollback?rollbackEye(s):pb;updateWinchLine(cable,guide?[pa,guide,eye]:[pa,eye]);}else cable.visible=false;
+    if(s.hook){const eye=isRollback?rollbackEye(s):ordinaryEye(s);updateWinchLine(cable,guide?[pa,guide,eye]:[pa,eye]);}else cable.visible=false;
    }
    // Driving and recovery camera presets remain locked until CAM or ANGLES explicitly changes them.
    let presetFocus=null;
@@ -827,7 +845,7 @@ export default function TowingGame(){
   if(!s.boomDeployed){s.boomAngle=.36;s.boomExtension=0;s.boomSwing=0;}
  }
 };
- const toggleHook=()=>{const s=sim.current;if(!s)return;if(!s.hook&&s.hookRedirect&&!s.riggingAnchors[s.hookRedirect].pos){setNotice('Place the selected anchor before connecting to the vehicle.');return;}if(!s.hook&&!s.boomDeployed&&s.tools.includes('boom')){setNotice('Apply PARK BRAKE to activate the boom before hooking.');return;}if(!s.hook&&!s.tools.includes('winch')){setNotice('This truck has no winch.');return;}if(s.type.id==='flatbed'){const deck=rollbackDeck(s.bedProgress),local=rollbackLocal(s),scale=s.pickup.userData.scale;if(s.loaded){setNotice('Release the secured load before connecting.');return;}if(s.hook&&!rollbackCanUnhook(deck,local.z,scale,s.parkingBrake,s.vel.length()<.25)){setNotice('Park and pay out until all tires are on the ground before disconnecting.');return;}if(!s.hook&&(!s.parkingBrake||!s.bedTilt||s.bedProgress<.995||s.hookRedirect||Math.abs(RECOVERY_POINTS[s.hookPoint].z)<1.5||!rollbackCanConnect(deck,local.x,local.z,rollbackYawError(s),scale))){setNotice('Park, deploy bed, align car behind ramp and select its facing front/rear eye with DIRECT LINE.');return;}}if(!s.hook&&s.pos.distanceTo(s.pickPos)>24){setNotice('Move within 24 m to hook the vehicle.');return;}s.hook=!s.hook;s.previousCableDistance=null;s.cableStrain=0;s.cableStalled=false;s.rollbackBlocked=false;if(s.type.id==='flatbed'){s.winch=false;s.winchOut=false;s.pickVel.set(0,0,0);s.pickYawVel=0;if(!s.hook&&s.dropoffArrived&&s.pos.distanceTo(V(0,0,23))<5&&!s.loaded&&!s.strapsOn){s.dropoffComplete=true;setNotice('Vehicle unloaded and disconnected at depot.');}else if(s.hook)s.dropoffComplete=false;}if(s.hook){const f=V(Math.sin(s.yaw),0,-Math.cos(s.yaw));const a=s.pos.clone().add(f.multiplyScalar(-2.3));const head=s.type.id==='flatbed'?rollbackHead(s):s.tools.includes('boom')&&s.truck.userData.boomTip?s.truck.userData.boomTip.getWorldPosition(V()):a;const eye=s.type.id==='flatbed'?rollbackEye(s):recoveryAnchor({pos:s.pickPos,yaw:s.pickYaw,roll:0},RECOVERY_POINTS[s.hookPoint]);s.cableLength=linePathLength(head,eye,s.riggingAnchors[s.hookRedirect].pos);}};
+ const toggleHook=()=>{const s=sim.current;if(!s)return;if(!s.hook&&s.hookRedirect&&!s.riggingAnchors[s.hookRedirect].pos){setNotice('Place the selected anchor before connecting to the vehicle.');return;}if(!s.hook&&!s.boomDeployed&&s.tools.includes('boom')){setNotice('Apply PARK BRAKE to activate the boom before hooking.');return;}if(!s.hook&&!s.tools.includes('winch')){setNotice('This truck has no winch.');return;}if(s.type.id==='flatbed'){const deck=rollbackDeck(s.bedProgress),local=rollbackLocal(s),scale=s.pickup.userData.scale;if(s.loaded){setNotice('Release the secured load before connecting.');return;}if(s.hook&&!rollbackCanUnhook(deck,local.z,scale,s.parkingBrake,s.vel.length()<.25)){setNotice('Park and pay out until all tires are on the ground before disconnecting.');return;}if(!s.hook&&(!s.parkingBrake||!s.bedTilt||s.bedProgress<.995||s.hookRedirect||Math.abs(RECOVERY_POINTS[s.hookPoint].z)<1.5||!rollbackCanConnect(deck,local.x,local.z,rollbackYawError(s),scale))){setNotice('Park, deploy bed, align car behind ramp and select its facing front/rear eye with DIRECT LINE.');return;}}if(!s.hook&&s.pos.distanceTo(s.pickPos)>24){setNotice('Move within 24 m to hook the vehicle.');return;}s.hook=!s.hook;s.previousCableDistance=null;s.cableStrain=0;s.cableStalled=false;s.rollbackBlocked=false;if(s.type.id==='flatbed'){s.winch=false;s.winchOut=false;s.pickVel.set(0,0,0);s.pickYawVel=0;if(!s.hook&&s.dropoffArrived&&s.pos.distanceTo(V(0,0,23))<5&&!s.loaded&&!s.strapsOn){s.dropoffComplete=true;setNotice('Vehicle unloaded and disconnected at depot.');}else if(s.hook)s.dropoffComplete=false;}if(s.hook){const f=V(Math.sin(s.yaw),0,-Math.cos(s.yaw));const a=s.pos.clone().add(f.multiplyScalar(-2.3));const head=s.type.id==='flatbed'?rollbackHead(s):s.tools.includes('boom')&&s.truck.userData.boomTip?s.truck.userData.boomTip.getWorldPosition(V()):a;const eye=s.type.id==='flatbed'?rollbackEye(s):ordinaryEye(s);s.cableLength=linePathLength(head,eye,s.riggingAnchors[s.hookRedirect].pos);if(s.type.id==='medium')setNotice('Cable connected. Hold WINCH IN to pull the vehicle along the ground.');}else if(s.type.id==='medium'){s.winch=false;s.winchOut=false;s.tension=0;s.pickVel.set(0,0,0);setNotice('Cable disconnected.');}};
  const reset=()=>{const s=sim.current;if(!s)return;s.pos.set(0,s.levelFour?terrainHeight(0,Math.min(-49,JOBS[careerRef.current.job%JOBS.length].z+15)):0,s.levelFour?Math.min(-49,JOBS[careerRef.current.job%JOBS.length].z+15):7);s.vel.set(0,0,0);s.yaw=0;const job=JOBS[careerRef.current.job%JOBS.length];s.pickPos.set(job.x,s.levelFour?terrainHeight(job.x,job.z):0,job.z);s.pickYaw=-.18;s.pickYawVel=0;s.pickRoll=job.roll??0;s.pickRollVel=0;s.secondary.active=!!job.second;s.secondary.mesh.visible=!!job.second;s.secondary.pos.set(job.second?.x??-22,s.levelFour?terrainHeight(job.second?.x??-22,job.second?.z??-106):0,job.second?.z??-106);s.secondary.vel.set(0,0,0);s.secondary.roll=job.second?.roll??0;s.secondary.rollVel=0;s.secondary.yaw=job.second?.yaw??-.1;s.secondary.yawVel=0;for(const line of s.recoveryLines){line.connected=false;line.spool=20;line.motor=0;line.tension=0;line.target=0;line.point=0;line.redirect=0;line.secondRedirect=0;line.customPoint=null;line.doubled=false;line.strain=0;line.stalled=false;line.previousDistance=null;}s.anchorPlacement=null;setPlacingAnchor(false);for(const anchor of s.riggingAnchors){if(anchor.marker){anchor.pos=null;anchor.marker.visible=false;}}s.hookPoint=0;s.hookRedirect=0;for(const rope of s.recoveryCables)rope.visible=false;s.jobIndex=careerRef.current.job;s.jobDone=false;s.dropoffArrived=false;s.dropoffComplete=false;s.autoUnload=false;s.autoLoad=false;s.heavyRecovery=job.kind==='heavy';s.loaded=false;s.prevHitch=null;s.strapsOn=false;s.bedTilt=false;s.bedProgress=0;s.rollbackLoadX=0;s.rollbackLoadYaw=0;s.rollbackLoadZ=0;s.rollbackBlocked=false;s.zone.position.set(job.kind==='tow'||job.kind==='flatbed'?0:2,.12,job.kind==='tow'||job.kind==='flatbed'?23:job.z);s.pickVel.set(0,0,0);s.hook=false;s.winch=false;s.winchOut=false;s.parkingBrake=false;s.boomDeployed=false;s.boomAngle=.36;s.boomSwing=0;s.boomExtension=0;s.boomControl=0;s.boomExtendControl=0;s.boomSwingControl=0;s.liftDeployed=false;s.liftHeight=0;s.liftExtension=0;s.liftControl=0;s.liftExtendControl=0;s.liftHydraulicX=0;s.liftHydraulicY=0;s.gridWidth=0;s.armsClosed=false;s.riggersDeployed=false;s.cableLength=14;s.previousCableDistance=null;s.cableStrain=0;s.cableStalled=false;};
  const saveInProgress=()=>{
   const game=sim.current;
@@ -979,7 +997,7 @@ export default function TowingGame(){
  const currentJob=JOBS[career.job%JOBS.length];
  return <main className={'game-shell'+(menuOpen?' menu-active':'')+(cameraPanelOpen?' camera-active':'')}><div className={'scene'+(placingAnchor?' anchor-placement-scene':'')} ref={mount}/>
    {placingAnchor&&<div className="anchor-placement-hint" role="status"><b>{s?.customHookPlacement!==null?'SELECT CUSTOM HOOK':'PLACE GROUND ANCHOR'}</b><span>{s?.customHookPlacement!==null?'Tap a frame edge or bumper on the recovery vehicle.':'Tap open ground off the road, 4–32 m from truck and 3–32 m from vehicle.'}</span><button type="button" onClick={s?.customHookPlacement!==null?cancelCustomHook:cancelAnchorPlacement}>CANCEL PLACEMENT</button></div>}
-  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .69 • SCULPTED VEHICLES</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
+  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .70 • GROUND CONTACT</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
   <div className={'game-minimap '+(mapOpen?'map-expanded':'map-collapsed')} style={{position:'absolute',left:12,bottom:195,zIndex:9,width:mapOpen?146:106,height:mapOpen?166:36,pointerEvents:'auto',border:'2px solid #f3c851',borderRadius:12,background:'rgba(9,20,30,.88)',color:'#fff',boxShadow:'0 3px 14px #0008',padding:6,boxSizing:'border-box'}}>
    <button type="button" aria-expanded={mapOpen} onClick={()=>setMapOpen(v=>!v)} style={{fontSize:11,fontWeight:800,width:'100%',background:'transparent',border:0,color:'white'}}>{mapOpen?'MAP −':'MAP +'}</button>
    {mapOpen&&<svg viewBox="0 0 140 140" width="132" height="132" aria-label="Map of recovery vehicles and destination">
