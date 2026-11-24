@@ -17,7 +17,7 @@ export function captureRecoverySave(career,s){
  .map(k=>[k,s[k]])),
  anchors:s.riggingAnchors.slice(3,5).map(a=>vec(a.pos)),
  lines:s.recoveryLines.map(l=>({connected:l.connected,point:l.point,customPoint:l.customPoint?{...l.customPoint}:null,
-  redirect:l.redirect,secondRedirect:l.secondRedirect||0,target:l.target,spool:l.spool})),
+  redirect:l.redirect,secondRedirect:l.secondRedirect||0,target:l.target,spool:l.spool,doubled:!!l.doubled})),
  camera:{mode:s.cameraMode,yaw:s.cameraYaw,pitch:s.cameraPitch,presetYaw:s.presetYaw,presetPitch:s.presetPitch,zoom:s.zoom}};
 }
 export function parseRecoverySave(raw,jobCount){
@@ -33,7 +33,7 @@ export function parseRecoverySave(raw,jobCount){
   !s.anchors.every(a=>a===null||validVec(a))||
   !Array.isArray(s.lines)||s.lines.length!==2||
   !s.lines.every(l=>l&&typeof l.connected==='boolean'&&index(l.point,9)&&index(l.target,1)&&
-    index(l.redirect,4)&&index(l.secondRedirect,4)&&validNum(l.spool)&&l.spool>=0&&l.spool<=100&&
+    index(l.redirect,4)&&index(l.secondRedirect,4)&&(l.doubled===undefined||typeof l.doubled==='boolean')&&validNum(l.spool)&&l.spool>=0&&l.spool<=100&&
     (!l.customPoint||[l.customPoint.x,l.customPoint.y,l.customPoint.z].every(validNum)))||
   !s.camera||!validNum(s.camera.zoom))return null;
   return s;
@@ -55,11 +55,11 @@ export function restoreRecoverySave(s,saved,V){
   anchor.pos=point?V(point.x,point.y,point.z):null;
   anchor.marker.visible=!!point;
   if(point)anchor.marker.position.set(point.x,point.y-.55,point.z);
-  Object.assign(s.recoveryLines[i],saved.lines[i],{motor:0,tension:0});
+  Object.assign(s.recoveryLines[i],saved.lines[i],{doubled:!!saved.lines[i].doubled,motor:0,tension:0,strain:0,stalled:false,previousDistance:null});
  }
  s.hookPoint=index(s.hookPoint,9)?s.hookPoint:0;
  s.hookRedirect=index(s.hookRedirect,4)?s.hookRedirect:0;
- s.winch=false;s.winchOut=false;s.throttle=0;s.brake=0;s.steer=0;s.tension=0;
+ s.winch=false;s.winchOut=false;s.throttle=0;s.brake=0;s.steer=0;s.tension=0;s.previousCableDistance=null;s.cableStrain=0;s.cableStalled=false;
  s.boomControl=0;s.boomExtendControl=0;s.boomSwingControl=0;
  s.liftControl=0;s.liftExtendControl=0;s.liftHydraulicX=0;s.liftHydraulicY=0;
  s.prevHitch=null;s.anchorPlacement=null;s.customHookPlacement=null;s.doubleAnchorSetup=false;

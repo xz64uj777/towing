@@ -311,3 +311,67 @@ test("each recovery target samples its own location and improves as it exits the
  assert.ok(deep.drag>bank.drag&&bank.drag>road.drag);
  assert.ok(deep.lateralGrip<bank.lateralGrip&&bank.lateralGrip<road.lateralGrip);
 });
+
+import {cableGeometry,cablePathSpeed,cableLoad,cableReelStep} from './cablePhysics.js';
+const cp=(x,y=0,z=0)=>({x,y,z});
+test('fixed redirects change direction and path length but not mechanical advantage',()=>{
+ const g=cableGeometry([cp(0),cp(0,0,10),cp(10,0,10)]);
+ assert.equal(g.distance,20);assert.equal(g.advantage,1);
+ assert.deepEqual(g.force,{x:-1,y:0,z:0});
+});
+test('moving block has two supporting legs and uses twice the straight cable length',()=>{
+ const g=cableGeometry([cp(0),cp(10),cp(0)],true);
+ assert.equal(g.distance,20);assert.equal(g.advantage,1.9);
+ assert.equal(g.force.x,-1.9);
+});
+test('moving block advantage falls with opposing leg angles',()=>{
+ const g=cableGeometry([cp(-10),cp(0),cp(10)],true);
+ assert.ok(Math.abs(g.advantage-.1)<1e-9);
+ const angled=cableGeometry([cp(0),cp(10),cp(10,0,10)],true);
+ assert.ok(angled.advantage>1&&angled.advantage<1.9);
+});
+test('two redirects and a moving block count every cable segment',()=>{
+ const g=cableGeometry([cp(0),cp(3),cp(3,0,4),cp(6,0,4),cp(6,0,0)],true);
+ assert.equal(g.distance,14);assert.ok(g.advantage>1);
+});
+test('slack cable has no tensile load; stretching and separation increase tension',()=>{
+ assert.equal(cableLoad(19,20,10,42000).tension,0);
+ const a=cableLoad(21,20,0,42000),b=cableLoad(21,20,2,42000),c=cableLoad(21,20,-2,42000);
+ assert.equal(a.strain,5);assert.ok(b.tension>a.tension&&a.tension>c.tension);
+ assert.equal(cableLoad(100,20,12,42000).tension,42000);
+ assert.equal(cableLoad(100,20,12,42000).stalled,true);
+});
+test('long cable is more compliant than short cable under equal extension',()=>{
+ assert.ok(cableLoad(11,10,0,42000).tension>cableLoad(41,40,0,42000).tension);
+});
+test('drum slows with load, stalls at rating, allows payout and resumes below rating',()=>{
+ const reel=t=>cableReelStep(20,1,2,1,t,42000);
+ assert.ok(reel(0)<reel(21000)&&reel(21000)<reel(41000));
+ assert.equal(reel(42000),20);
+ assert.ok(cableReelStep(20,-1,2,1,42000,42000)>20);
+ assert.equal(cableReelStep(20,0,2,1,0,42000),20);
+ assert.ok(reel(41000)<20);
+});
+test('reel bounds do not jump a connected cable and path speed is bounded on resume',()=>{
+ assert.equal(cableReelStep(2,1,2,1,0,42000),2);
+ assert.equal(cableReelStep(95,-1,2,1,0,42000),95);
+ assert.equal(cablePathSpeed(20,null,1/120),0);
+ assert.equal(cablePathSpeed(20,19,0),0);
+ assert.equal(cablePathSpeed(20,19,.01),12);
+ assert.equal(cablePathSpeed(20,21,.01),-12);
+});
+test('moving block trades cable travel for reduced target travel',()=>{
+ const single=cableGeometry([cp(0),cp(9)]),doubled=cableGeometry([cp(0),cp(9),cp(0)],true);
+ assert.equal(10-single.distance,1);assert.equal(20-doubled.distance,2);
+});
+test('moving block survives save and resume; old saves default to single line',()=>{
+ const fixture=checkpointFixture();fixture.recoveryLines[0].doubled=true;
+ const saved=captureRecoverySave({job:4},fixture);
+ assert.equal(parseRecoverySave(JSON.stringify(saved),7).lines[0].doubled,true);
+ const fresh=checkpointFixture();restoreRecoverySave(fresh,saved,checkpointVector);
+ assert.equal(fresh.recoveryLines[0].doubled,true);assert.equal(fresh.recoveryLines[0].motor,0);
+ assert.equal(fresh.recoveryLines[0].previousDistance,null);
+ delete saved.lines[0].doubled;assert.ok(parseRecoverySave(saved,7));
+ restoreRecoverySave(fresh,saved,checkpointVector);assert.equal(fresh.recoveryLines[0].doubled,false);
+ saved.lines[0].doubled='yes';assert.equal(parseRecoverySave(saved,7),null);
+});
