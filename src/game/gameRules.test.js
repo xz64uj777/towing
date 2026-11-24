@@ -734,3 +734,31 @@ test('slack cable sags, taut cable straightens, and each redirect stays exact',(
  assert.ok(cableRenderPoints(route,30,0,()=>4.8)[4].y>=4.85-1e-9);
  assert.equal(cableRenderPoints([cp(0),cp(0,3),cp(1,3),cp(2,3),cp(3,3)],12,0).length,33);
 });
+
+import {steeringStep,brakeStep,chassisGrade,cameraGroundClearance} from './drivingPhysics.js';
+import {wheelArchProfile,addIntegratedChassis} from './visualQuality.js';
+test('heavy steering builds gradually and recenters rather than snapping',()=>{
+ const a=steeringStep(0,1,1,4,.1,true);assert.ok(a>0&&a<.2);
+ assert.ok(steeringStep(a,0,1,4,.1,true)<a);
+ assert.ok(steeringStep(.4,1,1,20,1,true)<.4);
+});
+test('braking cannot reverse the truck or jitter around zero',()=>{
+ assert.equal(brakeStep(.02,18,.01),0);assert.equal(brakeStep(-.02,18,.01),0);
+ assert.ok(brakeStep(-2,18,.01)<0);
+});
+test('terrain tilt aligns with local heading and camera stays above terrain',()=>{
+ const a=chassisGrade({x:.2,z:0},0),b=chassisGrade({x:.2,z:0},Math.PI/2);
+ assert.ok(a.roll>0&&Math.abs(a.pitch)<1e-8);assert.ok(b.pitch>0&&Math.abs(b.roll)<1e-8);
+ assert.equal(cameraGroundClearance({x:0,y:-18,z:0},()=>0).y,1.15);
+ assert.equal(cameraGroundClearance({x:0,y:8,z:0},()=>0).y,8);
+});
+test('chassis rails and curved wheel arches replace the solid slab',()=>{
+ for(const kind of ['rotator','flatbed','suv','pickup']){
+  const body=new THREE.Group();addIntegratedChassis(THREE,body,{kind,scale:1,color:0x446688});
+  assert.ok(body.getObjectByName('longitudinal chassis rail'));assert.ok(body.getObjectByName('front fender and rocker'));
+  assert.ok(body.getObjectByName('differential housing'));assert.ok(!body.getObjectByName('frame'));
+  body.traverse(o=>{if(o.geometry)assert.ok(o.geometry.attributes.position.array.every(Number.isFinite));});
+ }
+ assert.ok(wheelArchProfile(-1.55,-1.55)>.62+.48);
+ assert.equal(wheelArchProfile(0,-1.55),.72);
+});

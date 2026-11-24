@@ -49,8 +49,8 @@ export function padContact(topY,groundY,maxStroke=1.85){
 }
 export function suspensionStep(previous,acceleration,sideAcceleration,support,seconds,rigged){
  const a=1-Math.exp(-Math.max(0,seconds)*(rigged?5:7));
- const pitch=clamp(-acceleration*.008+clamp(support?.longitudinal??0,-1.5,1.5)*.055,-.10,.10);
- const roll=clamp(-sideAcceleration*.010-clamp(support?.lateral??0,-1.5,1.5)*.065,-.11,.11);
+ const pitch=clamp(acceleration*.008+clamp(support?.longitudinal??0,-1.5,1.5)*.055,-.10,.10);
+ const roll=clamp(sideAcceleration*.010-clamp(support?.lateral??0,-1.5,1.5)*.065,-.11,.11);
  const heave=rigged?-.035*Math.min(1.5,support?.ratio??0):-.015*Math.min(3,Math.abs(acceleration)+Math.abs(sideAcceleration));
  return {pitch:previous.pitch+(pitch-previous.pitch)*a,roll:previous.roll+(roll-previous.roll)*a,heave:previous.heave+(heave-previous.heave)*a};
 }

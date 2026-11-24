@@ -152,3 +152,69 @@ export function addRoadsideDetails(T,scene,height,advanced=false){
  for(const o of [trunks,crowns,tuft]){o.instanceMatrix.needsUpdate=true;if(o.instanceColor)o.instanceColor.needsUpdate=true;o.computeBoundingSphere();}
  return [trunks,crowns,tuft];
 }
+
+// Body skirts and wheel openings are real meshes, not painted rectangles.
+// The tire centers/attachment points are unchanged; dimensions follow the
+// existing wheel layout so the recovery equipment stays compatible.
+export function wheelArchProfile(z,axle,scale=1){
+ const radius=.61*scale,offset=z-axle;
+ return Math.abs(offset)<radius?.62*scale+Math.sqrt(Math.max(0,radius*radius-offset*offset)):.72*scale;
+}
+export function addIntegratedChassis(T,body,{kind,scale=1,color}){
+ const flat=kind==='flatbed',heavy=kind==='rotator',commercial=['flatbed','medium','rotator','delivery'].includes(kind);
+ const rear=flat?3.65:1.55,front=-1.55,end=flat?5.35:2.34,start=-3.05*scale;
+ const frame=paint(T,0x30363b,.82,.28),dark=paint(T,0x22282b,.84,.12),metal=paint(T,0x757e84,.58,.6),bodyMat=paint(T,color,.46,.23);
+ const B=(name,size,pos,m)=>{const o=mesh(T,body,name,new T.BoxGeometry(...size),m);o.position.set(...pos);return o;};
+ // Separate longitudinal rails and crossmembers; keep the space between tires open.
+ for(const side of [-1,1]){
+  B('longitudinal chassis rail',[.18*scale,.30*scale,end-start],[side*.54*scale,.88*scale,(start+end)/2],frame);
+  if(commercial)B('under-cab step and tank',[.29*scale,.32*scale,.82*scale],[side*.77*scale,.84*scale,-.35*scale],metal);
+ }
+ for(const z of [front,0,rear]){
+  B('frame crossmember',[1.20*scale,.18*scale,.18*scale],[0,.88*scale,z],frame);
+ }
+ for(const z of [front,rear]){
+  const axle=mesh(T,body,'axle tube',new T.CylinderGeometry(.10*scale,.10*scale,1.96,12),dark);axle.rotation.z=Math.PI/2;axle.position.set(0,.62*scale,z);
+  const diff=mesh(T,body,'differential housing',new T.SphereGeometry(.22*scale,12,8),frame);diff.scale.set(1.15,.85,.9);diff.position.set(0,.62*scale,z);
+ }
+ // Wheel opening cutouts in each lower side panel. Width matches the
+ // tire outer edge; the top connects to the sculpted hood and cabin.
+ const section=(side,z0,z1,axles,top,material,name)=>{
+  const cuts=[z0,z1];for(const axle of axles){
+   const r=.61*scale;for(let i=0;i<=20;i++){const z=axle-r+2*r*i/20;if(z>z0&&z<z1)cuts.push(z);}
+  }
+  cuts.sort((a,b)=>a-b);
+  const verts=[],indices=[];
+  const x=side*(1.06+.16*scale+.025);
+  for(const z of cuts){
+   let lower=.72*scale;
+   for(const axle of axles)lower=Math.max(lower,wheelArchProfile(z,axle,scale));
+   const upper=Math.max(lower+.045,top);
+   // Bridge the outer flare to the existing body and wrap the lower edge.
+   const inner=side*.91*scale;
+   verts.push(x,lower,z,x,upper,z,inner,upper+.025*scale,z,inner,lower,z);
+  }
+  for(let i=0;i<cuts.length-1;i++){
+   const j=i*4,k=j+4;
+   for(let q=0;q<4;q++){const next=(q+1)%4;indices.push(j+q,j+next,k+q,j+next,k+next,k+q);}
+  }
+  const last=(cuts.length-1)*4;indices.push(0,1,2,0,2,3,last,last+2,last+1,last,last+3,last+2);
+  const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(verts,3));geo.setIndex(indices);geo.computeVertexNormals();geo.computeBoundingBox();
+  const mat=material.clone();mat.side=T.DoubleSide;mesh(T,body,name,geo,mat);
+  // Narrow rolled wheel-arch lip (open bottom, not a circular disk).
+  for(const axle of axles){
+   const vertices=[],idx=[];for(let i=0;i<=24;i++){const a=Math.PI*i/24;for(const r of [.61,.68])vertices.push(x+side*.018,.62*scale+r*scale*Math.sin(a),axle+r*scale*Math.cos(a));}
+   for(let i=0;i<24;i++){const j=i*2;idx.push(j,j+1,j+2,j+1,j+3,j+2);}
+   const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(vertices,3));g.setIndex(idx);g.computeVertexNormals();const m=material.clone();m.side=T.DoubleSide;mesh(T,body,'rolled fender lip',g,m);
+  }
+ };
+ for(const side of [-1,1]){
+  section(side,-2.72*scale,.12*scale,[front],1.43*scale,bodyMat,'front fender and rocker');
+  if(flat)section(side,rear-.80*scale,rear+.80*scale,[rear],1.29*scale,dark,'carrier rear mudguard');
+  else section(side,.12*scale,2.28*scale,[rear],1.45*scale,bodyMat,heavy?'rotator rear fender':'rear quarter with wheel opening');
+  // Tie the lower flanks back into the narrower original body.
+  B('cab lower sill',[.25*scale,.12*scale,.68*scale],[side*1.01*scale,1.37*scale,-.24*scale],bodyMat);
+  if(commercial)B('rear mudflap',[.26*scale,.42*scale,.06],[side*1.06,.42*scale,rear+.54*scale],dark);
+ }
+ return body;
+}
