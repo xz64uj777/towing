@@ -909,8 +909,10 @@ export default function TowingGame(){
   {s?.tools.includes('winch')&&<div className="tension-readout" role="group" aria-label="Winch load and capacity">
     {(s.type.id==='rotator'?(hud.lineTensions??[0,0]):[hud.tension]).map((tension,i)=>{
      const limit=s.type.id==='rotator'?42:32,load=winchLoadBand(tension,limit);
+     const surface=(s.type.id==='rotator'&&s.recoveryLines[i].target===1?hud.secondarySurface:hud.recoverySurface)??'GROUND';
+     const surfaceShort=({PAVEMENT:'PAVED',SUBMERGED:'WATER',GRAVEL:'GRVL'}[surface]??surface);
      return <div className="tension-item" key={i}>
-      <div className="tension-item-head"><span className={'tension-label '+(i===0?'line-a':'line-b')}>{(s.type.id==='rotator'?'LINE '+(i===0?'A':'B'):'WINCH')+' · '+((s.type.id==='rotator'&&s.recoveryLines[i].target===1?hud.secondarySurface:hud.recoverySurface)??'GROUND')}</span><b className={'tension-amount '+load.level}>{tension.toFixed(1)} / {limit} kN</b></div>
+      <div className="tension-item-head"><span className={'tension-label '+(i===0?'line-a':'line-b')} title={surface} aria-label={(s.type.id==='rotator'?'Line '+(i===0?'A':'B'):'Winch')+', target surface: '+surface}>{(s.type.id==='rotator'?(i===0?'A':'B'):'WINCH')+' · '+surfaceShort}</span><b className={'tension-amount '+load.level}>{tension.toFixed(1)} / {limit} kN</b></div>
       <div className="tension-track" role="meter" aria-label={(s.type.id==='rotator'?'Line '+(i===0?'A':'B'):'Winch')+' load'} aria-valuemin={0} aria-valuemax={limit} aria-valuenow={Math.min(limit,Math.max(0,tension))}><div className={'tension-fill '+load.level} style={{width:(load.fraction*100).toFixed(0)+'%'}}/></div>
      </div>;
     })}
