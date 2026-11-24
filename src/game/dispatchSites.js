@@ -57,7 +57,7 @@ export function createDispatchSite(T,scene,i){
  const paint=(n,d,p,m)=>{const o=box(n,d,p,m);o.castShadow=false;return o;};
  const obstacles=[];
  if(i===5){
-  const groundMat=mat(0x97968c);groundMat.map=surfaceMap(T,35,45,74);
+  const groundMat=mat(0x797f82);groundMat.map=surfaceMap(T,22,30,74);
   const ground=box('freight terminal concrete apron',[44,.18,56],[0,-.05,-88],groundMat);
   // Warehouses and container rows enclose the yard without blocking the recovery bay.
   const siding=mat(0x657883,.76,.23),roof=mat(0x424e54),door=mat(0x849099,.65,.24);
@@ -74,14 +74,22 @@ export function createDispatchSite(T,scene,i){
    box('freight shipping container',[3.6,3.0,10.2],[x,1.54,z],m);
    for(let k=0;k<10;k++)box('container corrugation',[.09,2.72,.10],[x-side*1.83,1.54,z-4.4+k*.97],m);
   }
-  const ice=mat(0x8fa9b7,.25,.25),snow=mat(0xdce6e8,.91,0);
+  const ice=mat(0x9bb7c9,.29,.24),snow=mat(0xe5eef1,.91,0);snow.map=surfaceMap(T,8,12,88);ice.map=surfaceMap(T,7,9,70);
   // Plowed central access lane and cleared recovery bay amid snow-covered loading areas.
   paint('packed snow west apron',[10,.014,55],[-17,.048,-88],snow);
   paint('packed snow east apron north',[10,.014,23],[17,.048,-104.5],snow);
   paint('packed snow east apron south',[10,.014,23],[17,.048,-71.5],snow);
   paint('glazed ice patch',[9,.022,11],[-12.5,.061,-88.5],ice);
+  // Thin patches feather the straight plow edges; deep piles stay outside the traffic lanes.
+  const driftGeo=new T.SphereGeometry(1,12,6),dummy=new T.Object3D();
+  const drifts=new T.InstancedMesh(driftGeo,snow,68);drifts.name='irregular windblown snow at plow edges';drifts.receiveShadow=true;scene.add(drifts);
+  for(let j=0;j<68;j++){const side=j%2?1:-1,z=-114+(j*19%52);const x=side*(12.05+.45*Math.sin(j*2.399));dummy.position.set(x,.052,z);dummy.scale.set(.28+.42*(j%4)/3,.018+.025*(j%3)/2,.65+.6*(j%5)/4);dummy.rotation.set(0,j*.73,0);dummy.updateMatrix();drifts.setMatrixAt(j,dummy.matrix);}
+  drifts.instanceMatrix.needsUpdate=true;drifts.computeBoundingSphere();
+  const tracks=mat(0x626d74,.75,.05);
+  for(const x of [-1.05,1.05])for(let j=0;j<12;j++)paint('wet tire tracks through plowed lane',[.26,.008,2.8],[x+.15*Math.sin(j*.6),.054,-111+j*3.7],tracks);
+  for(const x of [-14.2,-12.1])for(let j=0;j<4;j++){const track=paint('skid on icy apron',[.21,.009,2.0],[x+j*.20,.079,-84.5-j*2.1],tracks);track.rotation.y=.11;}
   const bankGeo=new T.SphereGeometry(1,12,8);
-  for(const side of [-1,1])for(let j=0;j<11;j++){const bank=make('plowed snow bank',bankGeo,snow,side*22.7,.31,-113+j*5.0);bank.scale.set(1.10,.56,2.65);}
+  for(const side of [-1,1])for(let j=0;j<11;j++){const bank=make('plowed snow bank',bankGeo,snow,side*22.4,.42,-113+j*5.0);bank.scale.set(1.25,.60+.28*(j%3),2.7);}
   box('warehouse snow cap',[39,.13,7.4],[0,7.39,-120],snow);
   for(const side of [-1,1])for(let j=0;j<4;j++)box('snow on container roof',[3.6,.10,10.2],[side*24,3.09,-110+j*13.0],snow);
   for(let x=-18;x<=18;x+=6)paint('apron expansion joint',[.035,.012,54],[x,.05,-88],dark);

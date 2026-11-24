@@ -858,3 +858,20 @@ test('pre-redesign lake and late job saves restart safely while early saves rema
  assert.ok(!checkpointSiteCompatible({jobIndex:13}));assert.ok(checkpointSiteCompatible({jobIndex:6,siteRevision:SITE_REVISION}));
  assert.equal(captureRecoverySave({job:4},checkpointFixture()).siteRevision,SITE_REVISION);
 });
+
+import {rollHull,modelRollHull,rollContactOffset} from './rollContact.js';
+test('roll support places tires, side and roof above the contact plane',()=>{
+ const hull=rollHull([{x:-1,y:.15},{x:1,y:.15},{x:-1,y:2.5},{x:1,y:2.5},{x:0,y:1}]);
+ for(let i=0;i<=180;i++){const a=i*Math.PI/180,offset=rollContactOffset(hull,a),bottom=Math.min(...hull.map(p=>offset+p.x*Math.sin(a)+p.y*Math.cos(a)));assert.ok(Math.abs(bottom-.008)<1e-8);}
+ assert.ok(rollContactOffset(hull,Math.PI)>2.5);
+});
+test('actual model contact includes roof and tires, ignores hidden geometry, and clears at all roll angles',()=>{
+ const root=new THREE.Group();
+ addFleetBody(THREE,root,{kind:'delivery',scale:1.15});
+ for(const x of [-1.06,1.06]){const tire=new THREE.Mesh(new THREE.CylinderGeometry(.552,.552,.368,24));tire.rotation.z=Math.PI/2;tire.position.set(x,.713,1.55);root.add(tire);}
+ const hidden=new THREE.Mesh(new THREE.BoxGeometry(1,20,1));hidden.visible=false;root.add(hidden);
+ root.position.set(3,5,-8);
+ const hull=modelRollHull(THREE,root);
+ assert.ok(hull.length>4);assert.ok(rollContactOffset(hull,2.66)>2.5);assert.ok(rollContactOffset(hull,Math.PI)<4);
+ for(let i=0;i<100;i++){const a=i*Math.PI/99,shift=rollContactOffset(hull,a);assert.ok(hull.every(p=>shift+p.x*Math.sin(a)+p.y*Math.cos(a)>=.007999));}
+});
