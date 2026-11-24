@@ -618,5 +618,6 @@
  font-size:12px!important;
 }
 @media(orientation:landscape) and (max-height:540px){
+ .bottom-ui .equipment-stack.single-line-stack .recovery.single-line-menu.is-open{bottom:calc(72px + env(safe-area-inset-bottom))!important}
  .bottom-ui .recovery.single-line-menu.is-open .winch-row>.control{font-size:11px!important}
 }
