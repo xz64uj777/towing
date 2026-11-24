@@ -546,3 +546,61 @@
  .bottom-ui .equipment-stack.single-line-stack .boom-status{grid-column:1;grid-row:1}
  .bottom-ui .equipment-stack.single-line-stack .boom-control-cluster>.action{grid-column:1;grid-row:2;min-height:24px}
 }
+
+/* Build .65: compact natural-height menus, never stretch buttons to fill the screen. */
+.game-shell.menu-active::before{background:rgba(3,10,15,.26)}
+.toolbar .menu-toggle{
+ min-width:66px!important;height:28px!important;padding:3px 6px!important;
+ font-size:10px!important;border-radius:6px;
+}
+.toolbar.menu-open .toolbar-panel{
+ position:absolute!important;inset:calc(100% + 4px) 0 auto auto!important;
+ width:min(220px,calc(100vw - 18px - env(safe-area-inset-left) - env(safe-area-inset-right)))!important;
+ max-width:none!important;height:auto!important;max-height:none!important;
+ grid-template-columns:repeat(2,minmax(0,1fr))!important;grid-auto-rows:auto!important;
+ align-items:start;align-content:start;gap:3px;padding:5px!important;
+ border-width:1px;border-radius:8px;overflow:visible!important;
+}
+.toolbar.menu-open .toolbar-panel .checkpoint-caption{
+ height:21px;min-height:0;padding:2px 4px;display:block;font-size:9px;
+ line-height:16px;border-radius:5px;
+}
+.toolbar.menu-open .toolbar-panel button,
+.toolbar.menu-open .toolbar-panel select,
+.toolbar.menu-open .toolbar-panel .checkpoint-actions button{
+ height:27px!important;min-height:0!important;max-height:none!important;
+ font-size:9px!important;line-height:1.1;padding:2px 3px!important;
+ border-radius:5px;white-space:normal;
+}
+.toolbar.menu-open .toolbar-panel select{grid-column:1 / -1;padding:2px 4px!important}
+.camera-dock .camera-shortcuts button{min-height:27px;font-size:9px;padding:3px 4px}
+.camera-dock .camera-selector button{min-height:27px;font-size:9px;padding:2px}
+.bottom-ui .recovery.all-controls.single-line-menu.is-open{
+ --row:clamp(19px,calc((100dvh - 181px - env(safe-area-inset-top) - env(safe-area-inset-bottom))/8),27px);
+ width:min(198px,39vw)!important;gap:2px;padding:3px;
+}
+.bottom-ui .recovery.single-line-menu .equipment-header,
+.bottom-ui .recovery.single-line-menu .equipment-row{gap:2px}
+.bottom-ui .recovery.single-line-menu.is-open .action,
+.bottom-ui .recovery.single-line-menu.is-open .control,
+.bottom-ui .recovery.single-line-menu.is-open .recovery-toggle{
+ font-size:9px!important;border-radius:5px;
+}
+.bottom-ui .recovery.single-line-menu.is-collapsed .recovery-toggle{min-height:26px;height:26px;font-size:9px}
+@media(orientation:portrait) and (max-width:650px){
+ .bottom-ui .recovery.all-controls.single-line-menu.is-open{width:min(186px,47vw)!important}
+}
+@media(orientation:landscape) and (max-height:540px){
+ .toolbar.menu-open .toolbar-panel{
+  width:min(276px,calc(100vw - 18px - env(safe-area-inset-left) - env(safe-area-inset-right)))!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+ }
+ .toolbar.menu-open .toolbar-panel button,.toolbar.menu-open .toolbar-panel select,
+ .toolbar.menu-open .toolbar-panel .checkpoint-actions button{height:25px!important}
+ .bottom-ui .recovery.all-controls.single-line-menu.is-open{
+  --row:clamp(17px,calc((100dvh - 151px - env(safe-area-inset-top) - env(safe-area-inset-bottom))/8),23px);
+ }
+ .bottom-ui .recovery.single-line-menu.is-open .action,
+ .bottom-ui .recovery.single-line-menu.is-open .control,
+ .bottom-ui .recovery.single-line-menu.is-open .recovery-toggle{font-size:8px!important}
+}
