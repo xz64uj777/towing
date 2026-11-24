@@ -506,7 +506,7 @@
 .bottom-ui .recovery.single-line-menu .three-controls{grid-template-columns:repeat(3,minmax(0,1fr))}
 .bottom-ui .recovery.single-line-menu.is-open .action,.bottom-ui .recovery.single-line-menu.is-open .control,.bottom-ui .recovery.single-line-menu.is-open .recovery-toggle{
  min-width:0!important;min-height:var(--row)!important;height:var(--row)!important;max-height:var(--row)!important;
- font-size:clamp(8px,1.2vw,10px)!important;line-height:1.05;padding:2px!important;letter-spacing:0;
+ font-size:clamp(10px,1.6vw,12px)!important;line-height:1.05;padding:2px!important;letter-spacing:0;
  white-space:normal;overflow-wrap:anywhere;
 }
 .bottom-ui .recovery.single-line-menu select.action{white-space:nowrap;text-overflow:ellipsis}
@@ -545,4 +545,44 @@
  .bottom-ui .equipment-stack.single-line-stack .boom-joystick{grid-column:2;grid-row:1 / span 2}
  .bottom-ui .equipment-stack.single-line-stack .boom-status{grid-column:1;grid-row:1}
  .bottom-ui .equipment-stack.single-line-stack .boom-control-cluster>.action{grid-column:1;grid-row:2;min-height:24px}
+}
+
+.bottom-ui .recovery.single-line-menu .recovery-pages [aria-pressed="false"]{
+ color:#c4dce1;
+ background:#20353d;
+}
+.bottom-ui .recovery.single-line-menu .recovery-pages [aria-pressed="true"]{
+ color:#fff5dd;
+ background:#78521c;
+ border-color:#f3c851;
+}
+@media(orientation:landscape) and (max-height:540px){
+ .bottom-ui .recovery.all-controls.single-line-menu.is-open{
+  --row:clamp(24px,calc((100dvh - 108px - env(safe-area-inset-top) - env(safe-area-inset-bottom))/7),36px);
+  width:min(260px,42vw)!important;
+ }
+}
+.bottom-ui .recovery.single-line-menu.is-open .winch-speed-selector button{
+ min-height:var(--row);
+ padding:2px;
+}
+@media(orientation:landscape) and (max-height:540px){
+ .bottom-ui .recovery.all-controls.single-line-menu.is-open:not(.heavy-compact){
+  --row:clamp(24px,calc((100dvh - 106px - env(safe-area-inset-top) - env(safe-area-inset-bottom))/7),36px);
+ }
+}
+@media(orientation:landscape) and (max-height:380px){
+ .game-shell .camera-dock{left:28%;max-width:29vw}
+ .game-shell .toolbar{right:45%}
+ .game-shell .topbar .speed{margin-right:min(268px,43vw)}
+ .bottom-ui .equipment-stack .recovery.all-controls.single-line-menu.is-open,
+ .bottom-ui .equipment-stack .recovery.single-line-menu.is-collapsed{
+  bottom:calc(72px + env(safe-area-inset-bottom))!important;
+ }
+ .bottom-ui .recovery.all-controls.single-line-menu.is-open{
+  --row:clamp(24px,calc((100dvh - 114px - env(safe-area-inset-top) - env(safe-area-inset-bottom))/7),32px);
+ }
+}
+@media(orientation:portrait) and (max-width:380px) and (max-height:650px){
+ .game-shell .camera-dock{left:8px;transform:none;width:43vw;max-width:43vw}
 }
