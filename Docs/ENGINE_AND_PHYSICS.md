@@ -14,7 +14,8 @@ separate: everything that can be expressed as a pure function lives in its own m
 - `terrainPhysics.js` / `levelFourTerrain.js` / `lakeScene.js` — one shared height function per
   terrain, sampled by the scene mesh, the vehicles and the steep-slope forces.
 - `rollbackPhysics.js` — flatbed deck geometry and load travel.
-- `progressSave.js` — the device-local in-progress checkpoint (validated on load).
+- `progressSave.js` — validated device-local autosaves: a short ring of unfinished dispatches,
+  newest first, one slot per dispatch.
 
 ## Physics approach
 

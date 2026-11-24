@@ -604,3 +604,12 @@
  .bottom-ui .recovery.single-line-menu.is-open .control,
  .bottom-ui .recovery.single-line-menu.is-open .recovery-toggle{font-size:8px!important}
 }
+
+.resume-prompt{position:absolute;z-index:12;left:50%;top:50%;transform:translate(-50%,-50%);width:min(330px,calc(100% - 34px));padding:16px;display:flex;flex-direction:column;gap:8px;background:rgba(12,18,23,.96);border:1px solid #61dca3;border-radius:12px;box-shadow:0 12px 44px #0009;text-align:left}
+.resume-prompt b{font-size:12px;letter-spacing:1.2px;color:#8ef0bb}
+.resume-prompt span{font-size:12px;line-height:1.45;color:#d0d8de}
+.resume-prompt .resume-hint{font-size:10px;color:#aab5bf}
+.resume-actions{display:flex;gap:7px;margin-top:2px}
+.resume-actions button{flex:1;min-height:40px;padding:8px;border-radius:8px;border:1px solid #d5dde4;background:#1d2b34;color:#fff;font-weight:800;font-size:10px;letter-spacing:.6px;touch-action:manipulation}
+.resume-actions .resume-go{background:#287549;border-color:#91dfa9}
+@media(max-width:520px){.resume-prompt{padding:14px}.resume-actions button{min-height:44px}}

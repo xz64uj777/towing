@@ -71,3 +71,43 @@ export function restoreRecoverySave(s,saved,V){
   if(validNum(saved.camera[src]))s[dst]=saved.camera[src];
  }
 }
+
+// Autosave ring: a few unfinished dispatches, newest first. One slot per dispatch so the
+// periodic autosave refreshes its own entry instead of evicting the other jobs.
+export const RECOVERY_SLOTS_KEY='towing-in-progress-slots-v1';
+export const RECOVERY_SLOT_LIMIT=3;
+const slotKey=save=>save.jobIndex+'|'+save.career?.selected;
+export function pushRecoverySlot(slots,checkpoint,limit=RECOVERY_SLOT_LIMIT){
+ if(!checkpoint||!Number.isInteger(checkpoint.jobIndex)||!checkpoint.career)return Array.isArray(slots)?slots:[];
+ const bounded=Number.isInteger(limit)&&limit>0?limit:RECOVERY_SLOT_LIMIT;
+ const key=slotKey(checkpoint);
+ return [checkpoint,...(Array.isArray(slots)?slots:[]).filter(slot=>slot&&slotKey(slot)!==key)].slice(0,bounded);
+}
+export function parseRecoverySlots(raw,jobCount,limit=RECOVERY_SLOT_LIMIT){
+ try{
+  const list=typeof raw==='string'?JSON.parse(raw):raw;
+  if(!Array.isArray(list))return [];
+  const bounded=Number.isInteger(limit)&&limit>0?limit:RECOVERY_SLOT_LIMIT;
+  const seen=new Set(),slots=[];
+  for(const entry of list){
+   const save=parseRecoverySave(entry,jobCount);
+   if(!save)continue;
+   const key=slotKey(save);
+   if(seen.has(key))continue;
+   seen.add(key);slots.push(save);
+   if(slots.length>=bounded)break;
+  }
+  return slots;
+ }catch{return []}
+}
+// Plain-language checkpoint age for the resume prompt.
+export function savedAgo(savedAt,now=Date.now()){
+ if(!validNum(savedAt)||!validNum(now))return 'just now';
+ const seconds=Math.max(0,Math.round((now-savedAt)/1000));
+ if(seconds<45)return 'just now';
+ const minutes=Math.round(seconds/60);
+ if(minutes<60)return minutes===1?'1 minute ago':minutes+' minutes ago';
+ const hours=Math.round(minutes/60);
+ if(hours<24)return hours===1?'1 hour ago':hours+' hours ago';
+ const days=Math.round(hours/24);return days===1?'1 day ago':days+' days ago';
+}
