@@ -824,3 +824,37 @@ test('carrier deck details and medium boom retain existing hydraulic transforms'
  recoveryStructure.add(boomPivot);boomPivot.add(boomTilt);boomTilt.add(boomTip);boomPivot.position.set(0,2.16,1.13);boomTip.position.set(0,.05,3.25);
  const eye=boomTip.getWorldPosition(new THREE.Vector3());detailMediumRig(THREE,{recoveryStructure,boomPivot,boomTilt,boomTip});assert.ok(boomTip.getWorldPosition(new THREE.Vector3()).equals(eye));
 });
+
+import {siteConfig,siteHeight,siteSurface,bridgeGround,bridgeEdgeExceeded,constrainSiteTruck,siteRecoveryReady,checkpointSiteCompatible,createDispatchSite,SITE_REVISION} from './dispatchSites.js';
+test('terminal and bridge use independent heightfields, staging and surfaces',()=>{
+ assert.equal(siteConfig(5).kind,'terminal');assert.equal(siteConfig(6).kind,'bridge');
+ assert.equal(siteHeight(5,-13,-88),.04);assert.equal(sampleSurface(5,-13,-88).name,'ICE');assert.equal(sampleSurface(5,-19,-100).name,'PACKED SNOW');assert.ok(sampleSurface(5,-13,-88).traction<sampleSurface(5,-19,-100).traction);
+ assert.equal(sampleSurface(5,8,-88).name,'CONCRETE');assert.equal(sampleSurface(6,0,-104).name,'BRIDGE DECK');
+ assert.equal(siteHeight(6,0,-104),.04);assert.ok(bridgeGround(0,-104)<-5);
+ assert.ok(siteHeight(6,10,-104)<-5);
+});
+test('bridge edge failure and truck limits leave a safe recovery route',()=>{
+ assert.equal(bridgeEdgeExceeded(-5.75,-100),false);assert.equal(bridgeEdgeExceeded(-6.4,-100),true);
+ const p={x:8,z:-110},v={x:3,z:1};constrainSiteTruck(6,p,v);assert.equal(p.x,4.85);assert.equal(v.x,0);assert.equal(v.z,1);
+});
+test('terminal requires freight bay and bridge requires distinct bays for both targets',()=>{
+ const [a,b]=siteConfig(6).goals,vehicle=(p,roll=0)=>({pos:p,roll,active:true});
+ assert.ok(siteRecoveryReady(5,vehicle(siteConfig(5).goals[0]),null));
+ assert.ok(!siteRecoveryReady(5,vehicle({x:2,z:-88}),null));
+ assert.ok(siteRecoveryReady(6,vehicle(a),vehicle(b)));
+ assert.ok(!siteRecoveryReady(6,vehicle(a),vehicle(a)));
+ assert.ok(!siteRecoveryReady(6,vehicle(a,.7),vehicle(b)));
+ assert.ok(!siteRecoveryReady(6,vehicle(a),vehicle(b),true));
+});
+test('custom scenes contain actual site-specific mesh geometry and obstacles',()=>{
+ const terminal=new THREE.Scene(),bridge=new THREE.Scene();
+ const a=createDispatchSite(THREE,terminal,5),b=createDispatchSite(THREE,bridge,6);
+ assert.equal(a.ground.name,'freight terminal concrete apron');assert.ok(a.obstacles.length>0);assert.ok(terminal.getObjectByName('freight warehouse'));
+ assert.equal(b.ground.name,'elevated highway bridge deck');assert.ok(bridge.getObjectByName('bridge concrete pier'));assert.ok(bridge.getObjectByName('river beneath highway bridge'));
+ for(const scene of [terminal,bridge])scene.traverse(o=>{if(o.geometry)assert.ok(o.geometry.attributes.position.array.every(Number.isFinite));});
+});
+test('pre-redesign lake and late job saves restart safely while early saves remain compatible',()=>{
+ assert.ok(checkpointSiteCompatible({jobIndex:3}));assert.ok(!checkpointSiteCompatible({jobIndex:4}));
+ assert.ok(!checkpointSiteCompatible({jobIndex:13}));assert.ok(checkpointSiteCompatible({jobIndex:6,siteRevision:SITE_REVISION}));
+ assert.equal(captureRecoverySave({job:4},checkpointFixture()).siteRevision,SITE_REVISION);
+});

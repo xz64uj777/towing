@@ -6,7 +6,7 @@ Run your own towing and recovery operation in a mobile-first 3D simulator. Start
 
 Position your truck, operate the hydraulics, rig the recovery, watch cable tension and stability, and finish the dispatch to earn your payout. This is a hands-on equipment simulator: loading, securement, unloading and stowing matter as much as driving.
 
-**Current game: Build .78 — Fleet Redesign.** The browser version includes seven dispatches, four playable trucks, career earnings and upgrades, touch and keyboard controls, and local progress saves. Development is ongoing, with gameplay feedback from the owner's hands-on testing.
+**Current game: Build .79 — Distinct Recovery Sites.** The browser version includes seven dispatches, four playable trucks, career earnings and upgrades, touch and keyboard controls, and local progress saves. Development is ongoing, with gameplay feedback from the owner's hands-on testing.
 
 ## Career and dispatches
 
@@ -21,8 +21,10 @@ During development, **all jobs and trucks are available in test mode**. You can 
 | 3 | [Ditch Extraction](https://xz64uj777.github.io/towing/?level=3) | Medium Wrecker | $1,200 |
 | 4 | [Heavy Rollover Recovery](https://xz64uj777.github.io/towing/?level=4) | Heavy Rotator | $2,600 |
 | 5 | [Lakeside Vehicle Recovery](https://xz64uj777.github.io/towing/?level=5) | Heavy Rotator | $3,400 |
-| 6 | [Overturned Delivery Truck](https://xz64uj777.github.io/towing/?level=6) | Heavy Rotator | $4,200 |
-| 7 | [Two-Vehicle Ravine Rescue](https://xz64uj777.github.io/towing/?level=7) | Heavy Rotator | $5,800 |
+| 6 | [Winter Freight Terminal](https://xz64uj777.github.io/towing/?level=6) | Heavy Rotator | $4,200 |
+| 7 | [Highway Bridge Rescue](https://xz64uj777.github.io/towing/?level=7) | Heavy Rotator | $5,800 |
+
+Levels 4–7 now take place in a wooded ravine, a muddy lakeshore, a snowy freight terminal with ice, packed snow and cargo obstacles, and an elevated highway bridge over a river. The bridge has separate recovery bays for both casualties and an edge-failure rule. Old in-progress saves for redesigned dispatches restart the site while retaining career data.
 
 Direct dispatch links select that job in your local career. Use the main play link to continue normally. Progress and control settings are stored in your browser on the current device. MENU also offers **SAVE IN-PROGRESS** and **RESUME SAVED JOB** for interrupted recoveries.
 

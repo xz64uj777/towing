@@ -1,4 +1,5 @@
 // Device-local snapshot for an unfinished dispatch. This never replaces career storage.
+import {SITE_REVISION} from './dispatchSites.js';
 import {parkingBrakeForRiggers} from './gameRules.js';
 export const RECOVERY_SAVE_KEY='towing-in-progress-v1';
 const vec=v=>v?{x:v.x,y:v.y,z:v.z}:null;
@@ -6,14 +7,14 @@ const validVec=v=>v&&[v.x,v.y,v.z].every(Number.isFinite);
 const validNum=n=>typeof n==='number'&&Number.isFinite(n);
 const index=(n,max)=>Number.isInteger(n)&&n>=0&&n<=max;
 export function captureRecoverySave(career,s){
- return {version:1,savedAt:Date.now(),jobIndex:s.jobIndex,
+ return {version:1,siteRevision:SITE_REVISION,savedAt:Date.now(),jobIndex:s.jobIndex,
  career:{...career,job:s.jobIndex,selected:s.type.id},
  truck:{pos:vec(s.pos),yaw:s.yaw},
  vehicle:{pos:vec(s.pickPos),yaw:s.pickYaw,roll:s.pickRoll},
  secondary:{pos:vec(s.secondary.pos),yaw:s.secondary.yaw,roll:s.secondary.roll,active:s.secondary.active},
  equipment:Object.fromEntries(['parkingBrake','riggersDeployed','boomDeployed','boomAngle','boomSwing','boomExtension',
  'liftDeployed','liftHeight','liftExtension','gridWidth','armsClosed','loaded','strapsOn','bedTilt','bedSlide','bedProgress','hook',
- 'hookPoint','hookRedirect','cableLength','rollbackLoadX','rollbackLoadYaw','rollbackLoadZ','recoveryDamage','autoLoad','autoUnload','dropoffArrived','dropoffComplete','winchSpeed']
+ 'hookPoint','hookRedirect','cableLength','rollbackLoadX','rollbackLoadYaw','rollbackLoadZ','recoveryDamage','siteFailed','autoLoad','autoUnload','dropoffArrived','dropoffComplete','winchSpeed']
  .map(k=>[k,s[k]])),
  anchors:s.riggingAnchors.slice(3,5).map(a=>vec(a.pos)),
  lines:s.recoveryLines.map(l=>({connected:l.connected,point:l.point,customPoint:l.customPoint?{...l.customPoint}:null,

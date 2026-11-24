@@ -1,5 +1,6 @@
 // Coordinate-based surface sampling, shared by the wrecker and both recovery targets.
 // Coefficients are gameplay tuning, not real-world tire or winch ratings.
+import {siteConfig,siteSurface} from './dispatchSites.js';
 import {lakeHeight,LAKE_SURFACE} from './lakeScene.js';
 import {levelFourHeight,levelFourSlope} from './levelFourTerrain.js';
 import {recoveryGroundVelocity} from './gameRules.js';
@@ -24,6 +25,7 @@ function footprint(x,z,cx,cz,hx,hz){
  return (1-smooth(hx-.35,hx+.35,Math.abs(x-cx)))*(1-smooth(hz-.35,hz+.35,Math.abs(z-cz)));
 }
 export function sampleSurface(levelIndex,x,z){
+ if(siteConfig(levelIndex))return siteSurface(levelIndex,x,z);
  let ground=profiles.grass,depth=0;
  if(levelIndex>=3&&levelIndex!==4){
   const height=levelFourHeight(x,z),slope=levelFourSlope(x,z);
