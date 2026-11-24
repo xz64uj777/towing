@@ -1,4 +1,5 @@
 import {levelFourHeight,levelFourSlope} from './levelFourTerrain.js';
+import {surfaceMap} from './visualQuality.js';
 
 // Self-contained Level 4 scenery. All visible slopes come from the heightfield
 // used by recovery and driving physics; no false, flat-bottomed ravine boxes.
@@ -20,7 +21,7 @@ export function createLevelFourScene(THREE,scene){
  }
  geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
  geo.computeVertexNormals();
- const ground=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,side:THREE.DoubleSide}));
+ const ground=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,side:THREE.DoubleSide,map:surfaceMap(THREE,80,80,75)}));
  ground.name='Level 4 physical ravine and mountainside';
  ground.receiveShadow=true;scene.add(ground);
  const trunkMat=new THREE.MeshStandardMaterial({color:0x58452c,roughness:1});

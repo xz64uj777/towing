@@ -527,3 +527,46 @@ test('rollback captured offset persists in saves; old checkpoints default to cen
  const older=checkpointFixture();restoreRecoverySave(older,snapshot,checkpointVector);
  assert.deepEqual([older.rollbackLoadX,older.rollbackLoadYaw,older.rollbackLoadZ],[0,0,0]);
 });
+
+import * as THREE from 'three';
+import {BODY_PROFILES,loftGeometry,addVehicleShell,surfaceMap,waterNormalMap,reflectionSky,addRoadsideDetails} from './visualQuality.js';
+test('sculpted shell profiles preserve original vehicle width and longitudinal attachment envelope',()=>{
+ for(const kind of Object.keys(BODY_PROFILES)){
+  const root=new THREE.Group();addVehicleShell(THREE,root,{kind,scale:1,color:0x335577});root.updateMatrixWorld(true);
+  const hood=root.getObjectByName('sculpted hood'),cab=root.getObjectByName('tapered cabin');
+  for(const part of [hood,cab]){
+   const g=part.geometry,b=g.boundingBox;
+   assert.ok(g.attributes.position.array.every(Number.isFinite));
+   assert.ok(g.attributes.normal.array.every(Number.isFinite));
+   assert.ok(b.min.x>=-1.01&&b.max.x<=1.01&&b.min.z>=-3.21&&b.max.z<=2.25,kind);
+  }
+  assert.ok(root.getObjectByName('raked windshield'));
+ }
+});
+test('loft is closed and uses outward facing triangles',()=>{
+ const g=loftGeometry(THREE,[[0,1,0,.8,1,.8],[1,1,0,.8,1,.8]]);
+ const pos=g.attributes.position,index=g.index.array;
+ const v=i=>new THREE.Vector3().fromBufferAttribute(pos,i);
+ let signed=0;for(let j=0;j<index.length;j+=3)signed+=v(index[j]).dot(v(index[j+1]).cross(v(index[j+2])))/6;
+ assert.ok(signed>0);
+});
+test('crossover has independent rear quarters and rear glazing, commercial cab retains lightbar',()=>{
+ const suv=new THREE.Group(),rotator=new THREE.Group();
+ addVehicleShell(THREE,suv,{kind:'suv',scale:.92,color:0xb8c6ce});
+ addVehicleShell(THREE,rotator,{kind:'rotator',scale:1.13,color:0x5e68b0});
+ assert.ok(suv.getObjectByName('crossover rear quarters'));assert.ok(suv.getObjectByName('sloping rear window'));
+ assert.ok(rotator.getObjectByName('amber warning light'));assert.ok(!rotator.getObjectByName('crossover rear quarters'));
+});
+test('procedural material textures are deterministic and do not require a DOM',()=>{
+ for(const kind of ['ground','steel','tire']){
+  const a=surfaceMap(THREE,2,3,70,kind),b=surfaceMap(THREE,2,3,70,kind);
+  assert.deepEqual(a.image.data,b.image.data);assert.equal(a.repeat.x,2);assert.ok(new Set(a.image.data).size>3);a.dispose();b.dispose();
+ }
+ const normal=waterNormalMap(THREE),sky=reflectionSky(THREE);assert.equal(normal.image.width,64);assert.equal(sky.mapping,THREE.EquirectangularReflectionMapping);normal.dispose();sky.dispose();
+});
+test('roadside detail uses three bounded instanced draw batches and deterministic placement',()=>{
+ const scene=new THREE.Scene(),batch=addRoadsideDetails(THREE,scene,()=>0);
+ assert.deepEqual(batch.map(o=>o.count),[56,168,320]);assert.ok(batch.every(o=>o.isInstancedMesh&&Number.isFinite(o.boundingSphere.radius)));
+ const next=addRoadsideDetails(THREE,new THREE.Scene(),()=>0);
+ assert.deepEqual(batch[0].instanceMatrix.array,next[0].instanceMatrix.array);
+});

@@ -1,3 +1,4 @@
+import {surfaceMap,waterNormalMap} from './visualQuality.js';
 // Level 5: broad shallow lake with a muddy bank and submerged recovery target.
 const smooth=(a,b,x)=>{const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*(3-2*t);};
 export const LAKE_SURFACE=-2.15;
@@ -22,16 +23,17 @@ export function createLakeScene(THREE,scene){
  const grass=new THREE.Color('#50734c'),mud=new THREE.Color('#645947'),sand=new THREE.Color('#988a65');
  for(let i=0;i<pos.count;i++){
   const x=pos.getX(i),z=pos.getZ(i),y=lakeHeight(x,z);pos.setY(i,y);
-  const c=grass.clone();const wet=smooth(-5,-8,x)*(1-smooth(32,42,Math.abs(z+78)));
+  const c=grass.clone();const wet=smooth(5,8,-x)*(1-smooth(32,42,Math.abs(z+78)));
   c.lerp(mud,wet*.84);if(y<LAKE_SURFACE+.55)c.lerp(sand,.65);
   colors.push(c.r,c.g,c.b);
  }
  geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));geo.computeVertexNormals();
- const ground=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,side:THREE.DoubleSide}));
+ const ground=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,side:THREE.DoubleSide,map:surfaceMap(THREE,65,65,72)}));
  ground.name='Level 5 physical lake shore';ground.receiveShadow=true;scene.add(ground);
  // Water only occupies the recessed western basin; no water across the paved road.
  const waterGeo=new THREE.PlaneGeometry(74,58);waterGeo.rotateX(-Math.PI/2);
- const water=new THREE.Mesh(waterGeo,new THREE.MeshStandardMaterial({color:0x247e91,metalness:.42,roughness:.19,transparent:true,opacity:.82,side:THREE.DoubleSide,depthWrite:false}));
+ const waterNormal=waterNormalMap(THREE);
+ const water=new THREE.Mesh(waterGeo,new THREE.MeshStandardMaterial({color:0x247e91,metalness:.20,roughness:.24,transparent:true,opacity:.82,side:THREE.DoubleSide,depthWrite:false,normalMap:waterNormal,normalScale:new THREE.Vector2(.75,.75)}));
  water.name='Lake surface';water.position.set(-47,LAKE_SURFACE,-78);scene.add(water);
  const create=(g,m,x,y,z,name)=>{const o=new THREE.Mesh(g,m);o.position.set(x,y,z);o.name=name;o.castShadow=true;scene.add(o);return o;};
  const wood=new THREE.MeshStandardMaterial({color:0x695038,roughness:1});
@@ -58,5 +60,5 @@ export function createLakeScene(THREE,scene){
  }
  const buoyMat=new THREE.MeshStandardMaterial({color:0xf3a43b,roughness:.45});
  for(const z of [-98,-89,-68,-59])create(new THREE.SphereGeometry(.36,10,8),buoyMat,-28,LAKE_SURFACE+.22,z,'Floating rescue buoy');
- return {ground,obstacles:[]};
+ return {ground,obstacles:[],waterNormal};
 }
