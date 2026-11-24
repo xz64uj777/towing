@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {ditchHeight,physicsFrame,resolveObstacle,stabilityScale} from './simulationPhysics.js';
+import {stepCable} from './cablePhysics.js';
 import {canCompleteJob,minimapX,minimapY,wheelLiftCaptureReady,winchLoadBand,poweredWinchForce,stopWinchCoast,recoveryCableTension,canPowerBothRecoveryLines,parkingBrakeForRiggers,cameraPresetPose} from './gameRules.js';
 import {LEVEL_FOUR_DEPTH_METRES,LEVEL_FOUR_STAGING,levelFourHeight,levelFourSlope,levelFourDownhillAcceleration} from './levelFourTerrain.js';
 
@@ -483,4 +485,34 @@ test('secured load follows deck during leveling',()=>{
  const a=rollbackDeck(1),b=rollbackDeck(0);
  const p=rollbackPose(a,rollbackStop(a),.92),q=rollbackPose(b,rollbackStop(b),.92);
  assert.ok(p.pitch>0);assert.equal(q.pitch,0);assert.equal(q.height,1.56);
+
+test('a stopped drum holds an uphill load and powered payout reduces tension',()=>{
+ const held=stepCable(21,20,0,0,2,1/120,32000);
+ assert.equal(held.spool,20);
+ assert.ok(held.tension>0);
+ const paid=stepCable(21,held.spool,0,-1,2,1/120,32000);
+ assert.ok(paid.spool>held.spool && paid.tension<held.tension);
+});
+
+test('physics catches up at 15 FPS and bounds recovery after a pause',()=>{
+ assert.equal(physicsFrame(1/15,0).steps,8);
+ assert.equal(physicsFrame(2,0).steps,12);
+ let remainder=0,steps=0;
+ for(let i=0;i<144;i++){
+  const frame=physicsFrame(1/144,remainder);
+  steps+=frame.steps;
+  remainder=frame.remainder;
+ }
+ assert.equal(steps,120);
+});
+
+test('a low straight pull has greater stability than a high side pull',()=>{
+ assert.equal(stabilityScale(0,0,0,0),1);
+ assert.ok(stabilityScale(65000,65000,0,5)<1);
+});
+
+test('the ditch has a recessed bed and a centered obstacle contact resolves outward',()=>{
+ assert.ok(ditchHeight(10.5,-20)<ditchHeight(5,-20));
+ const contact=resolveObstacle(0,0,0,0,2);
+ assert.equal(Math.hypot(contact.x,contact.z),2);
 });
