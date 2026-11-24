@@ -479,3 +479,52 @@
  .all-controls .all-line-column .equipment-row .control{min-height:29px;font-size:8px}
  .all-controls .equipment-section-label{font-size:9px;padding:2px}
 }
+
+
+/* .64: fixed right-hand, single selected line; no scroll container. */
+.bottom-ui>.equipment-stack.has-boom.single-line-stack{display:contents}
+.bottom-ui .equipment-stack.single-line-stack .boom-float{
+ position:fixed!important;left:8px!important;right:auto!important;bottom:calc(205px + env(safe-area-inset-bottom))!important;
+ width:106px!important;max-width:106px!important;padding:4px;pointer-events:auto;
+}
+.bottom-ui .equipment-stack.single-line-stack .boom-control-cluster{display:flex;flex-direction:column;gap:3px}
+.bottom-ui .equipment-stack.single-line-stack .boom-status{font-size:8px;padding:0}
+.bottom-ui .equipment-stack.single-line-stack .boom-control-cluster>.action{width:100%;min-height:24px;font-size:8px;padding:2px}
+.bottom-ui .equipment-stack.single-line-stack .boom-joystick{width:86px;height:86px}
+.bottom-ui .equipment-stack.single-line-stack .boom-knob{width:26px;height:26px}
+.game-shell .game-minimap.map-collapsed{left:8px!important;bottom:calc(195px + env(safe-area-inset-bottom))!important;width:72px!important;height:28px!important;padding:3px!important}
+.game-shell .game-minimap.map-expanded{left:8px!important;top:calc(145px + env(safe-area-inset-top))!important;bottom:auto!important;z-index:19!important}
+.game-shell:has(.single-line-stack .boom-float) .game-minimap.map-collapsed{bottom:calc(346px + env(safe-area-inset-bottom))!important}
+.bottom-ui .recovery.all-controls.single-line-menu.is-open{
+ --row:clamp(24px,calc((100dvh - 181px - env(safe-area-inset-top) - env(safe-area-inset-bottom))/8),36px);
+ position:fixed!important;left:auto!important;right:8px!important;bottom:calc(70px + env(safe-area-inset-bottom))!important;
+ width:min(230px,39vw)!important;max-height:none!important;overflow:visible!important;gap:3px;padding:4px;
+}
+.bottom-ui .recovery.single-line-menu .equipment-header{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:3px;width:100%;flex-shrink:0}
+.bottom-ui .recovery.single-line-menu .equipment-header:has(>button:only-child){grid-template-columns:1fr}
+.bottom-ui .recovery.single-line-menu .equipment-row{gap:3px}
+.bottom-ui .recovery.single-line-menu .three-controls{grid-template-columns:repeat(3,minmax(0,1fr))}
+.bottom-ui .recovery.single-line-menu.is-open .action,.bottom-ui .recovery.single-line-menu.is-open .control,.bottom-ui .recovery.single-line-menu.is-open .recovery-toggle{
+ min-width:0!important;min-height:var(--row)!important;height:var(--row)!important;max-height:var(--row)!important;
+ font-size:clamp(8px,1.2vw,10px)!important;line-height:1.05;padding:2px!important;letter-spacing:0;
+ white-space:normal;overflow-wrap:anywhere;
+}
+.bottom-ui .recovery.single-line-menu select.action{white-space:nowrap;text-overflow:ellipsis}
+.single-line-menu .line-select{border:1px solid #a17b3b;background:#26333a;color:#ffd28a}
+.single-line-menu .line-select.line-b{border-color:#468da7;color:#85e2f0}
+.single-line-menu .line-select.active.line-a{background:#77501d;border-color:#ffc04e}
+.single-line-menu .line-select.active.line-b{background:#15576b;border-color:#55d3ec}
+.bottom-ui .recovery.single-line-menu.is-collapsed{position:fixed!important;right:8px!important;bottom:calc(70px + env(safe-area-inset-bottom))!important;width:min(178px,39vw)!important}
+@media(orientation:portrait) and (max-width:650px){
+ .bottom-ui .recovery.all-controls.single-line-menu.is-open{width:min(215px,49vw)!important;bottom:calc(84px + env(safe-area-inset-bottom))!important;--row:clamp(24px,calc((100dvh - 255px - env(safe-area-inset-top) - env(safe-area-inset-bottom))/8),36px)}
+ .bottom-ui .equipment-stack.single-line-stack .boom-float{width:96px!important;max-width:96px!important}
+}
+@media(orientation:landscape) and (max-height:540px){
+ .bottom-ui .recovery.all-controls.single-line-menu.is-open{bottom:calc(57px + env(safe-area-inset-bottom))!important;--row:clamp(18px,calc((100dvh - 183px - env(safe-area-inset-top) - env(safe-area-inset-bottom))/8),30px)}
+ .bottom-ui .recovery.single-line-menu.is-collapsed{bottom:calc(57px + env(safe-area-inset-bottom))!important}
+ .bottom-ui .equipment-stack.single-line-stack .boom-float{bottom:calc(126px + env(safe-area-inset-bottom))!important;left:8px!important;width:94px!important;max-width:94px!important}
+ .bottom-ui .equipment-stack.single-line-stack .boom-joystick{width:70px;height:70px}
+ .game-shell:has(.single-line-stack .boom-float) .game-minimap.map-collapsed{left:8px!important;bottom:calc(96px + env(safe-area-inset-bottom))!important}
+ .game-shell:has(.single-line-stack .boom-float) .tension-readout{left:calc(108px + env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));width:min(154px,24vw)}
+ .game-shell:has(.single-line-stack .boom-float) .bottom-ui>.joystick{width:78px;height:78px}
+}

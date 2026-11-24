@@ -170,8 +170,8 @@ export default function TowingGame(){
  const [savedCheckpoint,setSavedCheckpoint]=useState(()=>{
   try{return parseRecoverySave(localStorage.getItem(RECOVERY_SAVE_KEY),JOBS.length)}catch{return null}
  });
- const [settingsOpen,setSettingsOpen]=useState(false),[mapOpen,setMapOpen]=useState(()=>typeof window==='undefined'||window.innerHeight>520),[menuOpen,setMenuOpen]=useState(false),[recoveryOpen,setRecoveryOpen]=useState(true);const [settings,setSettings]=useState(()=>{try{return {steering:1,boom:1,winch:1,driveMode:'joystick',soundMuted:false,soundVolume:.7,...JSON.parse(localStorage.getItem('towing-controls')||'{}')}}catch{return {steering:1,boom:1,winch:1,driveMode:'joystick',soundMuted:false,soundVolume:.7}}});const settingsRef=useRef(settings);settingsRef.current=settings;const changeSetting=(key,value)=>setSettings(old=>{const next={...old,[key]:value};settingsRef.current=next;try{localStorage.setItem('towing-controls',JSON.stringify(next))}catch{}return next;});
- const [winchSpeed,setWinchSpeed]=useState('medium'),[placingAnchor,setPlacingAnchor]=useState(false);const [garage,setGarage]=useState(false),[notice,setNotice]=useState(''),[hydraulic,setHydraulic]=useState({x:0,y:0}),[boomStick,setBoomStick]=useState({x:0,y:0}),[boomMode,setBoomMode]=useState('extend'),[cameraMode,setCameraMode]=useState('orbit'),[cameraPanelOpen,setCameraPanelOpen]=useState(false);
+ const [settingsOpen,setSettingsOpen]=useState(false),[mapOpen,setMapOpen]=useState(false),[menuOpen,setMenuOpen]=useState(false),[recoveryOpen,setRecoveryOpen]=useState(true);const [settings,setSettings]=useState(()=>{try{return {steering:1,boom:1,winch:1,driveMode:'joystick',soundMuted:false,soundVolume:.7,...JSON.parse(localStorage.getItem('towing-controls')||'{}')}}catch{return {steering:1,boom:1,winch:1,driveMode:'joystick',soundMuted:false,soundVolume:.7}}});const settingsRef=useRef(settings);settingsRef.current=settings;const changeSetting=(key,value)=>setSettings(old=>{const next={...old,[key]:value};settingsRef.current=next;try{localStorage.setItem('towing-controls',JSON.stringify(next))}catch{}return next;});
+ const [activeRecoveryLine,setActiveRecoveryLine]=useState(0),[winchSpeed,setWinchSpeed]=useState('medium'),[placingAnchor,setPlacingAnchor]=useState(false);const [garage,setGarage]=useState(false),[notice,setNotice]=useState(''),[hydraulic,setHydraulic]=useState({x:0,y:0}),[boomStick,setBoomStick]=useState({x:0,y:0}),[boomMode,setBoomMode]=useState('extend'),[cameraMode,setCameraMode]=useState('orbit'),[cameraPanelOpen,setCameraPanelOpen]=useState(false);
  const saveCareer=fn=>setCareer(old=>{const next=fn(old);careerRef.current=next;try{localStorage.setItem('towing-career',JSON.stringify(next))}catch{}return next;});
  const audioRef=useRef(null);
  useEffect(()=>{
@@ -887,9 +887,9 @@ export default function TowingGame(){
  const currentJob=JOBS[career.job%JOBS.length];
  return <main className={'game-shell'+(menuOpen?' menu-active':'')+(cameraPanelOpen?' camera-active':'')}><div className={'scene'+(placingAnchor?' anchor-placement-scene':'')} ref={mount}/>
    {placingAnchor&&<div className="anchor-placement-hint" role="status"><b>{s?.customHookPlacement!==null?'SELECT CUSTOM HOOK':'PLACE GROUND ANCHOR'}</b><span>{s?.customHookPlacement!==null?'Tap a frame edge or bumper on the recovery vehicle.':'Tap open ground off the road, 4–32 m from truck and 3–32 m from vehicle.'}</span><button type="button" onClick={s?.customHookPlacement!==null?cancelCustomHook:cancelAnchorPlacement}>CANCEL PLACEMENT</button></div>}
-  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .63 • ALL CONTROLS</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
-  <div className="game-minimap" style={{position:'absolute',left:12,bottom:195,zIndex:9,width:mapOpen?146:106,height:mapOpen?166:36,pointerEvents:'auto',border:'2px solid #f3c851',borderRadius:12,background:'rgba(9,20,30,.88)',color:'#fff',boxShadow:'0 3px 14px #0008',padding:6,boxSizing:'border-box'}}>
-   <button onClick={()=>setMapOpen(v=>!v)} style={{fontSize:11,fontWeight:800,width:'100%',background:'transparent',border:0,color:'white'}}>{mapOpen?'MAP −':'MAP +'}</button>
+  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .64 • COMPACT CONTROLS</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
+  <div className={'game-minimap '+(mapOpen?'map-expanded':'map-collapsed')} style={{position:'absolute',left:12,bottom:195,zIndex:9,width:mapOpen?146:106,height:mapOpen?166:36,pointerEvents:'auto',border:'2px solid #f3c851',borderRadius:12,background:'rgba(9,20,30,.88)',color:'#fff',boxShadow:'0 3px 14px #0008',padding:6,boxSizing:'border-box'}}>
+   <button type="button" aria-expanded={mapOpen} onClick={()=>setMapOpen(v=>!v)} style={{fontSize:11,fontWeight:800,width:'100%',background:'transparent',border:0,color:'white'}}>{mapOpen?'MAP −':'MAP +'}</button>
    {mapOpen&&<svg viewBox="0 0 140 140" width="132" height="132" aria-label="Map of recovery vehicles and destination">
     <rect width="140" height="140" rx="6" fill="#1b3431"/>
     <path d="M 70 0 V 140" stroke="#61787a" strokeWidth="22"/>
@@ -933,7 +933,7 @@ export default function TowingGame(){
     })}
     <small title="Simulated cable strain; yellow 60%, red 85% of rated line load">{s.type.id==='rotator'?[0,1].map(i=>{const l=s.recoveryLines[i];return (i===0?'A':'B')+' '+(l.doubled?'2:1':'1:1')+' '+(hud.lineStalls?.[i]?'STALL':(hud.lineStrains?.[i]??0).toFixed(1)+'%');}).join(' · '):(hud.cableStalled?'STALL · ':winchSpeed.toUpperCase()+' · ')+'STRAIN '+(hud.cableStrain??0).toFixed(1)+'%'}</small>
    </div>}
-  <div className="bottom-ui">{settings.driveMode==='joystick'?<div className="joystick" onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);joystickMove(e);}} onPointerMove={e=>{if(e.buttons)joystickMove(e);}} onPointerUp={joystickStop} onPointerCancel={joystickStop}><div className="stick-knob" style={{transform:`translateX(${steerVisual*23}px)`}}>●</div><span>STEER</span></div>:<div className="joystick steering-arrows"><Hold label="◀ LEFT" onDown={press('steer',-1)} onUp={press('steer',0)}/><Hold label="RIGHT ▶" onDown={press('steer',1)} onUp={press('steer',0)}/></div>}<div className={'equipment-stack'+(s?.tools.includes('boom')&&(hud.parking||hud.riggers)?' has-boom':'')+(s?.type.id==='rotator'&&recoveryOpen?' wide-stack':'')}>{s?.tools.includes('boom')&&(hud.parking||hud.riggers)&&<div className="boom-float"><div className="boom-control-cluster">
+  <div className="bottom-ui">{settings.driveMode==='joystick'?<div className="joystick" onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);joystickMove(e);}} onPointerMove={e=>{if(e.buttons)joystickMove(e);}} onPointerUp={joystickStop} onPointerCancel={joystickStop}><div className="stick-knob" style={{transform:`translateX(${steerVisual*23}px)`}}>●</div><span>STEER</span></div>:<div className="joystick steering-arrows"><Hold label="◀ LEFT" onDown={press('steer',-1)} onUp={press('steer',0)}/><Hold label="RIGHT ▶" onDown={press('steer',1)} onUp={press('steer',0)}/></div>}<div className={'equipment-stack'+(s?.tools.includes('boom')&&(hud.parking||hud.riggers)?' has-boom':'')+(s?.type.id==='rotator'?' single-line-stack':'')}>{s?.tools.includes('boom')&&(hud.parking||hud.riggers)&&<div className="boom-float"><div className="boom-control-cluster">
  <div className="boom-status">{(hud.parking||hud.riggers)?'BOOM READY':'PARK OR RIGGERS'} · UP/DOWN + {boomMode==='extend'?'IN/OUT':'SWING'}</div>
  {s?.type.id==='rotator'&&<button type="button" className="action" onClick={()=>{boomStickStop();setBoomMode(m=>m==='extend'?'swing':'extend');}}>JOYSTICK: {boomMode==='extend'?'EXTEND':'SWING'}</button>}
  <div className="boom-joystick" role="group" aria-label="Boom joystick: vertical raises or lowers, horizontal extends or swings" onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);boomStickMove(e);}} onPointerMove={e=>{if(e.buttons)boomStickMove(e);}} onPointerUp={boomStickStop} onPointerCancel={boomStickStop} onLostPointerCapture={boomStickStop}>
@@ -942,10 +942,13 @@ export default function TowingGame(){
   <span className="boom-label right">{boomMode==='extend'?'OUT':'RIGHT'}</span>
   <div className="boom-knob" style={{transform:`translate(${boomStick.x*20}px,${-boomStick.y*20}px)`}}/>
  </div>
- </div></div>}<div className={'recovery equipment-compact all-controls '+(s?.type.id==='rotator'?'heavy-compact ':'')+(recoveryOpen?'is-open':'is-collapsed')}>
- <button type="button" className="recovery-toggle" onClick={()=>{setRecoveryOpen(v=>!v);setMenuOpen(false);setCameraPanelOpen(false);}}>
-  {s?.type.id==='light'?'WHEEL LIFT':s?.type.id==='rotator'?'HEAVY RECOVERY':s?.type.id==='flatbed'?'ROLLBACK':'EQUIPMENT'} {recoveryOpen?'−':'+'}
- </button>
+ </div></div>}<div className={'recovery equipment-compact all-controls '+(s?.type.id==='rotator'?'heavy-compact single-line-menu ':'')+(recoveryOpen?'is-open':'is-collapsed')}>
+ <div className="equipment-header">
+  <button type="button" className="recovery-toggle" aria-expanded={recoveryOpen} onClick={()=>{setRecoveryOpen(v=>!v);setMenuOpen(false);setCameraPanelOpen(false);}}>
+   {s?.type.id==='light'?'WHEEL LIFT':s?.type.id==='rotator'?'RECOVERY':s?.type.id==='flatbed'?'ROLLBACK':'EQUIPMENT'} {recoveryOpen?'−':'+'}
+  </button>
+  {recoveryOpen&&s?.type.id==='rotator'&&[0,1].map(i=><button type="button" key={i} className={'action line-select line-'+(i===0?'a':'b')+(activeRecoveryLine===i?' active':'')} aria-pressed={activeRecoveryLine===i} onClick={()=>{if(activeRecoveryLine!==i){setRecoveryMotor(activeRecoveryLine,0);setActiveRecoveryLine(i);}}}>LINE {i===0?'A':'B'}</button>)}
+ </div>
  {recoveryOpen&&<>
   {s?.type.id==='rotator'?<div className="equipment-row heavy-safety-row">
     <button type="button" className={'action brake-button '+(hud.parking?'active':'')} onClick={togglePark}>{hud.parking?'PARK ✓':'PARK BRAKE'}</button>
@@ -983,40 +986,38 @@ export default function TowingGame(){
       <button className="action" onClick={toggleArms}>{s?.armsClosed?'OPEN L-ARMS':'CLOSE L-ARMS'}</button>
     </>}
   </>}
-  {s?.type.id==='rotator'&&<>
-    <div className="all-line-grid">
-      {s.recoveryLines.map((line,i)=><div key={i} className={'all-line-column line-'+(i===0?'a':'b')}>
-        <div className="equipment-section-label">{i===0?'LINE A':'LINE B'} · {line.connected?'ON':'OFF'}</div>
-        <button type="button" className={'action '+(line.connected?'active':'')} onClick={()=>toggleRecoveryLine(i)}>{line.connected?'DISCONNECT':'CONNECT'}</button>
-        <div className="equipment-row">
-          <Hold disabled={!line.connected} label="WINCH IN" onDown={recoveryPress(i,1)} onUp={recoveryPress(i,0)}/>
-          <Hold disabled={!line.connected} label="PAY OUT" onDown={recoveryPress(i,-1)} onUp={recoveryPress(i,0)}/>
-        </div>
-      </div>)}
-    </div>
-    <div className="equipment-row all-both-row">
-      <Hold disabled={!s.recoveryLines.every(l=>l.connected)} label="WINCH BOTH" onDown={bothRecoveryPress(1)} onUp={bothRecoveryPress(0)}/>
-      <Hold disabled={!s.recoveryLines.every(l=>l.connected)} label="PAY BOTH" onDown={bothRecoveryPress(-1)} onUp={bothRecoveryPress(0)}/>
-    </div>
-    <div className="equipment-section-label">HOOKS &amp; ANCHORS</div>
-    <div className="all-line-grid">
-      {s.recoveryLines.map((line,i)=><div key={i} className={'all-line-column line-'+(i===0?'a':'b')}>
-        <div className="equipment-section-label">{i===0?'A':'B'} · RIGGING</div>
-        <select className="action" aria-label={'Line '+(i===0?'A':'B')+' attachment point'} disabled={line.connected} value={line.customPoint?'custom':line.point} onChange={e=>{if(!line.connected&&e.target.value!=='custom'){line.point=Number(e.target.value);line.customPoint=null;setNotice('Hook position: '+RECOVERY_POINTS[line.point].label);}}}>
-          {line.customPoint&&<option value="custom">CUSTOM HOOK</option>}{RECOVERY_POINTS.map((p,j)=><option key={p.id} value={j}>{p.label}</option>)}
-        </select>
-        <button type="button" className="action" disabled={line.connected} onClick={()=>startCustomHook(i)}>CUSTOM HOOK</button>
-        <button type="button" className="action" disabled={line.connected} onClick={()=>changeRecoveryRedirect(i)}>{s.riggingAnchors[line.redirect].label}{line.secondRedirect?' + '+s.riggingAnchors[line.secondRedirect].label:''}</button>
-        <button type="button" className="action" disabled={line.connected} onClick={()=>startAnchorPlacement(i)}>PLACE / MOVE {i===0?'A':'B'}</button>
-        <button type="button" className={'action '+(line.doubled?'active':'')} disabled={line.connected} onClick={()=>toggleMovingBlock(i)}>{line.doubled?'2:1 MOVING BLOCK':'1:1 SINGLE LINE'}</button>
-        {s.secondary.active&&<button type="button" className="action" disabled={line.connected} onClick={()=>changeRecoveryTarget(i)}>TARGET VEHICLE {line.target+1}</button>}
-      </div>)}
-    </div>
-    <button type="button" className="action" disabled={s.recoveryLines.some(l=>l.connected)} onClick={startDoubleAnchorSetup}>TWO-POINT LINE A</button>
-    <div className="equipment-row">
-      {[3,4].map((slot,i)=><button key={slot} type="button" className="action" disabled={!s.riggingAnchors[slot].pos||s.recoveryLines.some(l=>l.connected&&(l.redirect===slot||l.secondRedirect===slot))} onClick={()=>removePlacedAnchor(slot)}>REMOVE ANCHOR {i===0?'A':'B'}</button>)}
-    </div>
-  </>}
+  {s?.type.id==='rotator'&&(()=>{
+    const i=activeRecoveryLine,line=s.recoveryLines[i],letter=i===0?'A':'B',both=s.recoveryLines.every(l=>l.connected);
+    return <>
+     <div className="equipment-row three-controls">
+      <button type="button" className={'action '+(line.connected?'active':'')} onClick={()=>toggleRecoveryLine(i)}>{line.connected?'UNHOOK':'CONNECT'}</button>
+      <Hold key={'in-'+i} disabled={!line.connected} label="WINCH IN" onDown={recoveryPress(i,1)} onUp={recoveryPress(i,0)}/>
+      <Hold key={'out-'+i} disabled={!line.connected} label="PAY OUT" onDown={recoveryPress(i,-1)} onUp={recoveryPress(i,0)}/>
+     </div>
+     <div className="equipment-row all-both-row">
+      <Hold disabled={!both} label="WINCH BOTH" onDown={bothRecoveryPress(1)} onUp={bothRecoveryPress(0)}/>
+      <Hold disabled={!both} label="PAY BOTH" onDown={bothRecoveryPress(-1)} onUp={bothRecoveryPress(0)}/>
+     </div>
+     <div className="equipment-row">
+      <select className="action" aria-label={'Line '+letter+' attachment point'} disabled={line.connected} value={line.customPoint?'custom':line.point} onChange={e=>{if(!line.connected&&e.target.value!=='custom'){line.point=Number(e.target.value);line.customPoint=null;setNotice('Hook position: '+RECOVERY_POINTS[line.point].label);}}}>
+       {line.customPoint&&<option value="custom">CUSTOM HOOK</option>}{RECOVERY_POINTS.map((p,j)=><option key={p.id} value={j}>{p.label}</option>)}
+      </select>
+      <button type="button" className="action" disabled={line.connected} onClick={()=>startCustomHook(i)}>CUSTOM HOOK</button>
+     </div>
+     <div className="equipment-row">
+      <button type="button" className="action" disabled={line.connected} onClick={()=>changeRecoveryRedirect(i)} title={s.riggingAnchors[line.redirect].label}>{line.secondRedirect?'DOUBLE ROUTE':s.riggingAnchors[line.redirect].label}</button>
+      <button type="button" className="action" disabled={line.connected} onClick={()=>startAnchorPlacement(i)}>PLACE / MOVE {letter}</button>
+     </div>
+     <div className="equipment-row">
+      <button type="button" className={'action '+(line.doubled?'active':'')} disabled={line.connected} onClick={()=>toggleMovingBlock(i)}>{line.doubled?'2:1 BLOCK':'1:1 LINE'}</button>
+      {s.secondary.active?<button type="button" className="action" disabled={line.connected} onClick={()=>changeRecoveryTarget(i)}>TARGET {line.target+1}</button>:<button type="button" className="action" disabled={s.recoveryLines.some(l=>l.connected)} onClick={()=>{setActiveRecoveryLine(0);startDoubleAnchorSetup();}}>TWO-POINT A</button>}
+     </div>
+     <div className={'equipment-row '+(s.secondary.active?'three-controls':'')}>
+      {s.secondary.active&&<button type="button" className="action" disabled={s.recoveryLines.some(l=>l.connected)} onClick={()=>{setActiveRecoveryLine(0);startDoubleAnchorSetup();}}>2-POINT A</button>}
+      {[3,4].map((slot,j)=><button key={slot} type="button" className="action" disabled={!s.riggingAnchors[slot].pos||s.recoveryLines.some(l=>l.connected&&(l.redirect===slot||l.secondRedirect===slot))} onClick={()=>removePlacedAnchor(slot)}>REMOVE {j===0?'A':'B'}</button>)}
+     </div>
+    </>;
+  })()}
  </>}
  </div></div><div className="drive"><Hold label="REV" onDown={press('throttle',-.55)} onUp={press('throttle',0)}/><Hold label="BRAKE" onDown={press('brake',1)} onUp={press('brake',0)}/><Hold label="GAS" wide onDown={press('throttle',1)} onUp={press('throttle',0)}/></div></div>
   <div className={'camera-dock'+(cameraPanelOpen?' camera-open':'')}>
@@ -1037,6 +1038,6 @@ export default function TowingGame(){
   </div><select aria-label="Select test job" value={career.job%JOBS.length} onChange={e=>selectTestJob(Number(e.target.value))} style={{background:"#153c43",color:"#fff",border:"2px solid #f3c851",borderRadius:7,padding:"8px",fontWeight:800,maxWidth:190}}>{JOBS.map((job,index)=><option key={job.name} value={index}>{index+1}. {job.name}</option>)}</select><button onClick={()=>{setMenuOpen(false);reset();setNotice('Dispatch: '+JOBS[careerRef.current.job%JOBS.length].name);}}>RESTART JOB</button><button onClick={()=>{setMenuOpen(false);setGarage(v=>!v);setHelp(false);}}>FLEET / GARAGE</button><button onClick={()=>{setMenuOpen(false);reset();}}>RESET</button><button onClick={()=>{setMenuOpen(false);changeCamera('orbit');}}>RESET CAMERA</button><button onClick={()=>{setMenuOpen(false);setSettingsOpen(v=>!v);}}>SETTINGS</button><button aria-pressed={!settings.soundMuted} onClick={()=>{const muted=!settings.soundMuted;if(!muted)audioRef.current?.unlock();else audioRef.current?.silence();changeSetting('soundMuted',muted);}}>{settings.soundMuted?'SOUND OFF':'SOUND ON'}</button><button onClick={()=>{setMenuOpen(false);setHelp(v=>!v);}}>CONTROLS</button></div>}</div>
   {settingsOpen&&<aside className="help" style={{zIndex:30,maxWidth:310}}><button onClick={()=>setSettingsOpen(false)}>×</button><b>CONTROL SETTINGS</b>{[['steering','Driving sensitivity',0.4,1.6],['boom','Boom / hydraulic sensitivity',0.3,2],['winch','Winch speed',0.3,2]].map(([key,label,min,max])=><label key={key}>{label}: {settings[key].toFixed(1)}× <input type="range" min={min} max={max} step="0.1" value={settings[key]} onChange={e=>changeSetting(key,Number(e.target.value))}/></label>)}<label>Sound <input type="checkbox" checked={!settings.soundMuted} onChange={e=>{if(e.target.checked)audioRef.current?.unlock();else audioRef.current?.silence();changeSetting('soundMuted',!e.target.checked);}}/></label><label>Sound volume: {Math.round((settings.soundVolume??.7)*100)}% <input type="range" min="0" max="1" step="0.05" value={settings.soundVolume??.7} onChange={e=>changeSetting('soundVolume',Number(e.target.value))}/></label><label>Steering <select value={settings.driveMode} onChange={e=>changeSetting('driveMode',e.target.value)}><option value="joystick">Joystick</option><option value="arrows">Arrows</option></select></label><small>Saved on this device.</small></aside>}{notice&&<div className="game-notice" onClick={()=>setNotice('')}>{notice} ✕</div>}
   {garage&&<aside className="help garage"><button onClick={()=>setGarage(false)}>×</button><b>RECOVERY GARAGE</b><span>TEST MODE: All jobs and trucks unlocked. Choose any job from the bottom toolbar.</span><span>Balance: ${career.cash}</span><div className="fleet-list">{FLEET.map(t=><button key={t.id} className="garage-buy" onClick={()=>chooseTruck(t.id)}>{t.name} · {career.selected===t.id?'SELECTED':'TEST DRIVE'}</button>)}</div><button className="garage-buy" onClick={()=>upgrade('engine')}>ENGINE LV {career.engine}/3 · {'$'+(career.engine+1)*500}</button><button className="garage-buy" onClick={()=>upgrade('winch')}>WINCH LV {career.winch}/3 · {'$'+(career.winch+1)*500}</button><small>Progress saves on this device.</small></aside>}
-  {help&&<aside className="help instructions-panel" role="dialog" aria-label="Game instructions"><button type="button" className="instructions-close" onClick={()=>setHelp(false)} aria-label="Close instructions">×</button><button type="button" className="instructions-start" onClick={()=>setHelp(false)}>▶ START GAME</button><b>HOW TO OPERATE</b><span>Use the left joystick to steer. Reverse and gas are on the right. Release the gas to slow down; use PARK BRAKE to stop and secure the truck. Deploy the boom and parking brake before winching. The boom joystick appears directly above the equipment menu when either PARK BRAKE or RIGGERS is engaged and the truck is stopped. Winching heavy recoveries still requires both park brake and riggers. Park brake is required for capturing the tires and all heavy recovery operations; the light wheel lift can move at walking speed. Use CAM to cycle camera views or ANGLES for RAVINE, FREE, CHASE, REAR, FRONT, LEFT, RIGHT, TOP, HOOK and WIDE views. Drag to orbit; pinch to zoom any view. Drive within 24 m to hook the pickup. Light wheel-lift: tap LOWER WHEEL LIFT while moving slowly, reverse beneath the front tires until the status says TIRES ALIGNED, stop and apply PARK BRAKE, tap CLOSE L-ARMS, hold LIFT UP, tap FIT TIRE STRAPS, release brake and tow. Open WHEEL LIFT on the right to access these buttons. MENU opens separately at the top right. Flatbed: tilt bed, hook, secure load and deliver. Medium wrecker: fixed rear boom raises/lowers and telescopes but does not swing. Deploy the separate wheel lift, then hold LIFT UP/DOWN or its hydraulic joystick to raise/lower the tow bar. Only the heavy rotator can swing its boom with the riggers deployed. For a heavy rollover: deploy riggers and boom, connect LINE A and B to suitable simulated frame points, hold each independent winch (or use WINCH BOTH / PAY BOTH to operate them together) and watch the roll angle and tension. A connected idle line holds its length and can gain tension when another line pulls against it. Some jobs have two trucks; select TARGET VEHICLE 1 or 2 for each line and bring both upright into the recovery zone. Game forces are simplified and not real-world rigging instructions. Buy trucks in FLEET / GARAGE.</span><small>Keyboard: W/S drive & reverse · A/D steer · H hook · R winch</small></aside>}
+  {help&&<aside className="help instructions-panel" role="dialog" aria-label="Game instructions"><button type="button" className="instructions-close" onClick={()=>setHelp(false)} aria-label="Close instructions">×</button><button type="button" className="instructions-start" onClick={()=>setHelp(false)}>▶ START GAME</button><b>HOW TO OPERATE</b><span>Use the left joystick to steer. Reverse and gas are on the right. Release the gas to slow down; use PARK BRAKE to stop and secure the truck. Deploy the boom and parking brake before winching. The heavy boom joystick appears on the left side of the screen when either PARK BRAKE or RIGGERS is engaged and the truck is stopped. Winching heavy recoveries still requires both park brake and riggers. Park brake is required for capturing the tires and all heavy recovery operations; the light wheel lift can move at walking speed. Use CAM to cycle camera views or ANGLES for RAVINE, FREE, CHASE, REAR, FRONT, LEFT, RIGHT, TOP, HOOK and WIDE views. Drag to orbit; pinch to zoom any view. Drive within 24 m to hook the pickup. Light wheel-lift: tap LOWER WHEEL LIFT while moving slowly, reverse beneath the front tires until the status says TIRES ALIGNED, stop and apply PARK BRAKE, tap CLOSE L-ARMS, hold LIFT UP, tap FIT TIRE STRAPS, release brake and tow. Open WHEEL LIFT on the right to access these buttons. MENU opens separately at the top right. Flatbed: tilt bed, hook, secure load and deliver. Medium wrecker: fixed rear boom raises/lowers and telescopes but does not swing. Deploy the separate wheel lift, then hold LIFT UP/DOWN or its hydraulic joystick to raise/lower the tow bar. Only the heavy rotator can swing its boom with the riggers deployed. For a heavy rollover: deploy riggers and boom, connect LINE A and B to suitable simulated frame points, hold each independent winch (or use WINCH BOTH / PAY BOTH to operate them together) and watch the roll angle and tension. A connected idle line holds its length and can gain tension when another line pulls against it. Some jobs have two trucks; select TARGET VEHICLE 1 or 2 for each line and bring both upright into the recovery zone. Game forces are simplified and not real-world rigging instructions. Buy trucks in FLEET / GARAGE.</span><small>Keyboard: W/S drive & reverse · A/D steer · H hook · R winch</small></aside>}
  </main>;
 }
