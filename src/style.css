@@ -263,3 +263,61 @@
   pointer-events:none;
  }
 }
+
+
+/* Build .54: the OPTIONS board is centered and all actions fit without scrolling. */
+.game-shell.menu-active::before{
+ content:"";position:absolute;inset:0;z-index:25;
+ background:rgba(3,10,15,.82);pointer-events:auto;
+}
+.toolbar.menu-open{z-index:40}
+.toolbar.menu-open .menu-toggle{position:relative;z-index:2}
+.toolbar.menu-open .toolbar-panel{
+ position:fixed!important;
+ inset:calc(65px + env(safe-area-inset-top)) 12px calc(16px + env(safe-area-inset-bottom)) 12px!important;
+ width:auto!important;max-width:none!important;max-height:none!important;
+ height:auto!important;overflow:visible!important;
+ display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));
+ grid-auto-flow:row;grid-auto-rows:minmax(42px,1fr);
+ align-items:stretch;align-content:stretch;
+ column-gap:8px;row-gap:8px;
+ padding:12px!important;
+ background:rgba(9,27,36,.98);border:2px solid #f3c851;border-radius:14px;
+}
+.toolbar.menu-open .toolbar-panel .checkpoint-actions{display:contents}
+.toolbar.menu-open .toolbar-panel .checkpoint-caption{
+ grid-column:1 / -1;
+ font-size:12px;font-weight:800;display:flex;align-items:center;
+ padding:5px 10px;border:1px solid #527884;border-radius:8px;
+ background:rgba(26,54,65,.94);min-height:0;
+}
+.toolbar.menu-open .toolbar-panel button,
+.toolbar.menu-open .toolbar-panel select,
+.toolbar.menu-open .toolbar-panel .checkpoint-actions button{
+ position:static;width:100%!important;max-width:none!important;
+ min-width:0;min-height:0;height:100%;
+ padding:6px!important;margin:0;
+ font-size:clamp(9px,1.65vw,12px)!important;line-height:1.2;
+ white-space:normal;overflow-wrap:anywhere;
+ touch-action:manipulation;
+}
+.toolbar.menu-open .toolbar-panel select{font-weight:850}
+@media(max-height:540px) and (orientation:landscape){
+ .toolbar.menu-open .toolbar-panel{
+  inset:calc(48px + env(safe-area-inset-top)) 9px calc(9px + env(safe-area-inset-bottom)) 9px!important;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  grid-auto-rows:minmax(36px,1fr);
+  gap:6px;padding:8px!important;
+ }
+ .toolbar.menu-open .toolbar-panel .checkpoint-caption{
+  grid-column:1 / -1;font-size:11px;
+ }
+ .toolbar.menu-open .toolbar-panel button,
+ .toolbar.menu-open .toolbar-panel select,
+ .toolbar.menu-open .toolbar-panel .checkpoint-actions button{
+  font-size:clamp(9px,1.45vw,11px)!important;padding:4px!important;
+ }
+}
+@media(max-width:390px) and (orientation:portrait){
+ .toolbar.menu-open .toolbar-panel{inset:calc(65px + env(safe-area-inset-top)) 7px calc(9px + env(safe-area-inset-bottom)) 7px!important;gap:6px;padding:8px!important}
+}
