@@ -375,3 +375,85 @@ test('moving block survives save and resume; old saves default to single line',(
  restoreRecoverySave(fresh,saved,checkpointVector);assert.equal(fresh.recoveryLines[0].doubled,false);
  saved.lines[0].doubled='yes';assert.equal(parseRecoverySave(saved,7),null);
 });
+
+import {firingFrequency,makeSoundWave,soundState,createGameAudio} from './gameAudio.js';
+const soundFixture=()=>({type:{id:'rotator'},tools:['winch','boom','riggers'],vel:{x:0,z:0},pos:{x:0,z:0},yaw:0,throttle:0,
+ parkingBrake:false,riggersDeployed:false,boomDeployed:false,boomAngle:.36,boomExtension:0,boomSwing:0,liftHeight:0,liftExtension:0,
+ secondary:{active:false,roll:0},pickRoll:1.5,recoveryLines:[{connected:false,motor:0,tension:0,spool:20},{connected:false,motor:0,tension:0,spool:20}],
+ cableLength:14,tension:0});
+test('diesel firing frequency follows engine rpm and cylinder count',()=>{
+ assert.equal(firingFrequency(720,6),36);assert.equal(firingFrequency(1200,8),80);
+ const s=soundFixture(),idle=soundState(s,null,.03,{drag:.36});
+ s.throttle=1;s.vel.z=-9;const moving=soundState(s,idle.current,.03,{drag:.36});
+ assert.ok(moving.rpm>idle.rpm&&moving.engineLoad>idle.engineLoad);
+});
+test('winch sound responds to real reel motion and load while parked',()=>{
+ const s=soundFixture();s.parkingBrake=true;s.riggersDeployed=true;s.boomDeployed=true;s.recoveryLines[0].connected=true;
+ const idle=soundState(s,null,.03,{drag:.36});s.recoveryLines[0].motor=1;s.recoveryLines[0].spool-=.06;s.recoveryLines[0].tension=35000;
+ const moving=soundState(s,idle.current,.03,{drag:.36});
+ assert.ok(moving.winchOn&&moving.reelSpeed>1&&moving.load>.8&&moving.rpm>idle.rpm);
+ s.recoveryLines[0].stalled=true;s.recoveryLines[0].tension=42000;
+ const stall=soundState(s,moving.current,.03,{drag:.36});
+ assert.ok(stall.stalled&&stall.events.includes('strain')&&stall.reelSpeed===0);
+});
+test('hydraulic noise requires actual equipment motion and parking brake produces air event',()=>{
+ const s=soundFixture();const before=soundState(s,null,.03,{drag:.36});
+ s.parkingBrake=true;s.boomDeployed=true;s.boomAngle+=.02;
+ const moving=soundState(s,before.current,.03,{drag:.36});
+ assert.ok(moving.hydraulic>0&&moving.events.includes('air'));
+ assert.equal(soundState(s,moving.current,.03,{drag:.36}).hydraulic,0);
+});
+test('terrain, reversing and metal engagement trigger appropriate audio state',()=>{
+ const s=soundFixture();const initial=soundState(s,null,.03,{drag:.36});
+ s.throttle=-.55;s.vel.z=2;s.recoveryLines[0].connected=true;
+ const state=soundState(s,initial.current,.03,{name:'MUD',drag:1.8});
+ assert.ok(state.reverse&&state.wet&&state.rough>initial.rough&&state.events.includes('metal'));
+ assert.equal(soundState(s,state.current,.03,{drag:.36}).events.length,0);
+});
+test('a resumed or replaced simulation does not produce spurious hydraulic or engagement sounds',()=>{
+ const s=soundFixture();const old=soundState(s,null,.03,{drag:.36});const replacement=soundFixture();
+ replacement.riggersDeployed=true;replacement.boomAngle=.9;
+ const next=soundState(replacement,old.current,.03,{drag:.36});
+ assert.equal(next.hydraulic,0);assert.deepEqual(next.events,[]);
+});
+test('original sound waveforms are finite, bounded and deterministic',()=>{
+ for(const name of ['diesel','noise','gravel','metal','heavy','air','strain']){
+  const a=makeSoundWave(name,8000,.5),b=makeSoundWave(name,8000,.5);
+  assert.equal(a.length,4000);assert.deepEqual(a,b);
+  assert.ok(a.every(v=>Number.isFinite(v)&&Math.abs(v)<=1));
+  assert.ok(a.some(v=>Math.abs(v)>.1));
+  assert.ok(Math.abs(a[0])<1e-9);assert.ok(Math.abs(a.at(-1))<1e-9);
+ }
+});
+test('audio controller safely handles environments without Web Audio',()=>{
+ const audio=createGameAudio();audio.unlock();audio.update(soundFixture(),.04,{drag:.36},.7,false,false);
+ audio.silence();audio.close();audio.close();
+});
+
+test('audio graph initializes on unlock, mutes smoothly and closes its context',()=>{
+ const prev=globalThis.AudioContext;
+ let created=0,closed=0,starts=0;const params=[];
+ const param=()=>({value:0,setTargetAtTime(v){assert.ok(Number.isFinite(v));this.value=v;}});
+ const node=()=>({gain:param(),frequency:param(),Q:param(),playbackRate:param(),threshold:param(),knee:param(),ratio:param(),connect(){},disconnect(){},start(){starts++;},stop(){}});
+ class FakeAudio {
+  constructor(){created++;this.state='suspended';this.sampleRate=8000;this.currentTime=0;this.destination=node();}
+  createGain(){const n=node();params.push(n.gain);return n;}
+  createDynamicsCompressor(){return node();}
+  createBiquadFilter(){return node();}
+  createBufferSource(){return node();}
+  createOscillator(){return node();}
+  createBuffer(ch,n){const data=new Float32Array(n);return {getChannelData(){return data;}};}
+  resume(){this.state='running';return Promise.resolve();}
+  close(){closed++;this.state='closed';return Promise.resolve();}
+ }
+ globalThis.AudioContext=FakeAudio;
+ try{
+  const a=createGameAudio(),s=soundFixture();
+  a.update(s,.04,{drag:.36},.7,false,false);assert.equal(created,0);
+  a.unlock();assert.equal(created,1);assert.ok(starts>=10);
+  a.update(s,.04,{drag:.36},.7,false,false);assert.ok(params[0].value>0);
+  a.update(s,.04,{drag:.36},.7,true,false);assert.equal(params[0].value,0);
+  a.update(s,.04,{drag:.36},.7,false,true);assert.equal(params[0].value,0);
+  a.close();assert.equal(closed,1);
+ }finally{if(prev===undefined)delete globalThis.AudioContext;else globalThis.AudioContext=prev;}
+});
