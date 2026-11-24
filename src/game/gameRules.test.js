@@ -663,3 +663,34 @@ test('manual hydraulic positions survive a checkpoint and old bed saves migrate'
  restoreRecoverySave(fresh,snap,checkpointVector);assert.equal(fresh.bedSlide,1);assert.equal(fresh.bedProgress,.42);assert.equal(fresh.bedTiltControl,0);
  delete snap.equipment.bedSlide;delete snap.equipment.bedProgress;restoreRecoverySave(fresh,snap,checkpointVector);assert.equal(fresh.bedProgress,1);
 });
+
+import {rollbackCreepReady,rollbackBedContact,rollbackBedMotionBlocked,rollbackDamage,rollbackNetPay,ROLLBACK_CREEP_SPEED} from './rollbackPhysics.js';
+test('empty disconnected ramp permits low-speed clearance but not with a load or cable',()=>{
+ assert.ok(rollbackCreepReady(1,1,false,false,false));
+ for(const state of [[0,0,false,false,false],[1,1,true,true,false],[1,1,false,false,true],[1,0,false,true,false]])assert.equal(rollbackCreepReady(...state),false);
+ assert.ok(ROLLBACK_CREEP_SPEED*3.6<=4);
+});
+test('raising ramp into front overhang is blocked; forward clearance permits stow',()=>{
+ const down=rollbackDeck(1,1),scale=.92,z=rollbackGroundLimit(down,scale)+1;
+ assert.equal(rollbackBedContact(down,0,z,0,scale),0);
+ let blocked=false;
+ for(let i=1;i<=100;i++){
+  const before=rollbackDeck(1,1-(i-1)/100),after=rollbackDeck(1,1-i/100);
+  if(rollbackBedMotionBlocked(before,after,0,z,0,scale)){blocked=true;break;}
+ }
+ assert.ok(blocked);
+ for(let i=1;i<=100;i++)assert.equal(rollbackBedMotionBlocked(rollbackDeck(1,1-(i-1)/100),rollbackDeck(1,1-i/100),0,z+2,0,scale),false);
+ assert.equal(rollbackBedContact(rollbackDeck(1,0),4,z,0,scale),0);
+});
+test('ramp contact handles yaw and reverse-loaded vehicle footprints',()=>{
+ const down=rollbackDeck(1,1),up=rollbackDeck(1,0),scale=.92;
+ assert.ok(rollbackBedContact(up,0,down.rearZ+1.5,Math.PI,scale)>0);
+ assert.equal(rollbackBedContact(up,0,down.rearZ+6,.4,scale),0);
+});
+test('damage costs are capped at payout and preserved in recovery checkpoints',()=>{
+ assert.equal(rollbackDamage(0,750),75);assert.equal(rollbackDamage(725,750),750);
+ assert.equal(rollbackNetPay(750,75),675);assert.equal(rollbackNetPay(750,900),0);
+ const f=checkpointFixture();f.recoveryDamage=150;const snap=captureRecoverySave({job:4},f),fresh=checkpointFixture();
+ restoreRecoverySave(fresh,snap,checkpointVector);assert.equal(fresh.recoveryDamage,150);
+ delete snap.equipment.recoveryDamage;restoreRecoverySave(fresh,snap,checkpointVector);assert.equal(fresh.recoveryDamage,0);
+});

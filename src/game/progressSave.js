@@ -13,7 +13,7 @@ export function captureRecoverySave(career,s){
  secondary:{pos:vec(s.secondary.pos),yaw:s.secondary.yaw,roll:s.secondary.roll,active:s.secondary.active},
  equipment:Object.fromEntries(['parkingBrake','riggersDeployed','boomDeployed','boomAngle','boomSwing','boomExtension',
  'liftDeployed','liftHeight','liftExtension','gridWidth','armsClosed','loaded','strapsOn','bedTilt','bedSlide','bedProgress','hook',
- 'hookPoint','hookRedirect','cableLength','rollbackLoadX','rollbackLoadYaw','rollbackLoadZ','autoLoad','autoUnload','dropoffArrived','dropoffComplete','winchSpeed']
+ 'hookPoint','hookRedirect','cableLength','rollbackLoadX','rollbackLoadYaw','rollbackLoadZ','recoveryDamage','autoLoad','autoUnload','dropoffArrived','dropoffComplete','winchSpeed']
  .map(k=>[k,s[k]])),
  anchors:s.riggingAnchors.slice(3,5).map(a=>vec(a.pos)),
  lines:s.recoveryLines.map(l=>({connected:l.connected,point:l.point,customPoint:l.customPoint?{...l.customPoint}:null,
@@ -59,6 +59,7 @@ export function restoreRecoverySave(s,saved,V){
   Object.assign(s.recoveryLines[i],saved.lines[i],{doubled:!!saved.lines[i].doubled,motor:0,tension:0,strain:0,stalled:false,previousDistance:null});
  }
  for(const [key,min,max] of [['rollbackLoadX',-.27,.27],['rollbackLoadYaw',-.15,.15],['rollbackLoadZ',0,.18]])s[key]=validNum(saved.equipment[key])?Math.max(min,Math.min(max,saved.equipment[key])):0;
+ s.recoveryDamage=validNum(saved.equipment.recoveryDamage)?Math.max(0,Math.min(750,saved.equipment.recoveryDamage)):0;s.bedContactLatch=false;
  s.hookPoint=index(s.hookPoint,9)?s.hookPoint:0;
  s.hookRedirect=index(s.hookRedirect,4)?s.hookRedirect:0;
  s.winch=false;s.winchOut=false;s.throttle=0;s.brake=0;s.steer=0;s.tension=0;s.previousCableDistance=null;s.cableStrain=0;s.cableStalled=false;

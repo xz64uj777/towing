@@ -62,3 +62,30 @@ export function rollbackTieDownPath(x,y,z,scale){
  points.push({x,y:.125,z:limit(z+r+.30)});
  return points;
 }
+
+// Empty, disconnected deck permits slow, straight forward movement.
+export const ROLLBACK_CREEP_SPEED=1.1;
+export const rollbackCreepReady=(slide,tilt,loaded,strapped,hook)=>!rollbackStowed(slide,tilt)&&!loaded&&!strapped&&!hook;
+// Conservative collision proxy: rotated body and four tires against the deck
+// footprint clipped at the bottom height of each component.
+export function rollbackBedContact(deck,x,z,yaw,scale){
+ const c=Math.cos(yaw),s=Math.sin(yaw),parts=[{x:0,z:-.46,w:1.04,l:2.84,bottom:.74}];
+ for(const side of [-1,1])for(const axle of [-1.55,1.55])parts.push({x:side*1.06,z:axle,w:.17,l:.33,bottom:.12});
+ let penetration=0;
+ for(const part of parts){
+  const low=part.bottom*scale;
+  if(deck.frontY<=low)continue;
+  const end=deck.rearY>=low?deck.rearZ:deck.frontZ+(deck.rearZ-deck.frontZ)*(deck.frontY-low)/(deck.frontY-deck.rearY);
+  const hz=(end-deck.frontZ)/2,hx=1.275;
+  if(hz<=0)continue;
+  const dx=x+scale*(part.x*c-part.z*s),dz=z+scale*(part.x*s+part.z*c)-(deck.frontZ+end)/2,w=part.w*scale,l=part.l*scale;
+  penetration=Math.max(penetration,Math.min(hx+w*Math.abs(c)+l*Math.abs(s)-Math.abs(dx),hz+w*Math.abs(s)+l*Math.abs(c)-Math.abs(dz),w+hx*Math.abs(c)+hz*Math.abs(s)-Math.abs(dx*c+dz*s),l+hx*Math.abs(s)+hz*Math.abs(c)-Math.abs(-dx*s+dz*c)));
+ }
+ return penetration;
+}
+export function rollbackBedMotionBlocked(before,after,x,z,yaw,scale){
+ const a=rollbackBedContact(before,x,z,yaw,scale),b=rollbackBedContact(after,x,z,yaw,scale);
+ return b>1e-6&&b>=a-1e-6;
+}
+export const rollbackDamage=(damage,pay)=>Math.min(Math.max(0,pay),Math.max(0,damage)+75);
+export const rollbackNetPay=(pay,damage)=>Math.max(0,pay-Math.max(0,damage));
