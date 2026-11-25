@@ -859,7 +859,7 @@ test('pre-redesign lake and late job saves restart safely while early saves rema
  assert.equal(captureRecoverySave({job:4},checkpointFixture()).siteRevision,SITE_REVISION);
 });
 
-import {rollHull,modelRollHull,rollContactOffset} from './rollContact.js';
+import {rollHull,modelRollHull,rollContactOffset,recoveryRollStep} from './rollContact.js';
 test('roll support places tires, side and roof above the contact plane',()=>{
  const hull=rollHull([{x:-1,y:.15},{x:1,y:.15},{x:-1,y:2.5},{x:1,y:2.5},{x:0,y:1}]);
  for(let i=0;i<=180;i++){const a=i*Math.PI/180,offset=rollContactOffset(hull,a),bottom=Math.min(...hull.map(p=>offset+p.x*Math.sin(a)+p.y*Math.cos(a)));assert.ok(Math.abs(bottom-.008)<1e-8);}
@@ -895,4 +895,26 @@ test('quarry is a separate dry site and older seven-job careers retain dispatch 
  assert.equal(migrateJobIndex(13,7,8),14);assert.equal(migrateJobIndex(7,7,8),8);
  assert.equal(migrateJobIndex(7,8,8),7);
  const scene=new THREE.Scene();const site=createDispatchSite(THREE,scene,7);assert.ok(site.ground);assert.ok(scene.getObjectByName('quarry aggregate pile'));
+});
+
+test('slack recovery lines let a tilted truck settle onto its tires or side',()=>{
+ const hull=rollHull([{x:-1,y:0},{x:1,y:0},{x:-1,y:2.6},{x:1,y:2.6}]);
+ const settle=start=>{
+  let state={roll:start,velocity:0};
+  for(let i=0;i<2400;i++)state=recoveryRollStep(hull,state.roll,state.velocity,0,1/120);
+  return state;
+ };
+ const upright=settle(13*Math.PI/180);
+ const side=settle(1.2);
+ assert.ok(upright.roll<.01,JSON.stringify(upright));
+ assert.ok(Math.abs(side.roll-Math.PI/2)<.01,JSON.stringify(side));
+ const roof=settle(2.66);
+ assert.ok(Math.abs(roof.roll-Math.PI)<.01,JSON.stringify(roof));
+});
+
+test('sustained cable torque can pull a resting recovery truck off its side',()=>{
+ const hull=rollHull([{x:-1,y:0},{x:1,y:0},{x:-1,y:2.6},{x:1,y:2.6}]);
+ let state={roll:Math.PI/2,velocity:0};
+ for(let i=0;i<480;i++)state=recoveryRollStep(hull,state.roll,state.velocity,-.65,1/120);
+ assert.ok(state.roll<1,JSON.stringify(state));
 });
