@@ -223,7 +223,7 @@ export default function TowingGame(){
  const [automaticCheckpoint]=useState(()=>{
   try{
    const checkpoint=parseRecoverySave(localStorage.getItem(AUTO_RECOVERY_SAVE_KEY),JOBS.length);
-   return checkpoint?.jobIndex===career.job%JOBS.length&&checkpoint.career.selected===career.selected&&
+   return checkpoint?.jobIndex===career.job&&checkpoint.career.selected===career.selected&&
     checkpointSiteCompatible(checkpoint,JOBS.length)?checkpoint:null;
   }catch{return null;}
  });
@@ -248,7 +248,7 @@ export default function TowingGame(){
  useEffect(()=>{
   const save=()=>{
    const game=sim.current,activeCareer=careerRef.current;
-   if(!game||game.jobDone||game.siteFailed||game.jobIndex!==activeCareer.job%JOBS.length||game.type.id!==activeCareer.selected)return;
+   if(!game||game.jobDone||game.siteFailed||game.jobIndex!==activeCareer.job||game.type.id!==activeCareer.selected)return;
    try{
     localStorage.setItem(AUTO_RECOVERY_SAVE_KEY,JSON.stringify(captureRecoverySave(activeCareer,game)));
    }catch{}
