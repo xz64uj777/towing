@@ -489,7 +489,8 @@
 }
 .bottom-ui .equipment-stack.single-line-stack .boom-control-cluster{display:flex;flex-direction:column;gap:3px}
 .bottom-ui .equipment-stack.single-line-stack .boom-status{font-size:8px;padding:0}
-.bottom-ui .equipment-stack.single-line-stack .boom-control-cluster>.action{width:100%;min-height:24px;font-size:8px;padding:2px}
+.boom-extension{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;width:100%}
+.boom-extension>.control{min-width:0;height:34px;padding:0 1px;font-size:8px;letter-spacing:0;background:#254f64;border-color:#88bfd0}
 .bottom-ui .equipment-stack.single-line-stack .boom-joystick{width:86px;height:86px}
 .bottom-ui .equipment-stack.single-line-stack .boom-knob{width:26px;height:26px}
 .game-shell .game-minimap.map-collapsed{left:8px!important;bottom:calc(195px + env(safe-area-inset-bottom))!important;width:72px!important;height:28px!important;padding:3px!important}
@@ -544,7 +545,8 @@
  .bottom-ui .equipment-stack.single-line-stack .boom-control-cluster{display:grid;grid-template-columns:minmax(0,1fr) 70px;grid-template-rows:auto auto;gap:3px}
  .bottom-ui .equipment-stack.single-line-stack .boom-joystick{grid-column:2;grid-row:1 / span 2}
  .bottom-ui .equipment-stack.single-line-stack .boom-status{grid-column:1;grid-row:1}
- .bottom-ui .equipment-stack.single-line-stack .boom-control-cluster>.action{grid-column:1;grid-row:2;min-height:24px}
+ .bottom-ui .equipment-stack.single-line-stack .boom-extension{grid-column:1;grid-row:2;grid-template-columns:1fr}
+ .boom-extension>.control{height:28px}
 }
 
 /* Build .65: compact natural-height menus, never stretch buttons to fill the screen. */
