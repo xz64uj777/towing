@@ -23,3 +23,33 @@ export function rollContactOffset(hull,roll){
  let bottom=Infinity;for(const p of hull)bottom=Math.min(bottom,p.x*s+p.y*c);
  return -bottom+.008;
 }
+
+// The supported center of mass rises as the body rolls toward an edge.
+// Its height gradient gives gravity's direction even when both winches are slack.
+export function recoveryRollStep(hull,roll,velocity,cableAcceleration,seconds){
+ let acceleration=cableAcceleration;
+ if(hull?.length){
+  let bottom=Infinity,top=-Infinity,halfWidth=0;
+  for(const point of hull){
+   bottom=Math.min(bottom,point.y);
+   top=Math.max(top,point.y);
+   halfWidth=Math.max(halfWidth,Math.abs(point.x));
+  }
+  const centerY=bottom+(top-bottom)*.42;
+  const supportedHeight=angle=>rollContactOffset(hull,angle)+centerY*Math.cos(angle);
+  const probe=.002,height=supportedHeight(roll);
+  // Tune angular acceleration separately from cable loads for the arcade simulation.
+  const gravity=.28/Math.max(halfWidth,top-centerY,.1);
+  const left=cableAcceleration-gravity*(height-supportedHeight(roll-probe))/probe;
+  const right=cableAcceleration-gravity*(supportedHeight(roll+probe)-height)/probe;
+  if(Math.abs(velocity)<.015){
+   if(left>=0&&right<=0)return {roll,velocity:0};
+   acceleration=(left+right)/2>=0?right:left;
+  }else{
+   acceleration=velocity>0?right:left;
+  }
+ }
+ const nextVelocity=Math.max(-1.5,Math.min(1.5,(velocity+acceleration*seconds)*Math.exp(-1.7*seconds)));
+ const nextRoll=Math.max(0,Math.min(Math.PI,roll+nextVelocity*seconds));
+ return {roll:nextRoll,velocity:nextRoll===0||nextRoll===Math.PI?0:nextVelocity};
+}
