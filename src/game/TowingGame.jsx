@@ -1,3 +1,4 @@
+import {resolveVehicleContact} from './vehicleContact.js';
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import {levelFourHeight,levelFourSlope,levelFourDownhillAcceleration,LEVEL_FOUR_STAGING} from './levelFourTerrain.js';
@@ -113,6 +114,8 @@ function makeVehicle(scene,{name,color,pos,scale=1,kind='pickup'}) {
     for(let k=0;k<6;k++){const a=k*Math.PI/3,bolt=new THREE.Mesh(boltGeo,boltMat);bolt.position.set(Math.cos(a)*.17*scale,outer*.17*scale,Math.sin(a)*.17*scale);tire.add(bolt);}
     for(const y of [-.105,.105]){const groove=new THREE.Mesh(new THREE.TorusGeometry(.473*scale,.010*scale,5,28),new THREE.MeshStandardMaterial({color:0x0a0c0d,roughness:1}));groove.rotation.x=Math.PI/2;groove.position.y=y*scale;tire.add(groove);}
   }
+  const collisionBounds=new THREE.Box3().setFromObject(root).translate(pos.clone().negate());
+
   const forks=[],outriggers=[],supportPads=[],boomCylinders=[],liftCylinders=[];
   let recoveryStructure=null,boomPivot=null,boomTilt=null,boomSleeve=null,boomTip=null;
   let underliftPivot=null,underliftInner=null,underliftHead=null,liftCross=null;
@@ -201,7 +204,7 @@ function makeVehicle(scene,{name,color,pos,scale=1,kind='pickup'}) {
       }
     }
   }
-  root.userData={body,wheels,tireBands,deckTies,scale,towPitchPivot,bed,straps,recoveryStructure,boomPivot,boomTilt,boomSleeve,boomTip,boomCylinders,underliftPivot,underliftInner,underliftHead,liftCross,liftCylinders,forks,outriggers,supportPads};
+  root.userData={body,wheels,collisionBounds,tireBands,deckTies,scale,towPitchPivot,bed,straps,recoveryStructure,boomPivot,boomTilt,boomSleeve,boomTip,boomCylinders,underliftPivot,underliftInner,underliftHead,liftCross,liftCylinders,forks,outriggers,supportPads};
   return root;
 }
 
@@ -709,6 +712,51 @@ export default function TowingGame(){
         }
         s.pickPos.y=terrainHeight(s.pickPos.x,s.pickPos.z);
       }
+    }
+    // The lift and ramp own contact while a target is attached or being guided.
+    const truckContact={pos:s.pos,vel:s.vel,yaw:s.yaw,bounds:equip.collisionBounds,weight:parked?0:.5};
+    const pickupContact={pos:s.pickPos,vel:s.pickVel,yaw:s.pickYaw,bounds:s.pickup.userData.collisionBounds,weight:1};
+    if(s.type.id==='rotator'){
+      pickupContact.roll=s.pickRoll;
+      pickupContact.lift=rollContactOffset(s.pickup.userData.rollHull,s.pickRoll);
+    }
+    let truckMoved=false,pickupMoved=false,secondaryMoved=false;
+    if(!s.loaded&&!(isRollback&&s.hook)){
+      const local=s.liftDeployed?rollbackLocal(s):null;
+      if(local&&local.z>2.4&&Math.abs(local.x)<.85&&Math.cos(s.pickYaw-s.yaw)>.96){
+        // Let an aligned bumper overhang the forks while the tires enter the grid.
+        truckContact.rear=Math.min(equip.collisionBounds.max.z,2);
+      }
+      truckMoved=pickupMoved=resolveVehicleContact(truckContact,pickupContact);
+      delete truckContact.rear;
+    }
+    if(s.secondary.active){
+      const secondary=s.secondary;
+      const secondContact={pos:secondary.pos,vel:secondary.vel,yaw:secondary.yaw,roll:secondary.roll,
+        lift:rollContactOffset(secondary.contactHull,secondary.roll),bounds:secondary.mesh.userData.collisionBounds,weight:1};
+      if(resolveVehicleContact(truckContact,secondContact))truckMoved=secondaryMoved=true;
+      if(resolveVehicleContact(pickupContact,secondContact))pickupMoved=secondaryMoved=true;
+    }
+    if(s.tandemHelper){
+      const helper=s.tandemHelper;
+      const parkedContact={pos:helper.position,vel:{x:0,z:0},yaw:TANDEM_HELPER.yaw,bounds:helper.userData.collisionBounds,weight:0};
+      if(resolveVehicleContact(truckContact,parkedContact))truckMoved=true;
+      if(resolveVehicleContact(pickupContact,parkedContact))pickupMoved=true;
+    }
+    if(truckMoved){
+      if(site)constrainSiteTruck(levelIndex,s.pos,s.vel);
+      s.pos.y=levelFour?terrainHeight(s.pos.x,s.pos.z):0;
+      s.truck.position.copy(s.pos);
+    }
+    if(pickupMoved){
+      if(levelFour)s.pickPos.y=terrainHeight(s.pickPos.x,s.pickPos.z);
+      else if(isDitchPull(s))s.pickPos.y=ditchContactPose(s.pickPos.x,s.pickPos.z,s.pickYaw,s.pickup.userData.scale).height;
+    }
+    if(secondaryMoved){
+      const secondary=s.secondary;
+      if(levelFour)secondary.pos.y=terrainHeight(secondary.pos.x,secondary.pos.z);
+      secondary.mesh.position.copy(secondary.pos);
+      secondary.mesh.position.y+=rollContactOffset(secondary.contactHull,secondary.roll);
     }
     if(site?.kind==='bridge'&&!s.siteFailed&&(bridgeEdgeExceeded(s.pickPos.x,s.pickPos.z)||(s.secondary.active&&bridgeEdgeExceeded(s.secondary.pos.x,s.secondary.pos.z)))){s.siteFailed=true;s.pickVel.set(0,0,0);s.secondary.vel.set(0,0,0);for(const l of s.recoveryLines){l.connected=false;l.motor=0;l.tension=0;}setNotice('RECOVERY FAILED: Vehicle crossed the bridge edge. MENU → RESTART JOB.');}
     // Heading comes from cable moments; terrain and drag affect translation.
