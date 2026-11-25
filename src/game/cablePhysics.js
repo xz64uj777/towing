@@ -39,6 +39,15 @@ export function cableReelStep(spool,motor,baseSpeed,seconds,tension,limit,min=3,
   Math.min(Math.max(max,spool),spool+baseSpeed*factor*seconds);
 }
 
+// The parked drum holds its spool length with no motor command.
+export function standardWinchStep({distance,spool,pathSpeed,hold,motor,speed,seconds,min}){
+ const limit=32000;
+ if(!hold)return {spool:Math.max(spool,distance),tension:0,strain:0,stalled:false};
+ const prior=cableLoad(distance,spool,pathSpeed,limit);
+ const nextSpool=cableReelStep(spool,motor,speed,seconds,prior.tension,limit,min);
+ return {spool:nextSpool,...cableLoad(distance,nextSpool,pathSpeed,limit)};
+}
+
 // Render-only sag. All redirects remain exact vertices; cable force and
 // spool calculations still use the straight segmented route.
 export function cableRenderPoints(points,spool,tension,ground=()=>-Infinity,segments=8){

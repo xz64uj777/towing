@@ -623,7 +623,28 @@ test('closing or opening L-arms requires stationary parked truck',()=>{
  assert.equal(wheelLiftLockReady({speed:0,parkingBrake:true}),true);
 });
 
-import {wheelLiftStrapReady} from './gameRules.js';
+import {standardWinchStep} from './cablePhysics.js';
+
+test('a parked standard winch holds tension until the drum pays out',()=>{
+ const line={distance:12,spool:11,pathSpeed:0,hold:true,motor:0,speed:2,seconds:.1,min:3};
+ const holding=standardWinchStep(line);
+ assert.equal(holding.spool,11);
+ assert.ok(holding.tension>0);
+ const payout=standardWinchStep({...line,motor:-1});
+ assert.ok(payout.spool>11&&payout.tension<holding.tension);
+ assert.deepEqual(standardWinchStep({...line,hold:false}),{spool:12,tension:0,strain:0,stalled:false});
+});
+
+import {wheelLiftStrapReady,wheelLiftTransportReady} from './gameRules.js';
+
+test('wheel-lift transport requires a raised and strapped captured axle',()=>{
+ const captured={loaded:true,armsClosed:true,strapped:true,height:.7};
+ assert.equal(wheelLiftTransportReady({loaded:false}),true);
+ assert.equal(wheelLiftTransportReady(captured),true);
+ for(const change of [{armsClosed:false},{strapped:false},{height:.44}])
+  assert.equal(wheelLiftTransportReady({...captured,...change}),false);
+});
+
 test('wheel-lift straps require captured tires, raised lift, and stationary parked truck',()=>{
  const ready={hasLift:true,deployed:true,loaded:true,armsClosed:true,height:.7,speed:0,parkingBrake:true};
  assert.equal(wheelLiftStrapReady(ready),true);
