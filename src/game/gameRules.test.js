@@ -896,3 +896,25 @@ test('quarry is a separate dry site and older seven-job careers retain dispatch 
  assert.equal(migrateJobIndex(7,8,8),7);
  const scene=new THREE.Scene();const site=createDispatchSite(THREE,scene,7);assert.ok(site.ground);assert.ok(scene.getObjectByName('quarry aggregate pile'));
 });
+
+import {resolveVehicleContact} from './vehicleContact.js';
+
+const contactTruck=(x,z,{yaw=0,y=0,vx=0,vz=0,weight=1}={})=>({
+ pos:{x,y,z},vel:{x:vx,z:vz},yaw,weight,
+ bounds:{min:{x:-1,y:0,z:-2},max:{x:1,y:2,z:2}},
+});
+
+test('vehicle contact stops closing motion against a parked truck without moving it',()=>{
+ const truck=contactTruck(0,0,{vz:-4,vx:2});
+ const parked=contactTruck(0,-3.5,{weight:0});
+ assert.equal(resolveVehicleContact(truck,parked),true);
+ assert.deepEqual(truck.vel,{x:2,z:0});
+ assert.ok(truck.pos.z>=.5);
+ assert.deepEqual(parked.pos,{x:0,y:0,z:-3.5});
+});
+
+test('vehicle contact respects heading and separates vehicles on different elevations',()=>{
+ assert.equal(resolveVehicleContact(contactTruck(0,0),contactTruck(0,0,{y:3})),false);
+ assert.equal(resolveVehicleContact(contactTruck(0,0),contactTruck(0,-3.2)),true);
+ assert.equal(resolveVehicleContact(contactTruck(0,0,{yaw:Math.PI/2}),contactTruck(0,-3.2)),false);
+});
