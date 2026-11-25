@@ -6,7 +6,7 @@ Run your own towing and recovery operation in a mobile-first 3D simulator. Start
 
 Position your truck, operate the hydraulics, rig the recovery, watch cable tension and stability, and finish the dispatch to earn your payout. This is a hands-on equipment simulator: loading, securement, unloading and stowing matter as much as driving.
 
-**Current game: Build .81 — Tandem Practice.** The browser version includes eight dispatches, four playable trucks, career earnings and upgrades, touch and keyboard controls, and local progress saves. Development is ongoing, with gameplay feedback from the owner's hands-on testing.
+**Current game: Build .82 — Independent Tandem Trucks.** The browser version includes eight dispatches, four playable trucks, career earnings and upgrades, touch and keyboard controls, and local progress saves. Development is ongoing, with gameplay feedback from the owner's hands-on testing.
 
 ## Career and dispatches
 
@@ -23,11 +23,11 @@ During development, **all jobs and trucks are available in test mode**. You can 
 | 5 | [Lakeside Vehicle Recovery](https://xz64uj777.github.io/towing/?level=5) | Heavy Rotator | $3,400 |
 | 6 | [Winter Freight Terminal](https://xz64uj777.github.io/towing/?level=6) | Heavy Rotator | $4,200 |
 | 7 | [Highway Bridge Rescue](https://xz64uj777.github.io/towing/?level=7) | Heavy Rotator | $5,800 |
-| 8 | [Quarry Tandem Practice](https://xz64uj777.github.io/towing/?level=8) | Heavy Rotator + parked Medium Wrecker | $4,800 |
+| 8 | [Quarry Tandem Practice](https://xz64uj777.github.io/towing/?level=8) | Heavy Rotator + Medium Wrecker | $4,800 |
 
 Levels 4–7 now take place in a wooded ravine, a muddy lakeshore, a snowy freight terminal with ice, packed snow and cargo obstacles, and an elevated highway bridge over a river. Overturned vehicles now rest on their actual model envelope instead of a fixed height. The bridge has separate recovery bays for both casualties and an edge-failure rule. Old in-progress saves for redesigned dispatches restart the site while retaining career data.
 
-The quarry introduces tandem control: one winch per truck, switching operator tabs while the inactive cable holds its spool length. The medium support truck is staged and parked; independent driving of both trucks is a later upgrade. Both winches must take load before the exercise completes.
+The quarry introduces tandem control: one winch per truck, switching operator tabs while the inactive cable holds its spool length. Both trucks can be driven independently and have their own parking brake and boom controls. Stop before switching; the inactive truck is parked automatically. Disconnect only the selected truck's cable before repositioning it. The medium has a fixed boom (raise/lower and telescope, no swing). Both trucks' positions and boom setups are saved. Both winches must take load before the exercise completes.
 
 Direct dispatch links select that job in your local career. Use the main play link to continue normally. Progress and control settings are stored in your browser on the current device. MENU also offers **SAVE IN-PROGRESS** and **RESUME SAVED JOB** for interrupted recoveries.
 

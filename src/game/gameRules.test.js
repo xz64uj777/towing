@@ -896,3 +896,28 @@ test('quarry is a separate dry site and older seven-job careers retain dispatch 
  assert.equal(migrateJobIndex(7,8,8),7);
  const scene=new THREE.Scene();const site=createDispatchSite(THREE,scene,7);assert.ok(site.ground);assert.ok(scene.getObjectByName('quarry aggregate pile'));
 });
+
+import {controlledTruck,lineOwner,ownerHasCable,linePowerReady,makeHelperState,stepHelper,tandemContactBlocked} from './tandemRecovery.js';
+import {steeringStep as tandemSteering,brakeStep as tandemBrake} from './drivingPhysics.js';
+test('tandem control routes brakes and winches to the owning truck',()=>{
+ const a=makeHelperState((x,y,z)=>new THREE.Vector3(x,y,z)),s={tandemHelper:{},helperState:a,tandemSelected:0,parkingBrake:false,boomDeployed:false,riggersDeployed:false,vel:new THREE.Vector3(),recoveryLines:[{connected:false,motor:0},{connected:true,motor:1,spool:12}]};
+ assert.equal(lineOwner(s,1),a);assert.equal(linePowerReady(s,0),false);assert.equal(linePowerReady(s,1),true);assert.equal(ownerHasCable(s,0),false);assert.equal(ownerHasCable(s,1),true);
+ assert.equal(switchTandemControl(s,1),true);assert.equal(controlledTruck(s),a);assert.equal(s.parkingBrake,true);assert.equal(s.recoveryLines[1].spool,12);
+ a.vel.x=1;assert.equal(switchTandemControl(s,0),false);assert.equal(controlledTruck(s),a);
+});
+test('medium support drives, steers and brakes independently',()=>{
+ const a=makeHelperState((x,y,z)=>new THREE.Vector3(x,y,z)),start=a.pos.clone(),surface={traction:.86,lateralGrip:.85,drag:.7};
+ a.throttle=1;for(let i=0;i<120;i++)stepHelper(a,1/120,surface,1,0,tandemSteering,tandemBrake);
+ assert.ok(a.pos.distanceTo(start)<1e-8);
+ a.parkingBrake=false;a.steer=.7;for(let i=0;i<180;i++)stepHelper(a,1/120,surface,1,0,tandemSteering,tandemBrake);
+ assert.ok(a.pos.distanceTo(start)>1);assert.ok(a.yaw>0);
+ a.parkingBrake=true;a.throttle=0;for(let i=0;i<180;i++)stepHelper(a,1/120,surface,1,0,tandemSteering,tandemBrake);
+ assert.ok(a.vel.length()<.001);
+ assert.ok(tandemContactBlocked({x:6,z:0},{x:5,z:0},{x:0,z:0}));assert.ok(!tandemContactBlocked({x:4,z:0},{x:5,z:0},{x:0,z:0}));
+});
+test('tandem checkpoint restores support position and boom independently',()=>{
+ const f=checkpointFixture();f.tandemHelper={};f.helperState=makeHelperState(checkpointVector);f.tandemUsed=[true,false];f.helperState.pos.set(-8,.04,-97);f.helperState.yaw=.8;f.helperState.boomAngle=.66;f.helperState.boomExtension=1.4;
+ const snap=captureRecoverySave({job:7,jobCount:8},f),fresh=checkpointFixture();fresh.tandemHelper={};fresh.helperState=makeHelperState(checkpointVector);
+ restoreRecoverySave(fresh,snap,checkpointVector);
+ assert.equal(fresh.helperState.pos.x,-8);assert.equal(fresh.helperState.yaw,.8);assert.equal(fresh.helperState.boomExtension,1.4);assert.deepEqual(fresh.tandemUsed,[true,false]);
+});
