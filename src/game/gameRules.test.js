@@ -937,10 +937,32 @@ test('medium support drives, steers and brakes independently',()=>{
  assert.ok(tandemContactBlocked({x:6,z:0},{x:5,z:0},{x:0,z:0}));assert.ok(!tandemContactBlocked({x:4,z:0},{x:5,z:0},{x:0,z:0}));
 });
 test('tandem checkpoint restores support position and boom independently',()=>{
- const f=checkpointFixture();f.tandemHelper={};f.helperState=makeHelperState(checkpointVector);f.tandemUsed=[true,false];f.helperState.pos.set(-8,.04,-97);f.helperState.yaw=.8;f.helperState.boomAngle=.66;f.helperState.boomExtension=1.4;
+ const f=checkpointFixture();f.tandemHelper={};f.helperState=makeHelperState(checkpointVector);f.tandemUsed=[true,false];f.tandemSelected=1;f.helperState.pos.set(-8,.04,-97);f.helperState.yaw=.8;f.helperState.boomAngle=.66;f.helperState.boomExtension=1.4;
  const snap=captureRecoverySave({job:7,jobCount:8},f),fresh=checkpointFixture();fresh.tandemHelper={};fresh.helperState=makeHelperState(checkpointVector);
- restoreRecoverySave(fresh,snap,checkpointVector);
+ restoreRecoverySave(fresh,parseRecoverySave(JSON.stringify(snap),8),checkpointVector);
  assert.equal(fresh.helperState.pos.x,-8);assert.equal(fresh.helperState.yaw,.8);assert.equal(fresh.helperState.boomExtension,1.4);assert.deepEqual(fresh.tandemUsed,[true,false]);
+ assert.equal(controlledTruck(fresh),fresh.helperState);
+ assert.equal(fresh.helperState.parkingBrake,true);
+ assert.ok(fresh.recoveryLines.every(line=>line.motor===0));
+});
+test('a drive-ready tandem operator resumes stopped and older saves select truck A',()=>{
+ const f=checkpointFixture();
+ f.jobIndex=7;f.tandemHelper={};f.tandemSelected=1;f.tandemUsed=[false,false];
+ Object.assign(f.recoveryLines[1],{connected:false,motor:0});
+ f.helperState=makeHelperState(checkpointVector);
+ Object.assign(f.helperState,{parkingBrake:false,boomDeployed:false,throttle:1,steer:.4});
+ const snap=captureRecoverySave({job:7,jobCount:8},f);
+ const fresh=checkpointFixture();fresh.tandemHelper={};fresh.helperState=makeHelperState(checkpointVector);
+ Object.assign(fresh.helperState,{throttle:1,steer:.4,brake:1,boomControl:.2});
+ restoreRecoverySave(fresh,snap,checkpointVector);
+ assert.equal(controlledTruck(fresh),fresh.helperState);
+ assert.equal(fresh.helperState.parkingBrake,false);
+ assert.equal(fresh.helperState.boomDeployed,false);
+ assert.deepEqual([fresh.helperState.throttle,fresh.helperState.steer,fresh.helperState.brake,fresh.helperState.boomControl],[0,0,0,0]);
+ delete snap.tandemSelected;
+ restoreRecoverySave(fresh,snap,checkpointVector);
+ assert.equal(controlledTruck(fresh),fresh);
+ assert.equal(fresh.helperState.parkingBrake,true);
 });
 
 import {tandemDriveBlock} from './tandemRecovery.js';
