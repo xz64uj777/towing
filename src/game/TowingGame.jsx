@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import {levelFourHeight,levelFourSlope,levelFourDownhillAcceleration,LEVEL_FOUR_STAGING} from './levelFourTerrain.js';
 import {createLevelFourScene} from './levelFourScene.js';
-import {modelRollHull,rollContactOffset} from './rollContact.js';
+import {modelRollHull,rollContactOffset,recoveryRollStep} from './rollContact.js';
 import {TANDEM_SITE_INDEX,TANDEM_HELPER,isSupportLine,lineLimit,tandemComplete,noteTandemUse,switchTandemControl,migrateJobIndex} from './tandemRecovery.js';
 import {siteConfig,siteHeight,siteSlope,siteGravity,createDispatchSite,bridgeEdgeExceeded,constrainSiteTruck,siteRecoveryReady,siteGoalReached,checkpointSiteCompatible} from './dispatchSites.js';
 import {createLakeScene,lakeHeight,lakeSlope,lakeDownhillAcceleration,LAKE_SURFACE} from './lakeScene.js';
@@ -86,6 +86,7 @@ const winchSpeedFactor=speed=>({fine:.35,medium:1,high:2.4}[speed]??1);
 const isDitchPull=s=>s.type.id==='medium'&&JOBS[s.jobIndex%JOBS.length].kind==='recovery'&&!s.loaded;
 // Match the actual rendered pickup's grounded pose and scaled attachment point.
 const ordinaryEye=s=>{const point=RECOVERY_POINTS[s.hookPoint];if(!isDitchPull(s))return recoveryAnchor(s.type.id==='rotator'?primaryRecoveryTarget(s):{pos:s.pickPos,yaw:s.pickYaw,roll:0},point);const k=s.pickup.userData.scale,p=ditchContactPose(s.pickPos.x,s.pickPos.z,s.pickYaw,k);return V(s.pickPos.x,p.height,s.pickPos.z).add(V(point.x*k,point.y*k,point.z*k).applyEuler(new THREE.Euler(p.pitch,-s.pickYaw,p.roll,'YXZ')));};
+const AUTO_RECOVERY_SAVE_KEY='towing-autosave-v1';
 const loadCareer=()=>{let saved={};try{saved=JSON.parse(localStorage.getItem('towing-career')||'{}')}catch{}const requested=Number(new URLSearchParams(window.location.search).get('level'));const job=Number.isInteger(requested)&&requested>=1&&requested<=JOBS.length?requested-1:migrateJobIndex(saved.job??0,saved.jobCount??7,JOBS.length);return {...saved,job,jobCount:JOBS.length};};
 
 function box(parent,name,size,pos,color,opts={}) {
@@ -219,7 +220,14 @@ export default function TowingGame(){
  return {...saved,selected:JOBS[(saved.job||0)%JOBS.length].truck};
 });
  const careerRef=useRef(career);careerRef.current=career;
- const pendingRestore=useRef(null);
+ const [automaticCheckpoint]=useState(()=>{
+  try{
+   const checkpoint=parseRecoverySave(localStorage.getItem(AUTO_RECOVERY_SAVE_KEY),JOBS.length);
+   return checkpoint?.jobIndex===career.job%JOBS.length&&checkpoint.career.selected===career.selected&&
+    checkpointSiteCompatible(checkpoint,JOBS.length)?checkpoint:null;
+  }catch{return null;}
+ });
+ const pendingRestore=useRef(automaticCheckpoint);
  const [restoreSequence,setRestoreSequence]=useState(0);
  const [savedCheckpoint,setSavedCheckpoint]=useState(()=>{
   try{return parseRecoverySave(localStorage.getItem(RECOVERY_SAVE_KEY),JOBS.length)}catch{return null}
@@ -237,6 +245,24 @@ export default function TowingGame(){
   return()=>{window.removeEventListener('pointerup',unlock,true);window.removeEventListener('click',unlock,true);window.removeEventListener('keydown',unlock,true);document.removeEventListener('visibilitychange',hide);window.removeEventListener('blur',audio.silence);audio.close();audioRef.current=null;};
  },[]);
  const mount=useRef(null),sim=useRef(null),[hud,setHud]=useState({speed:0,gear:'D',hook:false,tension:0,winch:'IDLE'}),[help,setHelp]=useState(false),[steerVisual,setSteerVisual]=useState(0);
+ useEffect(()=>{
+  const save=()=>{
+   const game=sim.current,activeCareer=careerRef.current;
+   if(!game||game.jobDone||game.siteFailed||game.jobIndex!==activeCareer.job%JOBS.length||game.type.id!==activeCareer.selected)return;
+   try{
+    localStorage.setItem(AUTO_RECOVERY_SAVE_KEY,JSON.stringify(captureRecoverySave(activeCareer,game)));
+   }catch{}
+  };
+  const saveOnHide=()=>{if(document.hidden)save();};
+  const timer=window.setInterval(save,6000);
+  document.addEventListener('visibilitychange',saveOnHide);
+  window.addEventListener('pagehide',save);
+  return()=>{
+   window.clearInterval(timer);
+   document.removeEventListener('visibilitychange',saveOnHide);
+   window.removeEventListener('pagehide',save);
+  };
+ },[]);
  useEffect(()=>{
   const host=mount.current;if(!host)return;
   const scene=new THREE.Scene();scene.environment=reflectionSky(THREE);scene.environmentIntensity=.55;scene.background=new THREE.Color(0x9db2c2);scene.fog=new THREE.Fog(0x9db2c2,55,180);
@@ -334,14 +360,16 @@ export default function TowingGame(){
   if(firstJob.kind==='heavy'){pickup.rotation.order='YXZ';pickup.rotation.z=s.pickRoll;pickup.position.y=s.pickPos.y+rollContactOffset(pickup.userData.rollHull,s.pickRoll);secondaryPickup.rotation.order='YXZ';secondaryPickup.rotation.z=s.secondary.roll;secondaryPickup.position.y=s.secondary.pos.y+rollContactOffset(s.secondary.contactHull,s.secondary.roll);}
   if(levelFour)setCameraMode('ravine');
   const checkpoint=pendingRestore.current;
-  if(checkpoint&&checkpoint.jobIndex===s.jobIndex&&checkpoint.career.selected===s.type.id){
-   pendingRestore.current=null;
+  const restoring=checkpoint?.jobIndex===s.jobIndex&&checkpoint.career.selected===s.type.id;
+  if(restoring){
    if(checkpointSiteCompatible(checkpoint,JOBS.length)){restoreRecoverySave(s,checkpoint,V);setCameraMode(s.cameraMode);setWinchSpeed(s.winchSpeed);setNotice('SAVED JOB RESTORED: '+JOBS[s.jobIndex%JOBS.length].name+'.');}
    else setNotice('Site redesigned. Dispatch restarted; career cash and upgrades preserved.');
   }
   const resize=()=>{const w=host.clientWidth,h=host.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);};const ro=new ResizeObserver(resize);ro.observe(host);resize();
   let last=performance.now(),raf=0;
   const update=(now)=>{
+   // Consume the checkpoint once the restored scene reaches its first frame.
+   if(restoring&&pendingRestore.current===checkpoint)pendingRestore.current=null;
    const dt=Math.min(.033,(now-last)/1000);last=now;const steps=Math.max(1,Math.ceil(dt/(1/120)));const h=dt/steps;
    for(let n=0;n<steps;n++){
     const forward=V(Math.sin(s.yaw),0,-Math.cos(s.yaw));const right=V(Math.cos(s.yaw),0,Math.sin(s.yaw));
@@ -572,18 +600,18 @@ export default function TowingGame(){
       for(let i=0;i<targets.length;i++)if((i===0&&!s.loaded)||(i===1&&s.secondary.active))targets[i].vel.addScaledVector(forces[i],h/(targets[i].mass*(levelFour?1350:3100)));
       primaryYawMoment=yawMoments[0];
       primaryPowered=s.recoveryLines.some(l=>l.connected&&l.target===0&&l.motor>0);
-      if(!primaryPowered){s.pickVel.x=stopWinchCoast(s.pickVel.x,h);s.pickVel.z=stopWinchCoast(s.pickVel.z,h);s.pickRollVel=stopWinchCoast(s.pickRollVel,h);}
-       s.pickRollVel=clamp((s.pickRollVel+torques[0]*h)*Math.exp(-1.7*h),-1.5,1.5);
-      s.pickRoll=clamp(s.pickRoll+s.pickRollVel*h,0,3.06);
-      if(s.pickRoll===0||s.pickRoll===3.06)s.pickRollVel=0;
+      if(!primaryPowered){s.pickVel.x=stopWinchCoast(s.pickVel.x,h);s.pickVel.z=stopWinchCoast(s.pickVel.z,h);}
+      const primaryRoll=recoveryRollStep(targets[0].contactHull,s.pickRoll,s.pickRollVel,torques[0],h);
+      s.pickRoll=primaryRoll.roll;
+      s.pickRollVel=primaryRoll.velocity;
       if(s.secondary.active){
         const secondaryPowered=s.recoveryLines.some(l=>l.connected&&l.target===1&&l.motor>0);
         s.secondary.yawVel=recoveryYawStep(s.secondary.yawVel,yawMoments[1],targets[1].mass,h,secondaryPowered);
         s.secondary.yaw+=s.secondary.yawVel*h;
-        if(!secondaryPowered){s.secondary.vel.x=stopWinchCoast(s.secondary.vel.x,h);s.secondary.vel.z=stopWinchCoast(s.secondary.vel.z,h);s.secondary.rollVel=stopWinchCoast(s.secondary.rollVel,h);}
-        s.secondary.rollVel=clamp((s.secondary.rollVel+torques[1]*h)*Math.exp(-1.7*h),-1.5,1.5);
-        s.secondary.roll=clamp(s.secondary.roll+s.secondary.rollVel*h,0,3.06);
-        if(s.secondary.roll===0||s.secondary.roll===3.06)s.secondary.rollVel=0;
+        if(!secondaryPowered){s.secondary.vel.x=stopWinchCoast(s.secondary.vel.x,h);s.secondary.vel.z=stopWinchCoast(s.secondary.vel.z,h);}
+        const secondaryRoll=recoveryRollStep(targets[1].contactHull,s.secondary.roll,s.secondary.rollVel,torques[1],h);
+        s.secondary.roll=secondaryRoll.roll;
+        s.secondary.rollVel=secondaryRoll.velocity;
         const ground=recoverySurfaceVelocity(s.secondary.vel.x,s.secondary.vel.z,s.secondary.yaw,s.secondary.roll,h,surfaceAt(s.secondary.pos));
         s.secondary.vel.x=ground.x;s.secondary.vel.z=ground.z;
         s.secondary.pos.addScaledVector(s.secondary.vel,h);
@@ -753,6 +781,10 @@ export default function TowingGame(){
       s.jobDone=true;s.winch=false;s.winchOut=false;s.hook=false;
       for(const line of s.recoveryLines){line.connected=false;line.motor=0;line.tension=0;}
       const gross=JOBS[s.jobIndex%JOBS.length].pay,damage=job.kind==='flatbed'?s.recoveryDamage:0,reward=rollbackNetPay(gross,damage);
+      try{
+       const autosave=parseRecoverySave(localStorage.getItem(AUTO_RECOVERY_SAVE_KEY),JOBS.length);
+       if(autosave?.jobIndex===s.jobIndex)localStorage.removeItem(AUTO_RECOVERY_SAVE_KEY);
+      }catch{}
       // Completed jobs must not accidentally load an obsolete recovery checkpoint.
       try{const oldSave=parseRecoverySave(localStorage.getItem(RECOVERY_SAVE_KEY),JOBS.length);
        if(oldSave?.jobIndex===s.jobIndex){localStorage.removeItem(RECOVERY_SAVE_KEY);setSavedCheckpoint(null);}}
