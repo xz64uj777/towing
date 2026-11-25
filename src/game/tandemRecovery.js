@@ -18,7 +18,9 @@ export function switchTandemControl(s,index){
  const a=controlledTruck(s);if(speedOf(a)>.25)return false;
  stopTruckInputs(s);stopTruckInputs(s.helperState);for(const line of s.recoveryLines)line.motor=0;
  a.parkingBrake=true;a.boomDeployed=true;a.vel?.set?.(0,0,0);
- s.tandemSelected=index===1?1:0;return true;
+ s.tandemSelected=index===1?1:0;
+ // Selecting an unrigged truck enters driving mode; a connected or rigged truck stays parked.
+ const next=controlledTruck(s);if(!ownerHasCable(s,s.tandemSelected)&&!next.riggersDeployed){next.parkingBrake=false;next.boomDeployed=false;next.boomAngle=next===s ? .36 : .28;next.boomExtension=0;next.boomSwing=0;}return true;
 }
 export function makeHelperState(V){return {pos:V(TANDEM_HELPER.x,.04,TANDEM_HELPER.z),vel:V(0,0,0),yaw:TANDEM_HELPER.yaw,steerAngle:0,throttle:0,steer:0,brake:0,parkingBrake:true,boomDeployed:true,boomAngle:.28,boomExtension:0,boomControl:0,boomExtendControl:0,boomSwingControl:0,riggersDeployed:false,supportRatio:0};}
 export function stepHelper(a,dt,surface,steering,engine,steeringStep,brakeStep){
@@ -40,3 +42,5 @@ export function migrateJobIndex(index,oldCount,newCount=8){
  const count=oldCount===7?7:newCount;
  return Math.floor(index/count)*newCount+index%count;
 }
+
+export function tandemDriveBlock(s){const a=controlledTruck(s),letter=s.tandemSelected===1?'B':'A';if(ownerHasCable(s,s.tandemSelected??0))return 'TRUCK '+letter+': disconnect its cable before driving.';if(a.riggersDeployed)return 'TRUCK '+letter+': retract riggers before driving.';if(a.parkingBrake)return 'TRUCK '+letter+': release PARK BRAKE before driving.';return '';}

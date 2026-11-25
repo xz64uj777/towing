@@ -921,3 +921,14 @@ test('tandem checkpoint restores support position and boom independently',()=>{
  restoreRecoverySave(fresh,snap,checkpointVector);
  assert.equal(fresh.helperState.pos.x,-8);assert.equal(fresh.helperState.yaw,.8);assert.equal(fresh.helperState.boomExtension,1.4);assert.deepEqual(fresh.tandemUsed,[true,false]);
 });
+
+import {tandemDriveBlock} from './tandemRecovery.js';
+test('selecting unrigged truck B makes it immediately drivable from the real quarry spawn',()=>{
+ const V=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z),a=makeHelperState(V),s={tandemHelper:{},helperState:a,tandemSelected:0,pos:V(7,.04,-83),vel:V(),parkingBrake:false,boomDeployed:false,riggersDeployed:false,recoveryLines:[{connected:false,motor:0},{connected:false,motor:0}]};
+ const start=a.pos.clone();assert.ok(switchTandemControl(s,1));assert.equal(controlledTruck(s),a);assert.equal(a.parkingBrake,false);assert.equal(tandemDriveBlock(s),'');assert.equal(s.parkingBrake,true);
+ controlledTruck(s).throttle=1;
+ for(let i=0;i<120;i++){const before=a.pos.clone();stepHelper(a,1/120,sampleSurface(7,a.pos.x,a.pos.z),1,0,tandemSteering,tandemBrake);constrainSiteTruck(7,a.pos,a.vel);assert.ok(!tandemContactBlocked(before,a.pos,s.pos));assert.ok(!tandemContactBlocked(before,a.pos,{x:-5,z:-99},4.3));}
+ assert.ok(a.pos.distanceTo(start)>.5);assert.ok(s.pos.equals(V(7,.04,-83)));
+ a.vel.set(0,0,0);a.parkingBrake=true;a.boomDeployed=true;s.recoveryLines[1].connected=true;assert.match(tandemDriveBlock(s),/disconnect/);
+ assert.ok(switchTandemControl(s,0));assert.ok(switchTandemControl(s,1));assert.equal(a.parkingBrake,true);assert.equal(a.boomDeployed,true);
+});

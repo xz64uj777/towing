@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import {levelFourHeight,levelFourSlope,levelFourDownhillAcceleration,LEVEL_FOUR_STAGING} from './levelFourTerrain.js';
 import {createLevelFourScene} from './levelFourScene.js';
 import {modelRollHull,rollContactOffset} from './rollContact.js';
-import {TANDEM_SITE_INDEX,TANDEM_HELPER,isSupportLine,lineLimit,tandemComplete,noteTandemUse,switchTandemControl,migrateJobIndex,controlledTruck,lineOwner,ownerHasCable,linePowerReady,stopTruckInputs,makeHelperState,stepHelper,tandemContactBlocked} from './tandemRecovery.js';
+import {TANDEM_SITE_INDEX,TANDEM_HELPER,isSupportLine,lineLimit,tandemComplete,noteTandemUse,switchTandemControl,migrateJobIndex,controlledTruck,lineOwner,ownerHasCable,linePowerReady,stopTruckInputs,makeHelperState,stepHelper,tandemContactBlocked,tandemDriveBlock} from './tandemRecovery.js';
 import {siteConfig,siteHeight,siteSlope,siteGravity,createDispatchSite,bridgeEdgeExceeded,constrainSiteTruck,siteRecoveryReady,siteGoalReached,checkpointSiteCompatible} from './dispatchSites.js';
 import {createLakeScene,lakeHeight,lakeSlope,lakeDownhillAcceleration,LAKE_SURFACE} from './lakeScene.js';
 import {RECOVERY_SAVE_KEY,captureRecoverySave,parseRecoverySave,restoreRecoverySave} from './progressSave.js';
@@ -786,7 +786,7 @@ export default function TowingGame(){
    // Driving and recovery camera presets remain locked until CAM or ANGLES explicitly changes them.
    let presetFocus=null;const active=controlledTruck(s);
    if(s.cameraMode==='ravine'&&levelFour){
-     const look=active.pos.clone().lerp(s.pickPos,.72);
+     const look=active.pos.clone().lerp(s.pickPos,s.tandemHelper?.28:.72);
      // Elevated roadside vantage frames the road, steep near wall, and wreck below.
      const viewTruck=active.pos;camera.position.set(viewTruck.x+(site?10:5.5),viewTruck.y+(site?15:11),viewTruck.z+8);
      presetFocus=V(look.x,site?look.y+1:look.y-2.5,look.z);
@@ -913,7 +913,7 @@ export default function TowingGame(){
   renderer.domElement.addEventListener('pointerdown',onPointerDown);renderer.domElement.addEventListener('pointermove',onPointerMove);renderer.domElement.addEventListener('pointerup',onPointerUp);renderer.domElement.addEventListener('pointercancel',onPointerUp);
   return()=>{audioRef.current?.silence();cancelAnimationFrame(raf);ro.disconnect();window.removeEventListener('keydown',onKey);window.removeEventListener('keyup',onKey);window.removeEventListener('blur',stopHeldControls);document.removeEventListener('visibilitychange',onVisibilityChange);renderer.dispose();host.removeChild(renderer.domElement);const textures=new Set([scene.environment]);scene.traverse(o=>{o.geometry?.dispose?.();if(o.isInstancedMesh)o.dispose();if(o.material){for(const m of (Array.isArray(o.material)?o.material:[o.material])){for(const value of Object.values(m))if(value?.isTexture)textures.add(value);m.dispose();}}});for(const texture of textures)texture?.dispose();};
  },[career.selected,career.job,restoreSequence]);
- const s=sim.current;const press=(key,val)=>e=>{e.preventDefault();const s=sim.current;if(!s)return;if(s.tandemHelper&&['throttle','steer','brake'].includes(key)){controlledTruck(s)[key]=val;return;}if((key==='winch'||key==='winchOut')&&val&&((s.tools.includes('boom')&&!s.boomDeployed)||(s.heavyRecovery&&!s.riggersDeployed)||!s.parkingBrake)){setNotice(s.heavyRecovery?'Heavy recovery: deploy BOOM, RIGGERS and PARK BRAKE.':'Deploy BOOM and engage PARK BRAKE first.');return;}if(key==='throttle'&&!val)s.bedContactLatch=false;const released=key==='winch'&&!val&&s.winch;s[key]=val;if(released){s.pickVel.set(0,0,0);s.tension=0;}};
+ const s=sim.current;const press=(key,val)=>e=>{e.preventDefault();const s=sim.current;if(!s)return;if(s.tandemHelper&&['throttle','steer','brake'].includes(key)){const a=controlledTruck(s);if(key==='throttle'&&val){const reason=tandemDriveBlock(s);if(reason){a.throttle=0;setNotice(reason);return;}}a[key]=val;return;}if((key==='winch'||key==='winchOut')&&val&&((s.tools.includes('boom')&&!s.boomDeployed)||(s.heavyRecovery&&!s.riggersDeployed)||!s.parkingBrake)){setNotice(s.heavyRecovery?'Heavy recovery: deploy BOOM, RIGGERS and PARK BRAKE.':'Deploy BOOM and engage PARK BRAKE first.');return;}if(key==='throttle'&&!val)s.bedContactLatch=false;const released=key==='winch'&&!val&&s.winch;s[key]=val;if(released){s.pickVel.set(0,0,0);s.tension=0;}};
  const joystickMove=e=>{const el=e.currentTarget,rect=el.getBoundingClientRect(),dx=(e.clientX-(rect.left+rect.width/2))/(rect.width*.42);const steer=clamp(dx*settingsRef.current.steering,-1,1);setSteerVisual(steer);if(sim.current)controlledTruck(sim.current).steer=clamp(dx,-1,1);};
  const joystickStop=e=>{e.preventDefault();setSteerVisual(0);if(sim.current)controlledTruck(sim.current).steer=0;};
  const setBoomControl=(axis,d)=>{const game=sim.current;if(!game)return;const s=controlledTruck(game);if(d===0){s[axis]=0;return;}if(!game.tools.includes('boom')||!s.boomDeployed||(!s.parkingBrake&&!s.riggersDeployed)){setNotice('Apply PARK BRAKE or deploy RIGGERS to unlock the boom.');return;}if(s.vel.length()>.25){setNotice('Stop the truck before moving the boom.');return;}s[axis]=d;};
@@ -965,13 +965,13 @@ export default function TowingGame(){
      setNotice('Vehicle safely unloaded. Dispatch complete!');
    }else setNotice('L-arms opened. Vehicle released.');
  }};
- const togglePark=()=>{const s=sim.current;if(!s)return;if(s.helperState&&s.tandemSelected===1){const a=s.helperState;if(a.parkingBrake&&ownerHasCable(s,1)){setNotice('Disconnect truck B cable before driving.');return;}a.parkingBrake=!a.parkingBrake;a.boomDeployed=a.parkingBrake;boomStickStop();if(!a.boomDeployed){a.boomAngle=.28;a.boomExtension=0;}return;}
+ const togglePark=()=>{const s=sim.current;if(!s)return;if(s.helperState&&s.tandemSelected===1){const a=s.helperState;if(a.parkingBrake&&ownerHasCable(s,1)){setNotice('Disconnect truck B cable before driving.');return;}a.parkingBrake=!a.parkingBrake;a.boomDeployed=a.parkingBrake;boomStickStop();if(!a.boomDeployed){a.boomAngle=.28;a.boomExtension=0;}s.lastHud=0;setNotice(a.parkingBrake?'TRUCK B • PARK BRAKE APPLIED':'TRUCK B • DRIVE READY');return;}
  if(s.autoLoad||s.autoUnload){setNotice('Wait for the hydraulic cycle to finish before releasing PARK BRAKE.');return;}
  if(s.parkingBrake&&s.type.id==='flatbed'&&!transportReady(s)&&!creepReady(s)){setNotice('Secure the load, level the deck and slide it fully forward before driving.');return;}
  if(s.parkingBrake&&s.type.id==='flatbed'&&creepReady(s)){s.bedSlideControl=0;s.bedTiltControl=0;setNotice('EMPTY RAMP • Forward creep only (4 km/h). Pull clear, park, then stow.');}
  if(s.parkingBrake&&s.riggersDeployed){setNotice('Retract RIGGERS before releasing PARK BRAKE.');return;}
  if(s.parkingBrake&&ownerHasCable(s,0)){setNotice('Disconnect recovery lines before driving.');return;}
- s.parkingBrake=!s.parkingBrake;
+ s.parkingBrake=!s.parkingBrake;if(s.tandemHelper){s.lastHud=0;setNotice(s.parkingBrake?'TRUCK A • PARK BRAKE APPLIED':'TRUCK A • DRIVE READY');}
  if(s.tools.includes('boom')){
   s.boomDeployed=s.parkingBrake||s.riggersDeployed;
   boomStickStop();
@@ -1157,7 +1157,7 @@ export default function TowingGame(){
  const currentJob=JOBS[career.job%JOBS.length],currentSite=siteConfig(career.job%JOBS.length);
  return <main className={'game-shell'+(menuOpen?' menu-active':'')+(cameraPanelOpen?' camera-active':'')}><div className={'scene'+(placingAnchor?' anchor-placement-scene':'')} ref={mount}/>
    {placingAnchor&&<div className="anchor-placement-hint" role="status"><b>{s?.customHookPlacement!==null?'SELECT CUSTOM HOOK':'PLACE GROUND ANCHOR'}</b><span>{s?.customHookPlacement!==null?'Tap a frame edge or bumper on the recovery vehicle.':'Tap open ground off the road, 4–32 m from truck and 3–32 m from vehicle.'}</span><button type="button" onClick={s?.customHookPlacement!==null?cancelCustomHook:cancelAnchorPlacement}>CANCEL PLACEMENT</button></div>}
-  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>CAREER MODE • {career.selected.toUpperCase()} TRUCK</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .82 • INDEPENDENT TANDEM</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
+  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>{s?.tandemHelper?'TRUCK '+(activeRecoveryLine===0?'A • ROTATOR':'B • MEDIUM')+' • '+(controlledTruck(s).parkingBrake?'PARKED':'DRIVE READY'):'CAREER MODE • '+career.selected.toUpperCase()+' TRUCK'}</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .83 • TANDEM DRIVE FIX</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
   <div className={'game-minimap '+(mapOpen?'map-expanded':'map-collapsed')} style={{position:'absolute',left:12,bottom:195,zIndex:9,width:mapOpen?146:106,height:mapOpen?166:36,pointerEvents:'auto',border:'2px solid #f3c851',borderRadius:12,background:'rgba(9,20,30,.88)',color:'#fff',boxShadow:'0 3px 14px #0008',padding:6,boxSizing:'border-box'}}>
    <button type="button" aria-expanded={mapOpen} onClick={()=>setMapOpen(v=>!v)} style={{fontSize:11,fontWeight:800,width:'100%',background:'transparent',border:0,color:'white'}}>{mapOpen?'MAP −':'MAP +'}</button>
    {mapOpen&&<svg viewBox="0 0 140 140" width="132" height="132" aria-label="Map of recovery vehicles and destination">
@@ -1219,11 +1219,11 @@ export default function TowingGame(){
   <button type="button" className="recovery-toggle" aria-expanded={recoveryOpen} onClick={()=>{setRecoveryOpen(v=>!v);setMenuOpen(false);setCameraPanelOpen(false);}}>
    {s?.type.id==='light'?'WHEEL LIFT':s?.type.id==='rotator'?'RECOVERY':s?.type.id==='flatbed'?'ROLLBACK':'EQUIPMENT'} {recoveryOpen?'−':'+'}
   </button>
-  {recoveryOpen&&s?.type.id==='rotator'&&[0,1].map(i=><button type="button" key={i} className={'action line-select line-'+(i===0?'a':'b')+(activeRecoveryLine===i?' active':'')} aria-pressed={activeRecoveryLine===i} onClick={()=>{if(activeRecoveryLine!==i){if(s.tandemHelper&&!switchTandemControl(s,i)){setNotice('Stop the current truck before switching.');return;}setRecoveryMotor(activeRecoveryLine,0);setActiveRecoveryLine(i);setSteerVisual(0);setBoomStick({x:0,y:0});setBoomMode('extend');if(s.tandemHelper){s.lastHud=0;setNotice(i===0?'TRUCK A • Rotator controls':'TRUCK B • Medium wrecker controls');}}}}>{s.tandemHelper?'TRUCK':'LINE'} {i===0?'A':'B'}</button>)}
+  {recoveryOpen&&s?.type.id==='rotator'&&[0,1].map(i=><button type="button" key={i} className={'action line-select line-'+(i===0?'a':'b')+(activeRecoveryLine===i?' active':'')} aria-pressed={activeRecoveryLine===i} onClick={()=>{if(activeRecoveryLine!==i){if(s.tandemHelper&&!switchTandemControl(s,i)){setNotice('Stop the current truck before switching.');return;}setRecoveryMotor(activeRecoveryLine,0);setActiveRecoveryLine(i);setSteerVisual(0);setBoomStick({x:0,y:0});setBoomMode('extend');if(s.tandemHelper){const a=controlledTruck(s);s.lastHud=0;changeCamera('chase');setNotice('TRUCK '+(i===0?'A':'B')+' • '+(a.parkingBrake?'PARKED — cable/riggers or brake engaged':'DRIVE READY'));}}}}>{s.tandemHelper?'TRUCK':'LINE'} {i===0?'A':'B'}</button>)}
  </div>
  {recoveryOpen&&<>
   {s?.type.id==='rotator'?<div className="equipment-row heavy-safety-row">
-    <button type="button" className={'action brake-button '+(hud.parking?'active':'')} onClick={togglePark}>{hud.parking?'PARK ✓':'PARK BRAKE'}</button>
+    <button type="button" className={'action brake-button '+(hud.parking?'active':'')} onClick={togglePark}>{s?.tandemHelper?(controlledTruck(s).parkingBrake?'RELEASE PARK':'APPLY PARK'):(hud.parking?'PARK ✓':'PARK BRAKE')}</button>
     <button type="button" disabled={!!s?.tandemHelper&&activeRecoveryLine===1} className={'action '+(hud.riggers?'active':'')} onClick={toggleRiggers}>{s?.tandemHelper&&activeRecoveryLine===1?'FIXED BOOM':hud.riggers?'RIGGERS RETRACT':'RIGGERS DEPLOY'}</button>
     <button type="button" className="action heavy-speed-cycle" onClick={()=>selectWinchSpeed(['fine','medium','high'][(['fine','medium','high'].indexOf(winchSpeed)+1)%3])}>SPEED {winchSpeed.toUpperCase()} ↻</button>
    </div>:<button type="button" className={'action brake-button '+(hud.parking?'active':'')} onClick={togglePark}>{hud.parking?'PARK BRAKE ✓':'PARK BRAKE'}</button>}
