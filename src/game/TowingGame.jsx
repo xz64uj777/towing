@@ -360,14 +360,16 @@ export default function TowingGame(){
   if(firstJob.kind==='heavy'){pickup.rotation.order='YXZ';pickup.rotation.z=s.pickRoll;pickup.position.y=s.pickPos.y+rollContactOffset(pickup.userData.rollHull,s.pickRoll);secondaryPickup.rotation.order='YXZ';secondaryPickup.rotation.z=s.secondary.roll;secondaryPickup.position.y=s.secondary.pos.y+rollContactOffset(s.secondary.contactHull,s.secondary.roll);}
   if(levelFour)setCameraMode('ravine');
   const checkpoint=pendingRestore.current;
-  if(checkpoint&&checkpoint.jobIndex===s.jobIndex&&checkpoint.career.selected===s.type.id){
-   pendingRestore.current=null;
+  const restoring=checkpoint?.jobIndex===s.jobIndex&&checkpoint.career.selected===s.type.id;
+  if(restoring){
    if(checkpointSiteCompatible(checkpoint,JOBS.length)){restoreRecoverySave(s,checkpoint,V);setCameraMode(s.cameraMode);setWinchSpeed(s.winchSpeed);setNotice('SAVED JOB RESTORED: '+JOBS[s.jobIndex%JOBS.length].name+'.');}
    else setNotice('Site redesigned. Dispatch restarted; career cash and upgrades preserved.');
   }
   const resize=()=>{const w=host.clientWidth,h=host.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);};const ro=new ResizeObserver(resize);ro.observe(host);resize();
   let last=performance.now(),raf=0;
   const update=(now)=>{
+   // Consume the checkpoint once the restored scene reaches its first frame.
+   if(restoring&&pendingRestore.current===checkpoint)pendingRestore.current=null;
    const dt=Math.min(.033,(now-last)/1000);last=now;const steps=Math.max(1,Math.ceil(dt/(1/120)));const h=dt/steps;
    for(let n=0;n<steps;n++){
     const beforeMain=s.helperState?s.pos.clone():null;
