@@ -1028,3 +1028,18 @@ test('expanding the campaign preserves the dispatch within older career loops',(
  assert.equal(parsed.career.selected,'offroad');
  assert.equal(parsed.equipment.woodlandExtracted,true);
 });
+
+test('recovery saves retain temporary anchor strength and disconnect obsolete fixed routes',()=>{
+ const fixture=checkpointFixture();
+ fixture.riggingAnchors[3].capacity=14000;
+ fixture.riggingAnchors[3].ballast=true;
+ fixture.recoveryLines[1].redirect=1;
+ const saved=parseRecoverySave(JSON.stringify(captureRecoverySave({job:4},fixture)),9);
+ const restored=checkpointFixture();
+ restoreRecoverySave(restored,saved,checkpointVector);
+ assert.equal(restored.riggingAnchors[3].capacity,14000);
+ assert.equal(restored.riggingAnchors[3].ballast,true);
+ assert.equal(restored.recoveryLines[0].connected,true);
+ assert.equal(restored.recoveryLines[1].connected,false);
+ assert.equal(restored.recoveryLines[1].redirect,0);
+});
