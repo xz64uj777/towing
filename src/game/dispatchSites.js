@@ -101,8 +101,8 @@ export function createDispatchSite(T,scene,i){
  const paint=(n,d,p,m)=>{const o=box(n,d,p,m);o.castShadow=false;return o;};
  const obstacles=[];
  if(i===DESERT_INDEX){
-  const terrain=new T.PlaneGeometry(110,120,88,96);
-  terrain.rotateX(-Math.PI/2);terrain.translate(0,0,-90);
+  const terrain=new T.PlaneGeometry(110,170,88,136);
+  terrain.rotateX(-Math.PI/2);terrain.translate(0,0,-105);
   const pos=terrain.attributes.position,colors=[];
   for(let n=0;n<pos.count;n++){
    const x=pos.getX(n),z=pos.getZ(n),sand=desertSurface(x,z).sand;
@@ -118,12 +118,12 @@ export function createDispatchSite(T,scene,i){
    box('corrugated canopy',[7.8,.23,6.7],[x,3.32,-62],roof);
   }
   for(let n=0;n<21;n++){
-   const x=(n%2?1:-1)*(15+Math.sin(n*4.6)*6),z=-72-n*2.45,r=.45+(n%4)*.21;
+   const x=(n%2?1:-1)*(15+Math.sin(n*4.6)*6),z=-72-n*4.05,r=.45+(n%4)*.21;
    const mesh=make('desert boulder',new T.DodecahedronGeometry(r,0),rock,x,desertHeight(x,z)+.2,z);mesh.rotation.y=n;
    obstacles.push({x,z,r});
   }
   const bark=mat(0x756048),green=mat(0x536340),leaf=new T.SphereGeometry(1,8,4);
-  for(const [x,z] of [[-9,-70],[9,-71],[-19,-92],[23,-111]]){
+  for(const [x,z] of [[-9,-70],[9,-71],[-19,-92],[23,-141]]){
    const y=desertHeight(x,z);
    make('date palm trunk',new T.CylinderGeometry(.14,.27,5.5,8),bark,x,y+2.75,z);
    for(let n=0;n<7;n++){

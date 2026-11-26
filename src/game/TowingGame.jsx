@@ -1,4 +1,4 @@
-import {trackMotion,cableBreaks} from './trackedRecovery.js';
+import {trackMotion,cableBreaks,damagedTrackSpeed} from './trackedRecovery.js';
 import {addTrackedBody,moveTracks,trackedDust} from './trackedModels.js';
 import {anchorCapacity,redirectLoad,anchorSlip} from './temporaryAnchors.js';
 import { useEffect, useRef, useState } from 'react';
@@ -48,8 +48,8 @@ const JOBS=[
 {name:'Quarry Tandem Practice',x:-5,z:-99,pay:4800,kind:'heavy',truck:'rotator',weight:5,roll:.0,vehicle:'pickup',brief:'One cable per truck. Stage the rotator, connect A to pull toward the green bay, then stop and switch to medium wrecker B. Position it independently, park, connect B and manage both cable loads. Both winches must pull under load before completion.'},
 {name:'Woodland Recovery',...woodlandSite.target,pay:3800,kind:'woodland',truck:'offroad',vehicle:'pickup',weight:3.4,
  brief:'Follow the gravel trail into the woods. Winch the stuck work truck onto firm ground, secure its front axle with the wheel lift, and tow it back to the green trailhead bay.'},
-{name:'Military Tank Recovery: Iraq',x:12,z:-101,pay:6200,kind:'tracked',truck:'hercules',vehicle:'abrams',weight:61,
- brief:'Find the disabled Abrams. Position the M88A2 on firm ground, park, lower the blade, and winch the tank onto the road. Disconnect, couple the tow bar and return to the maintenance outpost.'}
+{name:'Military Tank Recovery: Iraq',x:12,z:-143,pay:6200,kind:'tracked',truck:'hercules',vehicle:'abrams',weight:61,
+ brief:'Cross the ridge to find the disabled Abrams. Position the M88A2 on firm ground, park, lower the blade, and winch the tank onto the road. Disconnect, couple the tow bar and return to the maintenance outpost.'}
 ];
 // Quick camera presets are independent of the equipment and dispatch menus.
 const CAMERA_MODES=[['ravine','RAVINE'],['orbit','FREE'],['chase','CHASE'],['reverse','REAR'],['front','FRONT'],['left','LEFT'],['right','RIGHT'],['top','TOP'],['hook','HOOK'],['wide','WIDE']];
@@ -726,6 +726,7 @@ export default function TowingGame(){
     // Recovery ropes apply translation, yaw and roll at their actual world-space eyes.
     let primaryYawMoment=0;
     let primaryPowered=false;
+    const damagedTrack=!!s.pickup.userData.tracks;
     if(s.type.id==='rotator'){
       const targets=[{...primaryRecoveryTarget(s),vel:s.pickVel,yawRate:s.pickYawVel,rollRate:s.pickRollVel,mass:JOBS[s.jobIndex%JOBS.length].weight||12},{pos:s.secondary.pos,vel:s.secondary.vel,yaw:s.secondary.yaw,roll:s.secondary.roll,contactHull:s.secondary.contactHull,yawRate:s.secondary.yawVel,rollRate:s.secondary.rollVel,mass:11}];
       const torques=[0,0],yawMoments=[0,0],forces=[V(),V()],truckReaction=V(),wrench={x:0,y:0,z:0,mx:0,mz:0};
@@ -825,7 +826,10 @@ export default function TowingGame(){
        if(!pulling&&s.tension===0){s.pickVel.x=stopWinchCoast(s.pickVel.x,h);s.pickVel.z=stopWinchCoast(s.pickVel.z,h);}
        if(guide&&overloadAnchor(s,s.hookRedirect,redirectLoad(s.tension,pa,guide,pb),[pa,pb],h))s.tension=0;
        if(s.tension>0&&!s.loaded&&(!isRollback||pulling)){
-         const pull=groundCableDelta(dir.clone().negate(),s.tension,tracked?15000:2350,h);s.pickVel.x+=pull.x;s.pickVel.z+=pull.z;s.pickVel.y=0;
+         if(!damagedTrack||pulling||!s.parkingBrake){
+          const pull=groundCableDelta(dir.clone().negate(),s.tension,damagedTrack?15000:2350,h);
+          s.pickVel.x+=pull.x;s.pickVel.z+=pull.z;s.pickVel.y=0;
+         }
          if(!guide&&!isRollback){const reaction=groundCableDelta(dir,s.tension,tracked?65000:6200,h);s.vel.x+=reaction.x;s.vel.z+=reaction.z;}
          if(!isRollback){const offset=pb.clone().sub(s.pickPos).sub(V(0,.65,0));primaryYawMoment+=recoveryYawMoment(offset,dir.clone().negate(),s.tension);primaryPowered=pulling;}
        }
@@ -899,6 +903,11 @@ export default function TowingGame(){
        for(const wheel of s.pickup.userData.wheels)wheel.rotation.x+=travel/(.48*scale);
      }
      if(!s.loaded&&!(isRollback&&s.hook)){
+      if(damagedTrack){
+       const speed=s.pickVel.length();
+       const held=primaryPowered||s.hook&&!s.parkingBrake;
+       if(speed>0)s.pickVel.multiplyScalar(damagedTrackSpeed(speed,surfaceAt(s.pickPos).sand??0,held,h)/speed);
+      }
        const ground=recoverySurfaceVelocity(s.pickVel.x,s.pickVel.z,s.pickYaw,s.type.id==='rotator'?s.pickRoll:0,h,surfaceAt(s.pickPos));
       s.pickVel.x=ground.x;s.pickVel.z=ground.z;
       if(isDitchPull(s)){
@@ -1559,6 +1568,7 @@ export default function TowingGame(){
  const nextCamera=()=>{const index=CAMERA_MODES.findIndex(([id])=>id===cameraMode);changeCamera(CAMERA_MODES[(index+1)%CAMERA_MODES.length][0]);};
  const toggleRearCamera=()=>changeCamera(cameraMode==='reverse'?'orbit':'reverse');
  const currentJob=JOBS[career.job%JOBS.length],currentSite=siteConfig(career.job%JOBS.length);
+ const mapY=currentSite?.kind==='desert'?z=>143+(z+55)*1.1:minimapY;
  const offroadEquipment=s?.type.id==='offroad';
  const fieldLiftToggle=<button className={'action '+(s?.liftDeployed?'active':'')} onClick={toggleLift}>{s?.liftDeployed?'FOLD WHEEL LIFT':'LOWER WHEEL LIFT'}</button>;
  const fieldLiftGrid=<div className="equipment-row"><button className="action" onClick={()=>adjustGrid(-.1)}>GRID −</button><button className="action" onClick={()=>adjustGrid(.1)}>GRID +</button></div>;
@@ -1577,7 +1587,7 @@ export default function TowingGame(){
  </>;
  return <main className={'game-shell'+(menuOpen?' menu-active':'')+(cameraPanelOpen?' camera-active':'')}><div className={'scene'+(placingAnchor?' anchor-placement-scene':'')} ref={mount}/>
    {placingAnchor&&<div className="anchor-placement-hint" role="status"><b>{s?.customHookPlacement!==null?'SELECT CUSTOM HOOK':'PLACE GROUND ANCHOR'}</b><span>{s?.customHookPlacement!==null?'Tap a frame edge or bumper on the recovery vehicle.':'Tap a tree trunk or a clear spot to rig a temporary anchor.'}</span><button type="button" onClick={s?.customHookPlacement!==null?cancelCustomHook:cancelAnchorPlacement}>CANCEL PLACEMENT</button></div>}
-  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>{s?.tandemHelper?'TRUCK '+(activeRecoveryLine===0?'A • ROTATOR':'B • MEDIUM')+' • '+(controlledTruck(s).parkingBrake?'PARKED':'DRIVE READY'):'CAREER MODE • '+career.selected.toUpperCase()+' TRUCK'}</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .89 • CABLE FAILURE</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
+  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>{s?.tandemHelper?'TRUCK '+(activeRecoveryLine===0?'A • ROTATOR':'B • MEDIUM')+' • '+(controlledTruck(s).parkingBrake?'PARKED':'DRIVE READY'):'CAREER MODE • '+career.selected.toUpperCase()+' TRUCK'}</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .90 • CABLE FAILURE</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
   <div className={'game-minimap '+(mapOpen?'map-expanded':'map-collapsed')} style={{position:'absolute',left:12,bottom:195,zIndex:9,width:mapOpen?146:106,height:mapOpen?166:36,pointerEvents:'auto',border:'2px solid #f3c851',borderRadius:12,background:'rgba(9,20,30,.88)',color:'#fff',boxShadow:'0 3px 14px #0008',padding:6,boxSizing:'border-box'}}>
    <button type="button" aria-expanded={mapOpen} onClick={()=>setMapOpen(v=>!v)} style={{fontSize:11,fontWeight:800,width:'100%',background:'transparent',border:0,color:'white'}}>{mapOpen?'MAP −':'MAP +'}</button>
    {mapOpen&&<svg viewBox="0 0 140 140" width="132" height="132" aria-label="Map of recovery vehicles and destination">
@@ -1585,26 +1595,26 @@ export default function TowingGame(){
     {currentSite?.kind==='woodland'
      ?<polyline points={Array.from({length:21},(_,i)=>{
        const z=woodlandSite.bounds.minZ+i*(woodlandSite.bounds.maxZ-woodlandSite.bounds.minZ)/20;
-       return minimapX(woodlandTrailCenter(z))+','+minimapY(z);
+       return minimapX(woodlandTrailCenter(z))+','+mapY(z);
       }).join(' ')} fill="none" stroke="#9d8b65" strokeWidth="14"/>
      :<><path d="M 70 0 V 140" stroke="#61787a" strokeWidth="22"/>
       <path d="M 70 0 V 140" stroke="#c4c8a6" strokeDasharray="5 7" strokeWidth="1.5"/></>}
     {s?.riggingAnchors.slice(3).filter(a=>a.pos).map(anchor=><circle key={anchor.id}
-      cx={minimapX(anchor.pos.x)} cy={minimapY(anchor.pos.z)} r="3" fill="#63e5ef"><title>{anchor.label}</title></circle>)}
-    {currentSite?currentSite.goals.map((g,i)=><circle key={i} cx={minimapX(g.x)} cy={minimapY(g.z)} r={g.r*1.5} fill="none" stroke={i?'#56dff2':'#49dc77'} strokeWidth="2.5"/>):<circle cx={minimapX(currentJob.kind==='tow'||currentJob.kind==='flatbed'?0:2)} cy={minimapY(currentJob.kind==='tow'||currentJob.kind==='flatbed'?23:currentJob.z)} r="7" fill="none" stroke="#49dc77" strokeWidth="2.5"/>}
+      cx={minimapX(anchor.pos.x)} cy={mapY(anchor.pos.z)} r="3" fill="#63e5ef"><title>{anchor.label}</title></circle>)}
+    {currentSite?currentSite.goals.map((g,i)=><circle key={i} cx={minimapX(g.x)} cy={mapY(g.z)} r={g.r*1.5} fill="none" stroke={i?'#56dff2':'#49dc77'} strokeWidth="2.5"/>):<circle cx={minimapX(currentJob.kind==='tow'||currentJob.kind==='flatbed'?0:2)} cy={mapY(currentJob.kind==='tow'||currentJob.kind==='flatbed'?23:currentJob.z)} r="7" fill="none" stroke="#49dc77" strokeWidth="2.5"/>}
     {currentSite?.kind==='woodland'
-     ?<text x={minimapX(woodlandSite.goals[0].x)} y={minimapY(woodlandSite.goals[0].z)+15} fill="#c9ffd1" fontSize="7" textAnchor="middle" fontWeight="bold">TRAILHEAD</text>
-     :<><rect x="57" y={minimapY(23)-5} width="26" height="10" rx="3" fill="#49dc77" stroke="#fff" strokeWidth="1"/>
-      <text x="70" y={minimapY(23)+3} fill="#0d2518" fontSize="7" textAnchor="middle" fontWeight="bold">DEPOT</text></>}
-    <g transform={'translate('+minimapX(hud.carX??currentJob.x)+','+minimapY(hud.carZ??currentJob.z)+') rotate('+(-(hud.carYaw??0)*180/Math.PI)+')'}>
+     ?<text x={minimapX(woodlandSite.goals[0].x)} y={mapY(woodlandSite.goals[0].z)+15} fill="#c9ffd1" fontSize="7" textAnchor="middle" fontWeight="bold">TRAILHEAD</text>
+     :<><rect x="57" y={mapY(currentSite?.kind==='desert'?-65:23)-5} width="26" height="10" rx="3" fill="#49dc77" stroke="#fff" strokeWidth="1"/>
+      <text x="70" y={mapY(currentSite?.kind==='desert'?-65:23)+3} fill="#0d2518" fontSize="7" textAnchor="middle" fontWeight="bold">DEPOT</text></>}
+    <g transform={'translate('+minimapX(hud.carX??currentJob.x)+','+mapY(hud.carZ??currentJob.z)+') rotate('+(-(hud.carYaw??0)*180/Math.PI)+')'}>
      <rect x="-4" y="-7" width="8" height="14" rx="2" fill="#ffcf58" stroke="#111" strokeWidth="1"/>
     </g>
-    {s?.secondary.active&&<g transform={'translate('+minimapX(hud.secondX??currentJob.second.x)+','+minimapY(hud.secondZ??currentJob.second.z)+')'}>
+    {s?.secondary.active&&<g transform={'translate('+minimapX(hud.secondX??currentJob.second.x)+','+mapY(hud.secondZ??currentJob.second.z)+')'}>
      <rect x="-5" y="-7" width="10" height="14" rx="2" fill="#d99355" stroke="#fff" strokeWidth="1"/>
      <text x="0" y="3" fontSize="8" textAnchor="middle" fill="#111" fontWeight="bold">2</text>
     </g>}
-    {hud.otherTruck&&s?.tandemHelper&&<g transform={'translate('+minimapX(hud.otherTruck.x)+','+minimapY(hud.otherTruck.z)+') rotate('+(-hud.otherTruck.yaw*180/Math.PI)+')'}><rect x="-5" y="-9" width="10" height="18" rx="2" fill="#e7b744" stroke="white"/><text x="0" y="3" textAnchor="middle" fontSize="8" fill="#222">{activeRecoveryLine===0?'B':'A'}</text></g>}
-    <g transform={'translate('+minimapX(hud.mapX??0)+','+minimapY(hud.mapZ??7)+') rotate('+(-(hud.mapYaw??0)*180/Math.PI)+')'}>
+    {hud.otherTruck&&s?.tandemHelper&&<g transform={'translate('+minimapX(hud.otherTruck.x)+','+mapY(hud.otherTruck.z)+') rotate('+(-hud.otherTruck.yaw*180/Math.PI)+')'}><rect x="-5" y="-9" width="10" height="18" rx="2" fill="#e7b744" stroke="white"/><text x="0" y="3" textAnchor="middle" fontSize="8" fill="#222">{activeRecoveryLine===0?'B':'A'}</text></g>}
+    <g transform={'translate('+minimapX(hud.mapX??0)+','+mapY(hud.mapZ??7)+') rotate('+(-(hud.mapYaw??0)*180/Math.PI)+')'}>
      <rect x="-5" y="-9" width="10" height="18" rx="2" fill="#55b7ff" stroke="white" strokeWidth="1.5"/>
      <path d="M -3 -5 L 0 -8 L 3 -5" fill="none" stroke="white"/>
     </g>
