@@ -512,7 +512,29 @@ export default function TowingGame(){
       const step=frontWinchStep(s.frontWinch,frontWinchHead(s),anchor.pos,parked,h,1.4*settingsRef.current.winch);
       s.frontWinch.spool=step.spool;s.frontWinch.tension=step.tension;
       s.frontWinch.stalled=step.stalled;s.frontWinch.previousDistance=step.previousDistance;
-      if(!overloadAnchor(s,s.frontWinch.anchor,step.tension,[frontWinchHead(s)],h)){s.vel.x+=step.x;s.vel.z+=step.z;}
+      // Idle steel line restrains outward motion; only powered reeling pulls the truck.
+      const head=frontWinchHead(s),delta=head.clone().sub(anchor.pos),distance=delta.length();
+      const breakingLoad=48000; // gameplay rating, separate from drum pull limit
+      const demand=Math.max(0,distance-step.spool)*7200*Math.max(.70,Math.min(1.50,20/Math.max(1,step.spool)));
+      const outward=delta.clone();outward.y=0;
+      if(outward.lengthSq()>1e-8)outward.normalize();
+      const radial=s.vel.dot(outward);
+      const load=Math.max(step.tension,demand+Math.max(0,radial)*1000);
+      if(load>=breakingLoad&&breakingLoad<=(anchor.capacity??58000)){
+        s.frontWinch=makeFrontWinch();
+        setNotice('FRONT WINCH CABLE SNAPPED. Reconnect to recover.');
+      }else if(!overloadAnchor(s,s.frontWinch.anchor,load,[head],h)){
+        if(s.frontWinch.motor>0){s.vel.x+=step.x;s.vel.z+=step.z;}
+        else if(s.frontWinch.motor===0&&distance>=step.spool-.05&&radial>0){
+          // A fast impact can overload the line even before visible stretch develops.
+          const shock=12000*radial/Math.max(.15,h);
+          if(shock>=breakingLoad&&breakingLoad<=(anchor.capacity??58000)){
+            s.frontWinch=makeFrontWinch();setNotice('FRONT WINCH CABLE SNAPPED. Reconnect to recover.');
+          }else if(!overloadAnchor(s,s.frontWinch.anchor,Math.max(load,shock),[head],h)){
+            s.vel.addScaledVector(outward,-radial);
+          }
+        }
+      }
     }else if(s.woodlandBogged){
       s.vel.x=stopWinchCoast(s.vel.x,h);s.vel.z=stopWinchCoast(s.vel.z,h);
     }
@@ -1488,7 +1510,7 @@ export default function TowingGame(){
  </>;
  return <main className={'game-shell'+(menuOpen?' menu-active':'')+(cameraPanelOpen?' camera-active':'')}><div className={'scene'+(placingAnchor?' anchor-placement-scene':'')} ref={mount}/>
    {placingAnchor&&<div className="anchor-placement-hint" role="status"><b>{s?.customHookPlacement!==null?'SELECT CUSTOM HOOK':'PLACE GROUND ANCHOR'}</b><span>{s?.customHookPlacement!==null?'Tap a frame edge or bumper on the recovery vehicle.':'Tap a tree trunk or a clear spot to rig a temporary anchor.'}</span><button type="button" onClick={s?.customHookPlacement!==null?cancelCustomHook:cancelAnchorPlacement}>CANCEL PLACEMENT</button></div>}
-  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>{s?.tandemHelper?'TRUCK '+(activeRecoveryLine===0?'A • ROTATOR':'B • MEDIUM')+' • '+(controlledTruck(s).parkingBrake?'PARKED':'DRIVE READY'):'CAREER MODE • '+career.selected.toUpperCase()+' TRUCK'}</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .87 • ANCHOR PULLOUT</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
+  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>{s?.tandemHelper?'TRUCK '+(activeRecoveryLine===0?'A • ROTATOR':'B • MEDIUM')+' • '+(controlledTruck(s).parkingBrake?'PARKED':'DRIVE READY'):'CAREER MODE • '+career.selected.toUpperCase()+' TRUCK'}</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .88 • CABLE FAILURE</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
   <div className={'game-minimap '+(mapOpen?'map-expanded':'map-collapsed')} style={{position:'absolute',left:12,bottom:195,zIndex:9,width:mapOpen?146:106,height:mapOpen?166:36,pointerEvents:'auto',border:'2px solid #f3c851',borderRadius:12,background:'rgba(9,20,30,.88)',color:'#fff',boxShadow:'0 3px 14px #0008',padding:6,boxSizing:'border-box'}}>
    <button type="button" aria-expanded={mapOpen} onClick={()=>setMapOpen(v=>!v)} style={{fontSize:11,fontWeight:800,width:'100%',background:'transparent',border:0,color:'white'}}>{mapOpen?'MAP −':'MAP +'}</button>
    {mapOpen&&<svg viewBox="0 0 140 140" width="132" height="132" aria-label="Map of recovery vehicles and destination">
