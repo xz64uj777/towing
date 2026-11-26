@@ -15,21 +15,23 @@ export function soundState(s,previous,dt,surface){
  const parked=s.parkingBrake||s.riggersDeployed;
  const active=s.recoveryLines.filter(l=>l.connected);
  const heavy=s.type.id==='rotator';
- const winchOn=heavy?active.some(l=>l.motor!==0)&&s.boomDeployed&&parked&&speed<.25:
-  s.hook&&(s.winch||s.winchOut)&&s.parkingBrake&&(s.boomDeployed||s.tools.includes('bed'));
- const load=clamp(heavy?Math.max(0,...active.map(l=>l.tension/42000)):s.tension/32000);
- const stalled=winchOn&&(heavy?active.some(l=>l.stalled):!!s.cableStalled);
+ const front=s.frontWinch;
+ const frontRunning=Boolean(front&&front.anchor>=0&&(front.motor<0||front.motor>0&&!parked));
+ const winchOn=frontRunning||(heavy?active.some(l=>l.motor!==0)&&s.boomDeployed&&parked&&speed<.25:
+  s.hook&&(s.winch||s.winchOut)&&s.parkingBrake&&(s.boomDeployed||s.tools.includes('bed')));
+ const load=clamp(frontRunning?front.tension/32000:heavy?Math.max(0,...active.map(l=>l.tension/42000)):s.tension/32000);
+ const stalled=winchOn&&(frontRunning?front.stalled:heavy?active.some(l=>l.stalled):!!s.cableStalled);
  const same=previous?.sim===s&&dt>0&&dt<.25;
  const current={sim:s,speed,x:s.pos.x,z:s.pos.z,roll:s.pickRoll,secondaryRoll:s.secondary.roll,secondaryActive:s.secondary.active,
   boom:[s.boomAngle,s.boomExtension,s.boomSwing],lift:[s.liftHeight,s.liftExtension],
-  spools:s.recoveryLines.map(l=>l.spool),length:s.cableLength,park:!!s.parkingBrake,riggers:!!s.riggersDeployed,
+  spools:s.recoveryLines.map(l=>l.spool),length:s.cableLength,frontLength:front?.spool,frontConnected:front?.anchor>=0,park:!!s.parkingBrake,riggers:!!s.riggersDeployed,
   hook:!!s.hook,connected:s.recoveryLines.map(l=>!!l.connected),arms:!!s.armsClosed,straps:!!s.strapsOn,
   bed:!!s.bedTilt,deck:[s.bedSlide||0,s.bedProgress||0],liftDeployed:!!s.liftDeployed,loaded:!!s.loaded,stalled,load,jobDone:!!s.jobDone,reverse:s.vel.x*Math.sin(s.yaw)-s.vel.z*Math.cos(s.yaw)<-.25};
  const valid=same&&Math.hypot(current.x-previous.x,current.z-previous.z)<5;
  const motion=valid?clamp((current.boom.reduce((n,v,i)=>n+delta(v,previous.boom[i]),0)+
  current.lift.reduce((n,v,i)=>n+delta(v,previous.lift[i]),0)+current.deck.reduce((n,v,i)=>n+delta(v,previous.deck?.[i]),0))/dt,0,2):0;
  const hydraulic=clamp(motion*.95);
- const reelSpeed=valid&&winchOn?clamp((heavy?current.spools.reduce((n,v,i)=>n+(active.includes(s.recoveryLines[i])?delta(v,previous.spools[i]):0),0):
+ const reelSpeed=valid&&winchOn?clamp((frontRunning?delta(current.frontLength,previous.frontLength):heavy?current.spools.reduce((n,v,i)=>n+(active.includes(s.recoveryLines[i])?delta(v,previous.spools[i]):0),0):
  delta(current.length,previous.length))/dt,0,6):0;
  const throttle=parked?0:abs(s.throttle);
  const rev=clamp(Math.max(speed/17*.60+throttle*.36,hydraulic*.28,winchOn?.22+load*.35:0));
@@ -39,7 +41,7 @@ export function soundState(s,previous,dt,surface){
  if(valid){
   if(current.park!==previous.park)events.push('air');
   if(current.riggers!==previous.riggers||current.liftDeployed!==previous.liftDeployed||current.bed!==previous.bed)events.push('heavy');
-  if(current.hook!==previous.hook||current.connected.some((v,i)=>v!==previous.connected[i])||
+  if(current.hook!==previous.hook||current.frontConnected!==previous.frontConnected||current.connected.some((v,i)=>v!==previous.connected[i])||
     current.arms!==previous.arms||current.straps!==previous.straps||current.loaded!==previous.loaded)events.push('metal');
   if(stalled&&!previous.stalled)events.push('strain');
   if((previous.roll>.5&&current.roll<.18)||(current.secondaryActive&&previous.secondaryRoll>.5&&current.secondaryRoll<.18))events.push('heavy');

@@ -188,6 +188,8 @@ export function addOffroadBody(T,body,color){
  part('forward control cab',[2.48,1.47,2.23],[0,2.16,-2.98]);
  part('cab roof extension',[2.54,.18,2.31],[0,2.96,-2.97]);
  part('steel brush bumper',[2.78,.42,.46],[0,1.15,-4.19],dark);
+ part('front winch fairlead',[.70,.24,.12],[0,1.02,-4.43],dark);
+ part('front cable eye',[.20,.15,.10],[0,.96,-4.50],amber);
  part('front grille',[1.1,.41,.08],[0,1.68,-4.13],dark);
  part('engine enclosure',[2.14,.90,1.48],[0,1.96,-.93]);
  part('rear recovery platform',[2.49,.22,4.51],[0,1.52,1.46],dark);

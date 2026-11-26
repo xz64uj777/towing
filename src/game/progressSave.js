@@ -1,6 +1,7 @@
 // Device-local snapshot for an unfinished dispatch. This never replaces career storage.
 import {SITE_REVISION} from './dispatchSites.js';
 import {migrateJobIndex,stopTruckInputs} from './tandemRecovery.js';
+import {makeFrontWinch,WOODLAND_PULL_ANCHORS} from './woodlandRecovery.js';
 import {parkingBrakeForRiggers} from './gameRules.js';
 export const RECOVERY_SAVE_KEY='towing-in-progress-v1';
 const vec=v=>v?{x:v.x,y:v.y,z:v.z}:null;
@@ -9,6 +10,7 @@ const validNum=n=>typeof n==='number'&&Number.isFinite(n);
 const index=(n,max)=>Number.isInteger(n)&&n>=0&&n<=max;
 export function captureRecoverySave(career,s){
  return {version:1,siteRevision:SITE_REVISION,savedAt:Date.now(),jobIndex:s.jobIndex,jobCount:career.jobCount??7,
+ frontWinch:s.frontWinch?{anchor:s.frontWinch.anchor,spool:s.frontWinch.spool,bogged:s.woodlandBogged}:null,
  tandemUsed:s.tandemHelper?[...s.tandemUsed]:null,
  tandemSelected:s.tandemHelper?s.tandemSelected:null,
  helper:s.helperState?{pos:vec(s.helperState.pos),yaw:s.helperState.yaw,parkingBrake:s.helperState.parkingBrake,boomAngle:s.helperState.boomAngle,boomExtension:s.helperState.boomExtension}:null,
@@ -80,6 +82,14 @@ export function restoreRecoverySave(s,saved,V){
    helper.boomDeployed=helper.parkingBrake;
    helper.vel.set(0,0,0);stopTruckInputs(helper);
   }
+ }
+ if(s.frontWinch){
+  const line=saved.frontWinch;
+  s.frontWinch=makeFrontWinch();
+  if(!s.hook&&line&&index(line.anchor,WOODLAND_PULL_ANCHORS.length-1)&&validNum(line.spool)&&line.spool>=0&&line.spool<=90){
+   s.frontWinch.anchor=line.anchor;s.frontWinch.spool=line.spool;
+  }
+  s.woodlandBogged=line?.bogged===true;
  }
  s.hookPoint=index(s.hookPoint,9)?s.hookPoint:0;
  s.hookRedirect=index(s.hookRedirect,4)?s.hookRedirect:0;
