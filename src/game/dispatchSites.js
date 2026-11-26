@@ -4,15 +4,14 @@ export const SITE_REVISION=1;
 export const WOODLAND_SITE_INDEX=8;
 const WOODLAND_SITE={
  kind:'woodland',start:{x:8,z:-72},target:{x:21,z:-104},goals:[{x:8,z:-67,r:4.2}],
- anchors:[{x:16,z:-107,label:'TRAIL EDGE ANCHOR'},{x:11,z:-113,label:'TURNOUT ANCHOR'}],
  bounds:{minX:-16,maxX:36,minZ:-121,maxZ:-62}
 };
 export const siteConfig=i=>i===5?{
- kind:'terminal',start:{x:0,z:-73},goals:[{x:8,z:-88,r:4.1}],anchors:[{x:-19,z:-79,label:'YARD ANCHOR A'},{x:14,z:-96,label:'YARD ANCHOR B'}],bounds:{minX:-21,maxX:21,minZ:-114,maxZ:-62}
+ kind:'terminal',start:{x:0,z:-73},goals:[{x:8,z:-88,r:4.1}],bounds:{minX:-21,maxX:21,minZ:-114,maxZ:-62}
 }:i===6?{
- kind:'bridge',start:{x:0,z:-78},goals:[{x:0,z:-85,r:3.0},{x:0,z:-75,r:3.0}],anchors:[{x:-6.1,z:-87,label:'LEFT DECK ANCHOR'},{x:6.1,z:-91,label:'RIGHT DECK ANCHOR'}],bounds:{minX:-4.85,maxX:4.85,minZ:-124,maxZ:-54}
+ kind:'bridge',start:{x:0,z:-78},goals:[{x:0,z:-85,r:3.0},{x:0,z:-75,r:3.0}],bounds:{minX:-4.85,maxX:4.85,minZ:-124,maxZ:-54}
 }:i===7?{
- kind:'quarry',start:{x:7,z:-83},goals:[{x:7,z:-93,r:4.2}],anchors:[{x:-17,z:-90,label:'QUARRY ANCHOR A'},{x:15,z:-102,label:'QUARRY ANCHOR B'}],bounds:{minX:-22,maxX:22,minZ:-120,maxZ:-59}
+ kind:'quarry',start:{x:7,z:-83},goals:[{x:7,z:-93,r:4.2}],bounds:{minX:-22,maxX:22,minZ:-120,maxZ:-59}
 }:i===WOODLAND_SITE_INDEX?WOODLAND_SITE:null;
 const smooth=(a,b,x)=>{const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*(3-2*t);};
 export const woodlandTrailCenter=z=>8+5*Math.sin((z+69)/8);

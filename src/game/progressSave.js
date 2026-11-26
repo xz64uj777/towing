@@ -1,7 +1,7 @@
 // Device-local snapshot for an unfinished dispatch. This never replaces career storage.
 import {SITE_REVISION} from './dispatchSites.js';
 import {migrateJobIndex,stopTruckInputs} from './tandemRecovery.js';
-import {makeFrontWinch,WOODLAND_PULL_ANCHORS} from './woodlandRecovery.js';
+import {makeFrontWinch} from './woodlandRecovery.js';
 import {parkingBrakeForRiggers} from './gameRules.js';
 export const RECOVERY_SAVE_KEY='towing-in-progress-v1';
 const vec=v=>v?{x:v.x,y:v.y,z:v.z}:null;
@@ -23,6 +23,7 @@ export function captureRecoverySave(career,s){
  'hookPoint','hookRedirect','cableLength','woodlandExtracted','rollbackLoadX','rollbackLoadYaw','rollbackLoadZ','recoveryDamage','siteFailed','autoLoad','autoUnload','dropoffArrived','dropoffComplete','winchSpeed']
  .map(k=>[k,s[k]])),
  anchors:s.riggingAnchors.slice(3,5).map(a=>vec(a.pos)),
+ anchorSetup:s.riggingAnchors.slice(3,5).map(a=>({capacity:a.capacity,tree:!!a.tree,ballast:!!a.ballast})),
  lines:s.recoveryLines.map(l=>({connected:l.connected,point:l.point,customPoint:l.customPoint?{...l.customPoint}:null,
   redirect:l.redirect,secondRedirect:l.secondRedirect||0,target:l.target,spool:l.spool,doubled:!!l.doubled})),
  camera:{mode:s.cameraMode,yaw:s.cameraYaw,pitch:s.cameraPitch,presetYaw:s.presetYaw,presetPitch:s.presetPitch,zoom:s.zoom}};
@@ -63,8 +64,18 @@ export function restoreRecoverySave(s,saved,V){
   const point=saved.anchors[i],anchor=s.riggingAnchors[i+3];
   anchor.pos=point?V(point.x,point.y,point.z):null;
   anchor.marker.visible=!!point;
-  if(point)anchor.marker.position.set(point.x,point.y-.55,point.z);
+  const setup=saved.anchorSetup?.[i];
+  anchor.capacity=validNum(setup?.capacity)?Math.max(1000,Math.min(68000,setup.capacity)):58000;
+  anchor.tree=setup?.tree===true;
+  anchor.ballast=!anchor.tree&&setup?.ballast===true;
+  if(anchor.marker.children?.[0])anchor.marker.children[0].visible=!anchor.tree&&!anchor.ballast;
+  if(anchor.marker.children?.[2])anchor.marker.children[2].visible=anchor.ballast;
+  if(point)anchor.marker.position.set(point.x,point.y-(anchor.tree?.95:.55),point.z);
   Object.assign(s.recoveryLines[i],saved.lines[i],{doubled:!!saved.lines[i].doubled,motor:0,tension:0,strain:0,stalled:false,previousDistance:null});
+  const line=s.recoveryLines[i];
+  if([line.redirect,line.secondRedirect].some(slot=>slot&&!(slot>=3&&saved.anchors[slot-3]))){
+   line.connected=false;line.redirect=0;line.secondRedirect=0;
+  }
  }
  for(const [key,min,max] of [['rollbackLoadX',-.27,.27],['rollbackLoadYaw',-.15,.15],['rollbackLoadZ',0,.18]])s[key]=validNum(saved.equipment[key])?Math.max(min,Math.min(max,saved.equipment[key])):0;
  s.recoveryDamage=validNum(saved.equipment.recoveryDamage)?Math.max(0,Math.min(750,saved.equipment.recoveryDamage)):0;s.bedContactLatch=false;
@@ -86,13 +97,15 @@ export function restoreRecoverySave(s,saved,V){
  if(s.frontWinch){
   const line=saved.frontWinch;
   s.frontWinch=makeFrontWinch();
-  if(!s.hook&&line&&index(line.anchor,WOODLAND_PULL_ANCHORS.length-1)&&validNum(line.spool)&&line.spool>=0&&line.spool<=90){
+  if(!s.hook&&line&&index(line.anchor,4)&&line.anchor>=3&&s.riggingAnchors[line.anchor].pos&&validNum(line.spool)&&line.spool>=0&&line.spool<=90){
    s.frontWinch.anchor=line.anchor;s.frontWinch.spool=line.spool;
   }
   s.woodlandBogged=line?.bogged===true;
  }
  s.hookPoint=index(s.hookPoint,9)?s.hookPoint:0;
- s.hookRedirect=index(s.hookRedirect,4)?s.hookRedirect:0;
+ if(s.hookRedirect&&!(index(s.hookRedirect,4)&&s.hookRedirect>=3&&s.riggingAnchors[s.hookRedirect].pos)){
+  s.hook=false;s.hookRedirect=0;
+ }
  s.winch=false;s.winchOut=false;s.throttle=0;s.brake=0;s.steer=0;s.tension=0;s.previousCableDistance=null;s.cableStrain=0;s.cableStalled=false;
  s.boomControl=0;s.boomExtendControl=0;s.boomSwingControl=0;
  s.liftControl=0;s.liftExtendControl=0;s.liftHydraulicX=0;s.liftHydraulicY=0;

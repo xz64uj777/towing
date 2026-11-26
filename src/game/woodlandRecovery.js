@@ -1,10 +1,5 @@
 import {cablePathSpeed,standardWinchStep} from './cablePhysics.js';
 
-export const WOODLAND_PULL_ANCHORS=[
- {x:7,z:-99,label:'LOWER TRAIL ANCHOR'},
- {x:3,z:-75,label:'UPPER TRAIL ANCHOR'},
- {x:16,z:-87,label:'EAST TRAIL ANCHOR'},
-];
 export const FRONT_WINCH_CRAWL=2;
 export const makeFrontWinch=()=>({anchor:-1,spool:0,motor:0,previousDistance:null,tension:0,stalled:false});
 
