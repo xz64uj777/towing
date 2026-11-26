@@ -1,3 +1,4 @@
+import {DESERT_INDEX,DESERT_SITE,desertHeight,desertSurface} from './trackedRecovery.js';
 import {surfaceMap,waterNormalMap} from './visualQuality.js';
 // Distinct recovery locations. Shared coordinates drive rendering and objectives.
 export const SITE_REVISION=1;
@@ -12,7 +13,7 @@ export const siteConfig=i=>i===5?{
  kind:'bridge',start:{x:0,z:-78},goals:[{x:0,z:-85,r:3.0},{x:0,z:-75,r:3.0}],bounds:{minX:-4.85,maxX:4.85,minZ:-124,maxZ:-54}
 }:i===7?{
  kind:'quarry',start:{x:7,z:-83},goals:[{x:7,z:-93,r:4.2}],bounds:{minX:-22,maxX:22,minZ:-120,maxZ:-59}
-}:i===WOODLAND_SITE_INDEX?WOODLAND_SITE:null;
+}:i===WOODLAND_SITE_INDEX?WOODLAND_SITE:i===DESERT_INDEX?DESERT_SITE:null;
 const smooth=(a,b,x)=>{const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*(3-2*t);};
 export const woodlandTrailCenter=z=>8+5*Math.sin((z+69)/8);
 function woodlandGround(x,z){
@@ -45,6 +46,7 @@ export function bridgeGround(x,z){
  return -.12-6.2*channel+.10*Math.sin(x*.12)*channel;
 }
 export function siteHeight(i,x,z){
+ if(i===DESERT_INDEX)return desertHeight(x,z);
  if(i===5||i===7)return .04;
  if(i===6)return Math.abs(x)<=6.6&&z>=-128&&z<=-52?.04:bridgeGround(x,z);
  if(i===WOODLAND_SITE_INDEX)return woodlandGround(x,z).height;
@@ -58,6 +60,7 @@ export function siteGravity(i,x,z,strength=1){
  const s=siteSlope(i,x,z),d=1+s.x*s.x+s.z*s.z;return {x:-9.81*strength*s.x/d,z:-9.81*strength*s.z/d};
 }
 export function siteSurface(i,x,z){
+ if(i===DESERT_INDEX)return desertSurface(x,z);
  if(i===5){
   const paved=x>=-22&&x<=22&&z>=-116&&z<=-60;
   if(paved&&x>=-17&&x<=-8&&z>=-94&&z<=-83)return {name:'ICE',traction:.34,lateralGrip:.38,drag:.42,depth:0};
@@ -97,6 +100,41 @@ export function createDispatchSite(T,scene,i){
  const box=(n,d,p,m)=>make(n,new T.BoxGeometry(...d),m,...p);
  const paint=(n,d,p,m)=>{const o=box(n,d,p,m);o.castShadow=false;return o;};
  const obstacles=[];
+ if(i===DESERT_INDEX){
+  const terrain=new T.PlaneGeometry(110,120,88,96);
+  terrain.rotateX(-Math.PI/2);terrain.translate(0,0,-90);
+  const pos=terrain.attributes.position,colors=[];
+  for(let n=0;n<pos.count;n++){
+   const x=pos.getX(n),z=pos.getZ(n),sand=desertSurface(x,z).sand;
+   pos.setY(n,desertHeight(x,z)); const c=new T.Color(0x8e8065).lerp(new T.Color(0xc6a575),sand);
+   colors.push(c.r,c.g,c.b);
+  }
+  terrain.setAttribute('color',new T.Float32BufferAttribute(colors,3));terrain.computeVertexNormals();
+  const ground=make('desert service road and sand',terrain,new T.MeshStandardMaterial({vertexColors:true,map:surfaceMap(T,34,34,71),roughness:.96}),0,0,0);
+  ground.castShadow=false;
+  const stucco=mat(0xc7ad7d),roof=mat(0x6e766b),rock=mat(0x75644f);
+  for(const x of [-10,10]){
+   box('maintenance outpost shelter',[7,3.2,6],[x,1.6,-62],stucco);
+   box('corrugated canopy',[7.8,.23,6.7],[x,3.32,-62],roof);
+  }
+  for(let n=0;n<21;n++){
+   const x=(n%2?1:-1)*(15+Math.sin(n*4.6)*6),z=-72-n*2.45,r=.45+(n%4)*.21;
+   const mesh=make('desert boulder',new T.DodecahedronGeometry(r,0),rock,x,desertHeight(x,z)+.2,z);mesh.rotation.y=n;
+   obstacles.push({x,z,r});
+  }
+  const bark=mat(0x756048),green=mat(0x536340),leaf=new T.SphereGeometry(1,8,4);
+  for(const [x,z] of [[-9,-70],[9,-71],[-19,-92],[23,-111]]){
+   const y=desertHeight(x,z);
+   make('date palm trunk',new T.CylinderGeometry(.14,.27,5.5,8),bark,x,y+2.75,z);
+   for(let n=0;n<7;n++){
+    const a=n*Math.PI*2/7;
+    const frond=make('date palm frond',leaf,green,x+Math.sin(a)*.95,y+5.44,z+Math.cos(a)*.95);
+    frond.scale.set(.29,.12,1.25);frond.rotation.set(.18,a,0);
+   }
+   obstacles.push({x,z,r:.36});
+  }
+  return {ground,obstacles};
+ }
  if(i===WOODLAND_SITE_INDEX){
   const terrain=new T.PlaneGeometry(126,130,144,144);
   terrain.rotateX(-Math.PI/2);terrain.translate(9,0,-94);

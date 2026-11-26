@@ -20,7 +20,7 @@ export function captureRecoverySave(career,s){
  secondary:{pos:vec(s.secondary.pos),yaw:s.secondary.yaw,roll:s.secondary.roll,active:s.secondary.active},
  equipment:Object.fromEntries(['parkingBrake','riggersDeployed','boomDeployed','boomAngle','boomSwing','boomExtension',
  'liftDeployed','liftHeight','liftExtension','gridWidth','armsClosed','loaded','strapsOn','bedTilt','bedSlide','bedProgress','hook',
- 'hookPoint','hookRedirect','cableLength','woodlandExtracted','rollbackLoadX','rollbackLoadYaw','rollbackLoadZ','recoveryDamage','siteFailed','autoLoad','autoUnload','dropoffArrived','dropoffComplete','winchSpeed']
+ 'hookPoint','hookRedirect','cableLength','woodlandExtracted','bladeDepth','sandSink','rollbackLoadX','rollbackLoadYaw','rollbackLoadZ','recoveryDamage','siteFailed','autoLoad','autoUnload','dropoffArrived','dropoffComplete','winchSpeed']
  .map(k=>[k,s[k]])),
  anchors:s.riggingAnchors.slice(3,5).map(a=>vec(a.pos)),
  anchorSetup:s.riggingAnchors.slice(3,5).map(a=>({capacity:a.capacity,tree:!!a.tree,ballast:!!a.ballast})),
@@ -33,7 +33,7 @@ export function parseRecoverySave(raw,jobCount){
   const s=typeof raw==='string'?JSON.parse(raw):raw;
   if(!s||s.version!==1||!Number.isInteger(s.jobIndex)||s.jobIndex<0||s.jobIndex>99999||
   !Number.isInteger(jobCount)||jobCount<1||!s.career||
-  !['light','flatbed','medium','rotator','offroad'].includes(s.career.selected)||
+  !['light','flatbed','medium','rotator','offroad','hercules'].includes(s.career.selected)||
   !s.truck||!validVec(s.truck.pos)||!validNum(s.truck.yaw)||
   !s.vehicle||!validVec(s.vehicle.pos)||!validNum(s.vehicle.yaw)||!validNum(s.vehicle.roll)||
   !s.secondary||!validVec(s.secondary.pos)||!validNum(s.secondary.yaw)||!validNum(s.secondary.roll)||
