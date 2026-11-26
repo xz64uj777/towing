@@ -846,7 +846,7 @@ test('carrier deck details and medium boom retain existing hydraulic transforms'
  const eye=boomTip.getWorldPosition(new THREE.Vector3());detailMediumRig(THREE,{recoveryStructure,boomPivot,boomTilt,boomTip});assert.ok(boomTip.getWorldPosition(new THREE.Vector3()).equals(eye));
 });
 
-import {siteConfig,siteHeight,siteSurface,bridgeGround,bridgeEdgeExceeded,constrainSiteTruck,siteRecoveryReady,checkpointSiteCompatible,createDispatchSite,SITE_REVISION} from './dispatchSites.js';
+import {siteConfig,siteHeight,siteSlope,siteSurface,bridgeGround,bridgeEdgeExceeded,constrainSiteTruck,siteRecoveryReady,checkpointSiteCompatible,createDispatchSite,SITE_REVISION,WOODLAND_SITE_INDEX,woodlandTrailCenter} from './dispatchSites.js';
 test('terminal and bridge use independent heightfields, staging and surfaces',()=>{
  assert.equal(siteConfig(5).kind,'terminal');assert.equal(siteConfig(6).kind,'bridge');
  assert.equal(siteHeight(5,-13,-88),.04);assert.equal(sampleSurface(5,-13,-88).name,'ICE');assert.equal(sampleSurface(5,-19,-100).name,'PACKED SNOW');assert.ok(sampleSurface(5,-13,-88).traction<sampleSurface(5,-19,-100).traction);
@@ -981,6 +981,40 @@ test('woodland requires an unloaded, disconnected truck at the trailhead',()=>{
  assert.equal(canCompleteJob('woodland',finish),true);
  for(const change of [{reached:false},{loaded:true},{strapped:true},{hook:true},{delivered:false}])
   assert.equal(canCompleteJob('woodland',{...finish,...change}),false);
+});
+
+test('woodland approach offers a higher dry line and a lower, slick line',()=>{
+ const i=WOODLAND_SITE_INDEX;
+ for(const z of [-84,-87,-90]){
+  const center=woodlandTrailCenter(z),dry=siteSurface(i,center-2.5,z),wet=siteSurface(i,center+2.5,z);
+  assert.equal(dry.name,'GRAVEL');
+  assert.equal(wet.name,'RUTTED MUD');
+  assert.ok(dry.traction-wet.traction>.25);
+  assert.ok(dry.lateralGrip-wet.lateralGrip>.25);
+  assert.ok(siteHeight(i,center-2.5,z)-siteHeight(i,center+2.5,z)>.35);
+  assert.ok(siteHeight(i,center+1.2,z)<siteHeight(i,center+2.5,z));
+ }
+ const bog=(offset,z)=>siteSurface(i,woodlandTrailCenter(z)+offset,z).bog;
+ assert.ok(bog(2.5,-87)>.68);
+ assert.ok(bog(2.5,-82)<.38&&bog(2.5,-92)<.38);
+ assert.equal(bog(-2.5,-87),0);
+});
+
+test('woodland approach leaves both vehicle corridors and the recovery pad passable',()=>{
+ const i=WOODLAND_SITE_INDEX,config=siteConfig(i);
+ const scene=new THREE.Scene(),{obstacles}=createDispatchSite(THREE,scene,i);
+ for(let z=-97;z<=-77;z+=.25){
+  for(const offset of [-2.5,2.5]){
+   const x=woodlandTrailCenter(z)+offset,{x:crossfall,z:grade}=siteSlope(i,x,z);
+   assert.ok(Math.hypot(crossfall,grade)<.27);
+   assert.ok(siteSurface(i,x,z).traction>=.5);
+   assert.ok(obstacles.every(o=>Math.hypot(x-o.x,z-o.z)>o.r+2.2),`clear lane at ${x}, ${z}`);
+  }
+ }
+ assert.deepEqual([config.start,config.target,config.goals[0]],[{x:8,z:-72},{x:21,z:-104},{x:8,z:-67,r:4.2}]);
+ assert.equal(siteSurface(i,13,-101).name,'GRAVEL');
+ assert.equal(siteSurface(i,config.target.x,config.target.z).name,'MUD');
+ assert.equal(checkpointSiteCompatible({jobIndex:i,siteRevision:1},9),true);
 });
 
 test('expanding the campaign preserves the dispatch within older career loops',()=>{

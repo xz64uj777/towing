@@ -16,9 +16,9 @@ export const siteConfig=i=>i===5?{
 }:i===WOODLAND_SITE_INDEX?WOODLAND_SITE:null;
 const smooth=(a,b,x)=>{const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*(3-2*t);};
 export const woodlandTrailCenter=z=>8+5*Math.sin((z+69)/8);
-export const woodlandOnFirmTrail=(x,z)=>z>=WOODLAND_SITE.bounds.minZ&&z<=WOODLAND_SITE.bounds.maxZ&&Math.abs(x-woodlandTrailCenter(z))<=4.6;
 function woodlandGround(x,z){
- const road=1-smooth(5.8,7.4,Math.abs(x-woodlandTrailCenter(z)));
+ const offset=x-woodlandTrailCenter(z);
+ const road=1-smooth(5.8,7.4,Math.abs(offset));
  const trailhead=1-smooth(7.8,11,Math.hypot(x-8,z+68));
  const turnout=1-smooth(7.8,10.8,Math.hypot(x-11,z+113));
  const recoveryClearing=1-smooth(6.5,8.4,Math.hypot(x-13,z+101));
@@ -28,8 +28,19 @@ function woodlandGround(x,z){
  const forest=1-gravel-mud;
  const rise=.04+(-z-68)*.035+.10*Math.sin((z+69)*.23)+.06*Math.sin((x-8)*.45);
  const bank=forest*(.58*Math.sin(x*.16+z*.13)+.34*Math.cos(x*.28-z*.17));
- return {gravel,mud,forest,height:rise+bank-1.60*mud};
+ // The raised gravel line and lower wheel tracks fade out at both clearings.
+ const approach=gravel*smooth(-96,-92,z)*(1-smooth(-81,-77,z));
+ const wet=approach*smooth(-.8,.9,offset)*(1-smooth(4.9,6.5,offset));
+ const camber=approach*(1-smooth(-1.8,1.3,offset))*(.24-.035*(offset+2.5));
+ const crest=.14*approach*Math.sin((z+90)*.37);
+ const rutDistance=Math.min(Math.abs(offset-1.2),Math.abs(offset-3.8));
+ const rutDepth=.11*wet*(1-smooth(.27,.96,rutDistance));
+ const bogDistance=Math.hypot((offset-2.5)/2.4,(z+87)/4.8);
+ const bog=wet*(1-smooth(.45,1.10,bogDistance));
+ return {gravel,mud,forest,wet,bog,height:rise+bank-1.60*mud+camber+crest-.24*wet-rutDepth};
 }
+export const woodlandOnFirmTrail=(x,z)=>z>=WOODLAND_SITE.bounds.minZ&&z<=WOODLAND_SITE.bounds.maxZ&&
+ Math.abs(x-woodlandTrailCenter(z))<=4.6&&woodlandGround(x,z).wet<.45;
 export function bridgeGround(x,z){
  const channel=smooth(0,8,Math.min(z+116,-91-z));
  return -.12-6.2*channel+.10*Math.sin(x*.12)*channel;
@@ -57,10 +68,10 @@ export function siteSurface(i,x,z){
  if(i===7)return {name:Math.abs(x)<10?'COMPACTED GRAVEL':'LOOSE GRAVEL',traction:Math.abs(x)<10?.86:.68,lateralGrip:Math.abs(x)<10?.85:.64,drag:Math.abs(x)<10?.70:1.05,depth:0};
  if(i===6&&Math.abs(x)<=6.6&&z>=-128&&z<=-52)return {name:'BRIDGE DECK',traction:.92,lateralGrip:.90,drag:.40,depth:0};
  if(i===WOODLAND_SITE_INDEX){
-  const {gravel,mud,forest}=woodlandGround(x,z);
-  return {name:gravel>=.5?'GRAVEL':mud>=.42?'MUD':'FOREST FLOOR',
-   traction:.89*gravel+.39*mud+.65*forest,lateralGrip:.86*gravel+.42*mud+.62*forest,
-   drag:.62*gravel+2.15*mud+1.10*forest,depth:0};
+  const {gravel,mud,forest,wet,bog}=woodlandGround(x,z),dry=gravel-wet;
+  return {name:wet>=.45?'RUTTED MUD':gravel>=.5?'GRAVEL':mud>=.42?'MUD':'FOREST FLOOR',
+   traction:.89*dry+.55*wet+.39*mud+.65*forest,lateralGrip:.86*dry+.48*wet+.42*mud+.62*forest,
+   drag:.62*dry+1.48*wet+2.15*mud+1.10*forest,depth:0,bog};
  }
  return {name:'GRAVEL',traction:.78,lateralGrip:.75,drag:.8,depth:0};
 }
@@ -91,14 +102,15 @@ export function createDispatchSite(T,scene,i){
   const terrain=new T.PlaneGeometry(126,130,144,144);
   terrain.rotateX(-Math.PI/2);terrain.translate(9,0,-94);
   const position=terrain.attributes.position,colors=new Float32Array(position.count*3);
-  const needles=new T.Color(0x4c6240),gravel=new T.Color(0x9a8970),mud=new T.Color(0x524034);
+  const needles=new T.Color(0x4c6240),gravel=new T.Color(0x9a8970),mud=new T.Color(0x524034),wetClay=new T.Color(0x655043);
   for(let j=0;j<position.count;j++){
    const x=position.getX(j),z=position.getZ(j),surface=woodlandGround(x,z);
    position.setY(j,surface.height);
    const variation=.90+.10*Math.sin(x*.73+z*.84)*Math.sin(z*.59);
-   colors[j*3]=variation*(needles.r*surface.forest+gravel.r*surface.gravel+mud.r*surface.mud);
-   colors[j*3+1]=variation*(needles.g*surface.forest+gravel.g*surface.gravel+mud.g*surface.mud);
-   colors[j*3+2]=variation*(needles.b*surface.forest+gravel.b*surface.gravel+mud.b*surface.mud);
+   const dry=surface.gravel-surface.wet;
+   colors[j*3]=variation*(needles.r*surface.forest+gravel.r*dry+mud.r*surface.mud+wetClay.r*surface.wet);
+   colors[j*3+1]=variation*(needles.g*surface.forest+gravel.g*dry+mud.g*surface.mud+wetClay.g*surface.wet);
+   colors[j*3+2]=variation*(needles.b*surface.forest+gravel.b*dry+mud.b*surface.mud+wetClay.b*surface.wet);
   }
   terrain.setAttribute('color',new T.BufferAttribute(colors,3));terrain.computeVertexNormals();
   const ground=make('woodland service trail and muddy shoulder',terrain,new T.MeshStandardMaterial({
@@ -136,13 +148,19 @@ export function createDispatchSite(T,scene,i){
    mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();scene.add(mesh);
   }
   const stone=mat(0x75766a),rock=new T.DodecahedronGeometry(1,0);
-  for(const [x,z,r] of [[-7,-86,1.1],[13,-85,.9],[-4,-97,.85],[19,-94,1.0],[28,-108,1.05],[-1,-114,1.0],[23,-117,1.15]]){
+  const boulders=[[-7,-86,1.1],[13,-85,.9],[-4,-97,.85],[19,-94,1.0],[28,-108,1.05],[-1,-114,1.0],[23,-117,1.15]];
+  for(const z of [-80,-85])for(const side of [-1,1]){
+   boulders.push([woodlandTrailCenter(z)+side*7.1,z,side>0?.65:.55]);
+  }
+  for(const [x,z,r] of boulders){
    const obstacle=make('woodland trail boulder',rock,stone,x,siteHeight(i,x,z)+r*.26,z);
    obstacle.scale.set(r,r*.67,r*.85);obstacle.rotation.y=x*.35;
    obstacles.push({x,z,r});
   }
   const timber=mat(0x746048),reflector=mat(0xffda79);
-  for(const [x,z] of [[2,-67],[14,-67],[woodlandTrailCenter(-91)-5.2,-91],[woodlandTrailCenter(-91)+5.2,-91],[5,-113],[17,-113]]){
+  const posts=[[2,-67],[14,-67],[5,-113],[17,-113]];
+  for(const z of [-81,-92])for(const side of [-1,1])posts.push([woodlandTrailCenter(z)+side*6.65,z]);
+  for(const [x,z] of posts){
    const y=siteHeight(i,x,z);
    box('trail edge post',[.15,.94,.15],[x,y+.46,z],timber);
    box('trail edge reflector',[.17,.19,.17],[x,y+.81,z],reflector);

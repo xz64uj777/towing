@@ -6,7 +6,7 @@ Run your own towing and recovery operation in a mobile-first 3D simulator. Start
 
 Position your truck, operate the hydraulics, rig the recovery, watch cable tension and stability, and finish the dispatch to earn your payout. This is a hands-on equipment simulator: loading, securement, unloading and stowing matter as much as driving.
 
-**Current game: Build .84 — Woodland Recovery.** The browser version includes nine dispatches, five playable trucks, career earnings and upgrades, touch and keyboard controls, and local progress saves. Development is ongoing, with gameplay feedback from the owner's hands-on testing.
+**Current game: Build .85 — Woodland Self-Recovery.** The browser version includes nine dispatches, five playable trucks, career earnings and upgrades, touch and keyboard controls, and local progress saves. Development is ongoing, with gameplay feedback from the owner's hands-on testing.
 
 ## Career and dispatches
 
@@ -30,7 +30,7 @@ Levels 4–7 now take place in a wooded ravine, a muddy lakeshore, a snowy freig
 
 The quarry introduces tandem control: one winch per truck, switching operator tabs while the inactive cable holds its spool length. Both trucks can be driven independently and have their own parking brake and boom controls. Stop before switching; the inactive truck is parked automatically. Selecting an unrigged truck releases its brake for driving and switches to the chase camera. Connected or rigged trucks stay parked. Disconnect only the selected truck's cable before repositioning it. The medium has a fixed boom (raise/lower and telescope, no swing). Both trucks' positions and boom setups are saved. Both winches must take load before the exercise completes.
 
-Woodland Recovery starts at a trailhead. Drive the 8×8 into the woods, winch the work truck onto the gravel, then use the wheel lift and straps to tow it back to the marked bay.
+Woodland Recovery starts at a trailhead. Drive the 8×8 into the woods, winch the work truck onto the gravel, then use the wheel lift and straps to tow it back to the marked bay. The higher gravel line avoids the deepest ruts. If the 8×8 bogs down, select FRONT WINCH, face a cyan trail anchor, connect, release the parking brake, and hold PULL SELF. Use the rear winch for the casualty and the lift controls at the top of the equipment panel to raise and strap it.
 
 Direct dispatch links select that job in your local career. Use the main play link to continue normally. Progress and control settings are stored in your browser on the current device. MENU also offers **SAVE IN-PROGRESS** and **RESUME SAVED JOB** for interrupted recoveries.
 
