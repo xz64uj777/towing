@@ -149,7 +149,7 @@ export function createDispatchSite(T,scene,i){
   }
   const stone=mat(0x75766a),rock=new T.DodecahedronGeometry(1,0);
   const boulders=[[-7,-86,1.1],[13,-85,.9],[-4,-97,.85],[19,-94,1.0],[28,-108,1.05],[-1,-114,1.0],[23,-117,1.15]];
-  for(const z of [-80,-85,-90,-94])for(const side of [-1,1]){
+  for(const z of [-80,-85])for(const side of [-1,1]){
    boulders.push([woodlandTrailCenter(z)+side*7.1,z,side>0?.65:.55]);
   }
   for(const [x,z,r] of boulders){
