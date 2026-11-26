@@ -178,3 +178,34 @@ export function detailCarrierDeck(T,bed,length){
  // Tail edge stays within the original bed envelope.
  box(T,bed,'carrier tail reinforcement',[2.50,.10,.08],[0,-.025,length/2-.045],dark);
 }
+
+// Original civilian recovery body for the woodland 8×8. The boom and
+// wheel lift are mounted separately by the vehicle builder.
+export function addOffroadBody(T,body,color){
+ const paint=material(T,color,.44,.28),dark=material(T,0x252c28,.72,.25);
+ const glass=material(T,0x35565b,.21,.32),metal=material(T,0x868b81,.42,.55),amber=material(T,0xe8a939,.34,.14);
+ const part=(name,size,pos,surface=paint)=>box(T,body,name,size,pos,surface);
+ part('forward control cab',[2.48,1.47,2.23],[0,2.16,-2.98]);
+ part('cab roof extension',[2.54,.18,2.31],[0,2.96,-2.97]);
+ part('steel brush bumper',[2.78,.42,.46],[0,1.15,-4.19],dark);
+ part('front grille',[1.1,.41,.08],[0,1.68,-4.13],dark);
+ part('engine enclosure',[2.14,.90,1.48],[0,1.96,-.93]);
+ part('rear recovery platform',[2.49,.22,4.51],[0,1.52,1.46],dark);
+ part('amber warning bar',[.98,.15,.25],[0,3.12,-2.66],amber);
+ for(const side of [-1,1]){
+  part('frame rail',[.19,.32,7.8],[side*.65,1.18,-.15],dark);
+  part('split windscreen',[1.03,.60,.055],[side*.56,2.53,-4.11],glass);
+  part('side window',[.055,.62,1.25],[side*1.251,2.51,-3.10],glass);
+  part('cab access step',[.32,.17,.64],[side*1.28,1.38,-2.16],metal);
+  part('front headlight',[.39,.23,.085],[side*.91,1.50,-4.13],metal);
+  part('corner marker',[.14,.13,.08],[side*1.24,1.68,-4.13],amber);
+  part('recovery equipment locker',[.41,.61,3.55],[side*1.02,1.91,1.55]);
+  part('rear lamp',[.36,.18,.05],[side*.98,1.55,3.75],material(T,0x9e3d30,.34,.16));
+  for(const z of [.30,1.48,2.66])part('locker handle',[.036,.06,.20],[side*1.24,2.03,z],metal);
+ }
+ for(const z of [-2.75,-1.27,1.33,2.80]){
+  part('drive axle',[2.2,.16,.16],[0,.76,z],dark);
+  part('differential',[.39,.29,.37],[0,.76,z],dark);
+ }
+ return body;
+}

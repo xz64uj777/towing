@@ -975,3 +975,22 @@ test('selecting unrigged truck B makes it immediately drivable from the real qua
  a.vel.set(0,0,0);a.parkingBrake=true;a.boomDeployed=true;s.recoveryLines[1].connected=true;assert.match(tandemDriveBlock(s),/disconnect/);
  assert.ok(switchTandemControl(s,0));assert.ok(switchTandemControl(s,1));assert.equal(a.parkingBrake,true);assert.equal(a.boomDeployed,true);
 });
+
+test('woodland requires an unloaded, disconnected truck at the trailhead',()=>{
+ const finish={reached:true,loaded:false,strapped:false,hook:false,delivered:true};
+ assert.equal(canCompleteJob('woodland',finish),true);
+ for(const change of [{reached:false},{loaded:true},{strapped:true},{hook:true},{delivered:false}])
+  assert.equal(canCompleteJob('woodland',{...finish,...change}),false);
+});
+
+test('expanding the campaign preserves the dispatch within older career loops',()=>{
+ assert.equal(migrateJobIndex(15,8,9),16);
+ assert.equal(migrateJobIndex(13,7,9),15);
+ const fixture=checkpointFixture();
+ fixture.jobIndex=8;fixture.type={id:'offroad'};fixture.woodlandExtracted=true;
+ const checkpoint=captureRecoverySave({job:8,jobCount:9},fixture);
+ const parsed=parseRecoverySave(JSON.stringify(checkpoint),9);
+ assert.equal(parsed.jobIndex,8);
+ assert.equal(parsed.career.selected,'offroad');
+ assert.equal(parsed.equipment.woodlandExtracted,true);
+});

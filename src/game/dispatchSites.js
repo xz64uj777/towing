@@ -21,7 +21,8 @@ function woodlandGround(x,z){
  const road=1-smooth(5.8,7.4,Math.abs(x-woodlandTrailCenter(z)));
  const trailhead=1-smooth(7.8,11,Math.hypot(x-8,z+68));
  const turnout=1-smooth(7.8,10.8,Math.hypot(x-11,z+113));
- const gravel=Math.max(road,trailhead,turnout);
+ const recoveryClearing=1-smooth(6.5,8.4,Math.hypot(x-13,z+101));
+ const gravel=Math.max(road,trailhead,turnout,recoveryClearing);
  const basin=Math.hypot((x-WOODLAND_SITE.target.x)/9,(z-WOODLAND_SITE.target.z)/10);
  const mud=(1-gravel)*(1-smooth(.45,1.22,basin));
  const forest=1-gravel-mud;
