@@ -1,4 +1,4 @@
-import {anchorCapacity,redirectLoad} from './temporaryAnchors.js';
+import {anchorCapacity,redirectLoad,anchorSlip} from './temporaryAnchors.js';
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import {levelFourHeight,levelFourSlope,levelFourDownhillAcceleration,LEVEL_FOUR_STAGING} from './levelFourTerrain.js';
@@ -422,6 +422,24 @@ export default function TowingGame(){
     }
     setNotice(anchor.label+' PULLED LOOSE. Choose a firmer spot or reduce the load.');
   };
+  const overloadAnchor=(s,slot,load,neighbors,h)=>{
+    const a=s.riggingAnchors[slot];
+    if(!a?.pos||load<=(a.capacity??58000))return false;
+    if(a.tree||!a.marker){loseAnchor(s,slot);return true;}
+    const slip=anchorSlip(load,a.capacity??58000,a.travel??0,h);
+    a.travel=slip.travel;
+    const direction=V();
+    for(const p of neighbors){if(p)direction.add(p.clone().sub(a.pos).normalize());}
+    direction.y=0;
+    if(direction.lengthSq()>1e-8){
+      a.pos.addScaledVector(direction.normalize(),slip.distance);
+      const y=levelFour?terrainHeight(a.pos.x,a.pos.z):a.marker.position.y;
+      a.pos.y=y+.55;
+      a.marker.position.set(a.pos.x,y,a.pos.z);
+    }
+    if(slip.failed)loseAnchor(s,slot);
+    return true;
+  };
   const frontCable=frontAnchors?new THREE.Line(cableBuffer(),new THREE.LineBasicMaterial({color:0x63e5ef})):null;
   if(frontCable){frontCable.visible=false;frontCable.frustumCulled=false;scene.add(frontCable);}
   const goals=site?.goals??[{x:firstJob.kind==='tow'||firstJob.kind==='flatbed'?0:2,z:firstJob.kind==='tow'||firstJob.kind==='flatbed'?23:firstJob.z,r:3.85}];
@@ -494,8 +512,7 @@ export default function TowingGame(){
       const step=frontWinchStep(s.frontWinch,frontWinchHead(s),anchor.pos,parked,h,1.4*settingsRef.current.winch);
       s.frontWinch.spool=step.spool;s.frontWinch.tension=step.tension;
       s.frontWinch.stalled=step.stalled;s.frontWinch.previousDistance=step.previousDistance;
-      if(step.tension>(anchor.capacity??58000))loseAnchor(s,s.frontWinch.anchor);
-      else{s.vel.x+=step.x;s.vel.z+=step.z;}
+      if(!overloadAnchor(s,s.frontWinch.anchor,step.tension,[frontWinchHead(s)],h)){s.vel.x+=step.x;s.vel.z+=step.z;}
     }else if(s.woodlandBogged){
       s.vel.x=stopWinchCoast(s.vel.x,h);s.vel.z=stopWinchCoast(s.vel.z,h);
     }
@@ -694,12 +711,8 @@ export default function TowingGame(){
         // A braked idle drum still carries load. The meter shows line tension,
         // while the chassis receives the vector sum of the supporting legs.
         const load=cableLoad(distance,line.spool,pathSpeed,limit),pull=load.tension;
-        if(guide&&redirectLoad(pull,head,guide,second??anchor)>(s.riggingAnchors[line.redirect].capacity??58000)){
-          loseAnchor(s,line.redirect);continue;
-        }
-        if(second&&redirectLoad(pull,guide??head,second,anchor)>(s.riggingAnchors[line.secondRedirect].capacity??58000)){
-          loseAnchor(s,line.secondRedirect);continue;
-        }
+        if(guide&&overloadAnchor(s,line.redirect,redirectLoad(pull,head,guide,second??anchor),[head,second??anchor],h)){if(line.connected)line.tension=pull;continue;}
+        if(second&&overloadAnchor(s,line.secondRedirect,redirectLoad(pull,guide??head,second,anchor),[guide??head,anchor],h)){if(line.connected)line.tension=pull;continue;}
         if(s.tandemHelper)noteTandemUse(s.tandemUsed,i,line.motor,pull);
         line.tension=pull;line.strain=load.strain;line.stalled=line.motor>0&&load.stalled;
         if(pull>0){
@@ -759,7 +772,7 @@ export default function TowingGame(){
        const line=standardWinchStep({distance:dist,spool:s.cableLength,pathSpeed,hold:ready,motor,speed,seconds:h,min:isRollback?.55:3.2});
        s.cableLength=line.spool;s.tension=line.tension;s.cableStrain=line.strain;s.cableStalled=pulling&&line.stalled;
        if(!pulling){s.pickVel.x=stopWinchCoast(s.pickVel.x,h);s.pickVel.z=stopWinchCoast(s.pickVel.z,h);}
-       if(guide&&redirectLoad(s.tension,pa,guide,pb)>(s.riggingAnchors[s.hookRedirect].capacity??58000))loseAnchor(s,s.hookRedirect);
+       if(guide&&overloadAnchor(s,s.hookRedirect,redirectLoad(s.tension,pa,guide,pb),[pa,pb],h))s.tension=0;
        if(s.tension>0&&!s.loaded&&(!isRollback||pulling)){
          const pull=groundCableDelta(dir.clone().negate(),s.tension,2350,h);s.pickVel.x+=pull.x;s.pickVel.z+=pull.z;s.pickVel.y=0;
          if(!guide&&!isRollback){const reaction=groundCableDelta(dir,s.tension,6200,h);s.vel.x+=reaction.x;s.vel.z+=reaction.z;}
@@ -1122,7 +1135,7 @@ export default function TowingGame(){
       const capacity=anchorCapacity(surface,Math.hypot(slope.x,slope.z),!!tree);
       if(!capacity){setNotice('This ground will not hold an anchor. Try firmer or flatter terrain.');return;}
       const slot=s.anchorPlacement.slot,a=s.riggingAnchors[slot];
-      a.pos=point;a.capacity=capacity;a.tree=!!tree;a.ballast=ballast;a.marker.position.set(x,y,z);a.marker.visible=true;
+      a.pos=point;a.capacity=capacity;a.travel=0;a.tree=!!tree;a.ballast=ballast;a.marker.position.set(x,y,z);a.marker.visible=true;
       a.marker.children[0].visible=!tree&&!ballast;
       a.marker.children[2].visible=ballast;
       if(index===null)s.hookRedirect=slot;
@@ -1475,7 +1488,7 @@ export default function TowingGame(){
  </>;
  return <main className={'game-shell'+(menuOpen?' menu-active':'')+(cameraPanelOpen?' camera-active':'')}><div className={'scene'+(placingAnchor?' anchor-placement-scene':'')} ref={mount}/>
    {placingAnchor&&<div className="anchor-placement-hint" role="status"><b>{s?.customHookPlacement!==null?'SELECT CUSTOM HOOK':'PLACE GROUND ANCHOR'}</b><span>{s?.customHookPlacement!==null?'Tap a frame edge or bumper on the recovery vehicle.':'Tap a tree trunk or a clear spot to rig a temporary anchor.'}</span><button type="button" onClick={s?.customHookPlacement!==null?cancelCustomHook:cancelAnchorPlacement}>CANCEL PLACEMENT</button></div>}
-  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>{s?.tandemHelper?'TRUCK '+(activeRecoveryLine===0?'A • ROTATOR':'B • MEDIUM')+' • '+(controlledTruck(s).parkingBrake?'PARKED':'DRIVE READY'):'CAREER MODE • '+career.selected.toUpperCase()+' TRUCK'}</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .86 • TEMPORARY ANCHORS</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
+  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>{s?.tandemHelper?'TRUCK '+(activeRecoveryLine===0?'A • ROTATOR':'B • MEDIUM')+' • '+(controlledTruck(s).parkingBrake?'PARKED':'DRIVE READY'):'CAREER MODE • '+career.selected.toUpperCase()+' TRUCK'}</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .87 • ANCHOR PULLOUT</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
   <div className={'game-minimap '+(mapOpen?'map-expanded':'map-collapsed')} style={{position:'absolute',left:12,bottom:195,zIndex:9,width:mapOpen?146:106,height:mapOpen?166:36,pointerEvents:'auto',border:'2px solid #f3c851',borderRadius:12,background:'rgba(9,20,30,.88)',color:'#fff',boxShadow:'0 3px 14px #0008',padding:6,boxSizing:'border-box'}}>
    <button type="button" aria-expanded={mapOpen} onClick={()=>setMapOpen(v=>!v)} style={{fontSize:11,fontWeight:800,width:'100%',background:'transparent',border:0,color:'white'}}>{mapOpen?'MAP −':'MAP +'}</button>
    {mapOpen&&<svg viewBox="0 0 140 140" width="132" height="132" aria-label="Map of recovery vehicles and destination">
