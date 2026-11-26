@@ -623,7 +623,28 @@ test('closing or opening L-arms requires stationary parked truck',()=>{
  assert.equal(wheelLiftLockReady({speed:0,parkingBrake:true}),true);
 });
 
-import {wheelLiftStrapReady} from './gameRules.js';
+import {standardWinchStep} from './cablePhysics.js';
+
+test('a parked standard winch holds tension until the drum pays out',()=>{
+ const line={distance:12,spool:11,pathSpeed:0,hold:true,motor:0,speed:2,seconds:.1,min:3};
+ const holding=standardWinchStep(line);
+ assert.equal(holding.spool,11);
+ assert.ok(holding.tension>0);
+ const payout=standardWinchStep({...line,motor:-1});
+ assert.ok(payout.spool>11&&payout.tension<holding.tension);
+ assert.deepEqual(standardWinchStep({...line,hold:false}),{spool:12,tension:0,strain:0,stalled:false});
+});
+
+import {wheelLiftStrapReady,wheelLiftTransportReady} from './gameRules.js';
+
+test('wheel-lift transport requires a raised and strapped captured axle',()=>{
+ const captured={loaded:true,armsClosed:true,strapped:true,height:.7};
+ assert.equal(wheelLiftTransportReady({loaded:false}),true);
+ assert.equal(wheelLiftTransportReady(captured),true);
+ for(const change of [{armsClosed:false},{strapped:false},{height:.44}])
+  assert.equal(wheelLiftTransportReady({...captured,...change}),false);
+});
+
 test('wheel-lift straps require captured tires, raised lift, and stationary parked truck',()=>{
  const ready={hasLift:true,deployed:true,loaded:true,armsClosed:true,height:.7,speed:0,parkingBrake:true};
  assert.equal(wheelLiftStrapReady(ready),true);
@@ -916,10 +937,32 @@ test('medium support drives, steers and brakes independently',()=>{
  assert.ok(tandemContactBlocked({x:6,z:0},{x:5,z:0},{x:0,z:0}));assert.ok(!tandemContactBlocked({x:4,z:0},{x:5,z:0},{x:0,z:0}));
 });
 test('tandem checkpoint restores support position and boom independently',()=>{
- const f=checkpointFixture();f.tandemHelper={};f.helperState=makeHelperState(checkpointVector);f.tandemUsed=[true,false];f.helperState.pos.set(-8,.04,-97);f.helperState.yaw=.8;f.helperState.boomAngle=.66;f.helperState.boomExtension=1.4;
+ const f=checkpointFixture();f.tandemHelper={};f.helperState=makeHelperState(checkpointVector);f.tandemUsed=[true,false];f.tandemSelected=1;f.helperState.pos.set(-8,.04,-97);f.helperState.yaw=.8;f.helperState.boomAngle=.66;f.helperState.boomExtension=1.4;
  const snap=captureRecoverySave({job:7,jobCount:8},f),fresh=checkpointFixture();fresh.tandemHelper={};fresh.helperState=makeHelperState(checkpointVector);
- restoreRecoverySave(fresh,snap,checkpointVector);
+ restoreRecoverySave(fresh,parseRecoverySave(JSON.stringify(snap),8),checkpointVector);
  assert.equal(fresh.helperState.pos.x,-8);assert.equal(fresh.helperState.yaw,.8);assert.equal(fresh.helperState.boomExtension,1.4);assert.deepEqual(fresh.tandemUsed,[true,false]);
+ assert.equal(controlledTruck(fresh),fresh.helperState);
+ assert.equal(fresh.helperState.parkingBrake,true);
+ assert.ok(fresh.recoveryLines.every(line=>line.motor===0));
+});
+test('a drive-ready tandem operator resumes stopped and older saves select truck A',()=>{
+ const f=checkpointFixture();
+ f.jobIndex=7;f.tandemHelper={};f.tandemSelected=1;f.tandemUsed=[false,false];
+ Object.assign(f.recoveryLines[1],{connected:false,motor:0});
+ f.helperState=makeHelperState(checkpointVector);
+ Object.assign(f.helperState,{parkingBrake:false,boomDeployed:false,throttle:1,steer:.4});
+ const snap=captureRecoverySave({job:7,jobCount:8},f);
+ const fresh=checkpointFixture();fresh.tandemHelper={};fresh.helperState=makeHelperState(checkpointVector);
+ Object.assign(fresh.helperState,{throttle:1,steer:.4,brake:1,boomControl:.2});
+ restoreRecoverySave(fresh,snap,checkpointVector);
+ assert.equal(controlledTruck(fresh),fresh.helperState);
+ assert.equal(fresh.helperState.parkingBrake,false);
+ assert.equal(fresh.helperState.boomDeployed,false);
+ assert.deepEqual([fresh.helperState.throttle,fresh.helperState.steer,fresh.helperState.brake,fresh.helperState.boomControl],[0,0,0,0]);
+ delete snap.tandemSelected;
+ restoreRecoverySave(fresh,snap,checkpointVector);
+ assert.equal(controlledTruck(fresh),fresh);
+ assert.equal(fresh.helperState.parkingBrake,true);
 });
 
 import {tandemDriveBlock} from './tandemRecovery.js';

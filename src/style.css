@@ -472,8 +472,8 @@
  .bottom-ui .equipment-stack.has-boom .recovery.all-controls.is-open{max-height:none!important}
 }
 @media(orientation:landscape) and (max-height:540px){
- .bottom-ui .recovery.all-controls.is-open{max-height:max(88px,calc(100dvh - 159px - env(safe-area-inset-top) - env(safe-area-inset-bottom)))!important}
- .bottom-ui .equipment-stack.has-boom .recovery.all-controls.is-open{max-height:none!important}
+ .bottom-ui .recovery.all-controls.is-open,
+ .bottom-ui .equipment-stack.has-boom .recovery.all-controls.is-open{max-height:var(--landscape-recovery-max-height)!important}
  .all-controls .all-line-column{gap:3px;padding:3px}
  .all-controls .all-line-column>.action,.all-controls .all-line-column>select.action{min-height:28px;font-size:8px}
  .all-controls .all-line-column .equipment-row .control{min-height:29px;font-size:8px}
@@ -499,7 +499,8 @@
 .bottom-ui .recovery.all-controls.single-line-menu.is-open{
  --row:clamp(24px,calc((100dvh - 181px - env(safe-area-inset-top) - env(safe-area-inset-bottom))/8),36px);
  position:fixed!important;left:auto!important;right:8px!important;bottom:calc(70px + env(safe-area-inset-bottom))!important;
- width:min(230px,39vw)!important;max-height:none!important;overflow:visible!important;gap:3px;padding:4px;
+ width:min(230px,39vw)!important;max-height:var(--landscape-recovery-max-height,none)!important;
+ overflow:var(--landscape-recovery-overflow,visible)!important;gap:3px;padding:4px;
 }
 .bottom-ui .recovery.single-line-menu .equipment-header{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:3px;width:100%;flex-shrink:0}
 .bottom-ui .recovery.single-line-menu .equipment-header:has(>button:only-child){grid-template-columns:1fr}
@@ -521,8 +522,6 @@
  .bottom-ui .equipment-stack.single-line-stack .boom-float{width:96px!important;max-width:96px!important}
 }
 @media(orientation:landscape) and (max-height:540px){
- .bottom-ui .recovery.all-controls.single-line-menu.is-open{bottom:calc(57px + env(safe-area-inset-bottom))!important;--row:clamp(18px,calc((100dvh - 183px - env(safe-area-inset-top) - env(safe-area-inset-bottom))/8),30px)}
- .bottom-ui .recovery.single-line-menu.is-collapsed{bottom:calc(57px + env(safe-area-inset-bottom))!important}
  .bottom-ui .equipment-stack.single-line-stack .boom-float{bottom:calc(126px + env(safe-area-inset-bottom))!important;left:8px!important;width:94px!important;max-width:94px!important}
  .bottom-ui .equipment-stack.single-line-stack .boom-joystick{width:70px;height:70px}
  .game-shell:has(.single-line-stack .boom-float) .game-minimap.map-collapsed{left:8px!important;bottom:calc(96px + env(safe-area-inset-bottom))!important}
@@ -540,7 +539,17 @@
  .bottom-ui .equipment-stack.single-line-stack .recovery.equipment-compact.single-line-menu.is-open{bottom:calc(84px + env(safe-area-inset-bottom))!important}
 }
 @media(orientation:landscape) and (max-height:540px){
- .bottom-ui .equipment-stack.single-line-stack .recovery.equipment-compact{bottom:calc(57px + env(safe-area-inset-bottom))!important}
+ /* Reserve 6px between equipment and the pedals, and between recovery and the top shortcuts. */
+ .bottom-ui{
+  z-index:9;
+  --landscape-recovery-dock:64px;
+  --landscape-recovery-bottom:calc(12px + env(safe-area-inset-bottom) + var(--landscape-recovery-dock));
+  --landscape-recovery-max-height:calc(100dvh - var(--landscape-recovery-bottom) - 85px - env(safe-area-inset-top));
+  --landscape-recovery-overflow:hidden auto;
+ }
+ .bottom-ui .recovery.equipment-compact{bottom:var(--landscape-recovery-dock)}
+ .bottom-ui .equipment-stack.single-line-stack .recovery.equipment-compact{bottom:var(--landscape-recovery-bottom)!important}
+ .bottom-ui .recovery.equipment-compact .action{touch-action:pan-y}
  .bottom-ui .equipment-stack.single-line-stack .boom-float{width:140px!important;max-width:140px!important}
  .bottom-ui .equipment-stack.single-line-stack .boom-control-cluster{display:grid;grid-template-columns:minmax(0,1fr) 70px;grid-template-rows:auto auto;gap:3px}
  .bottom-ui .equipment-stack.single-line-stack .boom-joystick{grid-column:2;grid-row:1 / span 2}
@@ -620,6 +629,5 @@
  font-size:12px!important;
 }
 @media(orientation:landscape) and (max-height:540px){
- .bottom-ui .equipment-stack.single-line-stack .recovery.single-line-menu.is-open{bottom:calc(72px + env(safe-area-inset-bottom))!important}
  .bottom-ui .recovery.single-line-menu.is-open .winch-row>.control{font-size:11px!important}
 }

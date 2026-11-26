@@ -108,3 +108,9 @@ export function wheelLiftLockReady({speed,parkingBrake}){
 export function wheelLiftStrapReady({hasLift,deployed,loaded,armsClosed,height,speed,parkingBrake}){
  return Boolean(hasLift&&deployed&&loaded&&armsClosed&&Number.isFinite(height)&&height>=.45&&wheelLiftLockReady({speed,parkingBrake}));
 }
+
+
+// A captured vehicle can only travel with its axle raised and tires secured.
+export function wheelLiftTransportReady({loaded,armsClosed,strapped,height}){
+ return !loaded||Boolean(armsClosed&&strapped&&Number.isFinite(height)&&height>=.45);
+}

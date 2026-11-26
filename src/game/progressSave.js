@@ -1,6 +1,6 @@
 // Device-local snapshot for an unfinished dispatch. This never replaces career storage.
 import {SITE_REVISION} from './dispatchSites.js';
-import {migrateJobIndex} from './tandemRecovery.js';
+import {migrateJobIndex,stopTruckInputs} from './tandemRecovery.js';
 import {parkingBrakeForRiggers} from './gameRules.js';
 export const RECOVERY_SAVE_KEY='towing-in-progress-v1';
 const vec=v=>v?{x:v.x,y:v.y,z:v.z}:null;
@@ -10,6 +10,7 @@ const index=(n,max)=>Number.isInteger(n)&&n>=0&&n<=max;
 export function captureRecoverySave(career,s){
  return {version:1,siteRevision:SITE_REVISION,savedAt:Date.now(),jobIndex:s.jobIndex,jobCount:career.jobCount??7,
  tandemUsed:s.tandemHelper?[...s.tandemUsed]:null,
+ tandemSelected:s.tandemHelper?s.tandemSelected:null,
  helper:s.helperState?{pos:vec(s.helperState.pos),yaw:s.helperState.yaw,parkingBrake:s.helperState.parkingBrake,boomAngle:s.helperState.boomAngle,boomExtension:s.helperState.boomExtension}:null,
  career:{...career,job:s.jobIndex,selected:s.type.id},
  truck:{pos:vec(s.pos),yaw:s.yaw},
@@ -65,8 +66,20 @@ export function restoreRecoverySave(s,saved,V){
  }
  for(const [key,min,max] of [['rollbackLoadX',-.27,.27],['rollbackLoadYaw',-.15,.15],['rollbackLoadZ',0,.18]])s[key]=validNum(saved.equipment[key])?Math.max(min,Math.min(max,saved.equipment[key])):0;
  s.recoveryDamage=validNum(saved.equipment.recoveryDamage)?Math.max(0,Math.min(750,saved.equipment.recoveryDamage)):0;s.bedContactLatch=false;
- if(s.tandemHelper){s.tandemUsed=[!!saved.tandemUsed?.[0],!!saved.tandemUsed?.[1]];s.tandemSelected=0;
-  const a=s.helperState,b=saved.helper;if(a&&b&&validVec(b.pos)&&validNum(b.yaw)){put(a.pos,b.pos);a.yaw=b.yaw;a.boomAngle=validNum(b.boomAngle)?Math.max(0,Math.min(1.08,b.boomAngle)):.28;a.boomExtension=validNum(b.boomExtension)?Math.max(0,Math.min(2.2,b.boomExtension)):0;}if(a){a.parkingBrake=true;a.boomDeployed=true;a.vel.set(0,0,0);}
+ if(s.tandemHelper){
+  s.tandemUsed=[!!saved.tandemUsed?.[0],!!saved.tandemUsed?.[1]];
+  s.tandemSelected=saved.tandemSelected===1?1:0;
+  const helper=s.helperState,checkpoint=saved.helper;
+  if(helper&&checkpoint&&validVec(checkpoint.pos)&&validNum(checkpoint.yaw)){
+   put(helper.pos,checkpoint.pos);helper.yaw=checkpoint.yaw;
+   helper.boomAngle=validNum(checkpoint.boomAngle)?Math.max(0,Math.min(1.08,checkpoint.boomAngle)):.28;
+   helper.boomExtension=validNum(checkpoint.boomExtension)?Math.max(0,Math.min(2.2,checkpoint.boomExtension)):0;
+  }
+  if(helper){
+   helper.parkingBrake=s.tandemSelected===0||s.recoveryLines[1].connected||checkpoint?.parkingBrake!==false;
+   helper.boomDeployed=helper.parkingBrake;
+   helper.vel.set(0,0,0);stopTruckInputs(helper);
+  }
  }
  s.hookPoint=index(s.hookPoint,9)?s.hookPoint:0;
  s.hookRedirect=index(s.hookRedirect,4)?s.hookRedirect:0;

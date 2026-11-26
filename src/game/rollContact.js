@@ -23,3 +23,33 @@ export function rollContactOffset(hull,roll){
  let bottom=Infinity;for(const p of hull)bottom=Math.min(bottom,p.x*s+p.y*c);
  return -bottom+.008;
 }
+
+// The supported center of mass rises as the body rocks toward an edge.
+// Gravity follows the height gradient, including when both cables are slack.
+export function recoveryRollStep(hull,roll,velocity,cableAcceleration,seconds){
+ let acceleration=cableAcceleration;
+ if(hull?.length){
+  let bottom=Infinity,top=-Infinity,halfWidth=0;
+  for(const point of hull){
+   bottom=Math.min(bottom,point.y);
+   top=Math.max(top,point.y);
+   halfWidth=Math.max(halfWidth,Math.abs(point.x));
+  }
+  const centerY=bottom+(top-bottom)*.42;
+  const supportedHeight=angle=>rollContactOffset(hull,angle)+centerY*Math.cos(angle);
+  const probe=.002,height=supportedHeight(roll);
+  const gravity=.28/Math.max(halfWidth,top-centerY,.1);
+  const left=cableAcceleration-gravity*(height-supportedHeight(roll-probe))/probe;
+  const right=cableAcceleration-gravity*(supportedHeight(roll+probe)-height)/probe;
+  if(Math.abs(velocity)<.015){
+   // At a contact corner, forces on both sides can oppose leaving the resting face.
+   if(left>=0&&right<=0)return {roll,velocity:0};
+   acceleration=left+right>=0?right:left;
+  }else{
+   acceleration=velocity>0?right:left;
+  }
+ }
+ const nextVelocity=Math.max(-1.5,Math.min(1.5,(velocity+acceleration*seconds)*Math.exp(-1.7*seconds)));
+ const nextRoll=roll+nextVelocity*seconds;
+ return {roll:Math.atan2(Math.sin(nextRoll),Math.cos(nextRoll)),velocity:nextVelocity};
+}
