@@ -6,13 +6,13 @@ Run your own towing and recovery operation in a mobile-first 3D simulator. Start
 
 Position your truck, operate the hydraulics, rig the recovery, watch cable tension and stability, and finish the dispatch to earn your payout. This is a hands-on equipment simulator: loading, securement, unloading and stowing matter as much as driving.
 
-**Current game: Build .83 — Tandem Drive Fix.** The browser version includes eight dispatches, four playable trucks, career earnings and upgrades, touch and keyboard controls, and local progress saves. Development is ongoing, with gameplay feedback from the owner's hands-on testing.
+**Current game: Build .84 — Woodland Recovery.** The browser version includes nine dispatches, five playable trucks, career earnings and upgrades, touch and keyboard controls, and local progress saves. Development is ongoing, with gameplay feedback from the owner's hands-on testing.
 
 ## Career and dispatches
 
 Complete a job to earn cash and automatically advance to the next dispatch with its assigned truck. Use **MENU → FLEET / GARAGE** to spend earnings on engine and winch upgrades (three levels each, costing $500, $1,000 and $1,500). The HUD tracks cash, completed dispatches and equipment upgrades.
 
-During development, **all jobs and trucks are available in test mode**. You can choose a dispatch from the MENU job selector or test-drive another truck in the garage without purchasing it. Career progression still records your earnings and completed jobs, and the eight-dispatch sequence repeats after the last rescue.
+During development, **all jobs and trucks are available in test mode**. You can choose a dispatch from the MENU job selector or test-drive another truck in the garage without purchasing it. Career progression still records your earnings and completed jobs, and the nine-dispatch sequence repeats after the last rescue.
 
 | # | Dispatch | Assigned truck | Base payout |
 | --- | --- | --- | ---: |
@@ -24,10 +24,13 @@ During development, **all jobs and trucks are available in test mode**. You can 
 | 6 | [Winter Freight Terminal](https://xz64uj777.github.io/towing/?level=6) | Heavy Rotator | $4,200 |
 | 7 | [Highway Bridge Rescue](https://xz64uj777.github.io/towing/?level=7) | Heavy Rotator | $5,800 |
 | 8 | [Quarry Tandem Practice](https://xz64uj777.github.io/towing/?level=8) | Heavy Rotator + Medium Wrecker | $4,800 |
+| 9 | [Woodland Recovery](https://xz64uj777.github.io/towing/?level=9) | Trail Recovery 8×8 | $3,800 |
 
 Levels 4–7 now take place in a wooded ravine, a muddy lakeshore, a snowy freight terminal with ice, packed snow and cargo obstacles, and an elevated highway bridge over a river. Overturned vehicles now rest on their actual model envelope instead of a fixed height. The bridge has separate recovery bays for both casualties and an edge-failure rule. Old in-progress saves for redesigned dispatches restart the site while retaining career data.
 
 The quarry introduces tandem control: one winch per truck, switching operator tabs while the inactive cable holds its spool length. Both trucks can be driven independently and have their own parking brake and boom controls. Stop before switching; the inactive truck is parked automatically. Selecting an unrigged truck releases its brake for driving and switches to the chase camera. Connected or rigged trucks stay parked. Disconnect only the selected truck's cable before repositioning it. The medium has a fixed boom (raise/lower and telescope, no swing). Both trucks' positions and boom setups are saved. Both winches must take load before the exercise completes.
+
+Woodland Recovery starts at a trailhead. Drive the 8×8 into the woods, winch the work truck onto the gravel, then use the wheel lift and straps to tow it back to the marked bay.
 
 Direct dispatch links select that job in your local career. Use the main play link to continue normally. Progress and control settings are stored in your browser on the current device. MENU also offers **SAVE IN-PROGRESS** and **RESUME SAVED JOB** for interrupted recoveries.
 
@@ -39,7 +42,7 @@ Direct dispatch links select that job in your local career. Use the main play li
 | GAS / REV / BRAKE | Drive forward, reverse or slow down |
 | PARK BRAKE | Secure the truck and unlock stationary equipment operations |
 | Equipment panel (right) | Open the controls for the current truck; hold hydraulic and winch buttons to move, release to stop |
-| Boom joystick (left) | Raise/lower and extend/retract the boom; heavy rotator also supports swing |
+| Boom controls (left) | Joystick raises and lowers the boom and swings the rotator. Hold EXTEND or RETRACT to telescope |
 | FINE / MEDIUM / HIGH | Select winch speed |
 | CAM / ANGLES | Cycle or select camera presets, including rear, hook, top and wide views |
 | Drag / pinch | Orbit the camera / zoom |

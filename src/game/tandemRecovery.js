@@ -39,7 +39,7 @@ export function tandemContactBlocked(before,after,other,minDistance=5.6){const a
 export function migrateJobIndex(index,oldCount,newCount=8){
  if(!Number.isInteger(index)||index<0)return 0;
  if(oldCount===newCount)return index;
- const count=oldCount===7?7:newCount;
+ const count=Number.isInteger(oldCount)&&oldCount>=7&&oldCount<newCount?oldCount:newCount;
  return Math.floor(index/count)*newCount+index%count;
 }
 
