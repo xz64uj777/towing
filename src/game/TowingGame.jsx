@@ -1418,6 +1418,22 @@ export default function TowingGame(){
  const nextCamera=()=>{const index=CAMERA_MODES.findIndex(([id])=>id===cameraMode);changeCamera(CAMERA_MODES[(index+1)%CAMERA_MODES.length][0]);};
  const toggleRearCamera=()=>changeCamera(cameraMode==='reverse'?'orbit':'reverse');
  const currentJob=JOBS[career.job%JOBS.length],currentSite=siteConfig(career.job%JOBS.length);
+ const offroadEquipment=s?.type.id==='offroad';
+ const fieldLiftToggle=<button className={'action '+(s?.liftDeployed?'active':'')} onClick={toggleLift}>{s?.liftDeployed?'FOLD WHEEL LIFT':'LOWER WHEEL LIFT'}</button>;
+ const fieldLiftGrid=<div className="equipment-row"><button className="action" onClick={()=>adjustGrid(-.1)}>GRID −</button><button className="action" onClick={()=>adjustGrid(.1)}>GRID +</button></div>;
+ const fieldLift=(offroadEquipment||s?.type.id==='medium')&&<>
+  {!offroadEquipment&&<><div className="equipment-section-label">WHEEL LIFT</div>{fieldLiftToggle}</>}
+  {s.liftDeployed&&<>
+   <div className="wheel-lift-actions" role="group" aria-label="Wheel lift controls">
+    <div className="equipment-row"><Hold label="LIFT UP" onDown={liftPress('liftControl',1)} onUp={liftPress('liftControl',0)}/><Hold label="LIFT DOWN" onDown={liftPress('liftControl',-1)} onUp={liftPress('liftControl',0)}/></div>
+    {!offroadEquipment&&fieldLiftGrid}
+    <div className="equipment-row"><button className="action" onClick={toggleArms}>{s.armsClosed?'OPEN L-ARMS':'CLOSE L-ARMS'}</button><button className={'action '+(hud.strapsOn?'active':offroadEquipment&&s.loaded?'priority-action':'')} disabled={!s.loaded} onClick={strapTires}>{hud.strapsOn?'REMOVE STRAPS':'FIT STRAPS'}</button></div>
+   </div>
+   {!s.loaded&&<div className={'lift-status '+(hud.gridContact?.ok?'aligned':'')}>{hud.gridContact?.ok?'TIRES ALIGNED • PARK':'ALIGN FRONT TIRES • '+(hud.gridContact?.error?.toFixed(1)??'--')+' m'}</div>}
+   {offroadEquipment&&!s.loaded&&fieldLiftGrid}
+  </>}
+  {offroadEquipment&&!s.loaded&&fieldLiftToggle}
+ </>;
  return <main className={'game-shell'+(menuOpen?' menu-active':'')+(cameraPanelOpen?' camera-active':'')}><div className={'scene'+(placingAnchor?' anchor-placement-scene':'')} ref={mount}/>
    {placingAnchor&&<div className="anchor-placement-hint" role="status"><b>{s?.customHookPlacement!==null?'SELECT CUSTOM HOOK':'PLACE GROUND ANCHOR'}</b><span>{s?.customHookPlacement!==null?'Tap a frame edge or bumper on the recovery vehicle.':'Tap open ground off the road, 4–32 m from truck and 3–32 m from vehicle.'}</span><button type="button" onClick={s?.customHookPlacement!==null?cancelCustomHook:cancelAnchorPlacement}>CANCEL PLACEMENT</button></div>}
   <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>{s?.tandemHelper?'TRUCK '+(activeRecoveryLine===0?'A • ROTATOR':'B • MEDIUM')+' • '+(controlledTruck(s).parkingBrake?'PARKED':'DRIVE READY'):'CAREER MODE • '+career.selected.toUpperCase()+' TRUCK'}</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .85 • WOODLAND SELF-RECOVERY</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
@@ -1493,7 +1509,7 @@ export default function TowingGame(){
   {boomCanSwing&&<><span className="boom-label left">LEFT</span><span className="boom-label right">RIGHT</span></>}
   <div className="boom-knob" style={{transform:`translate(${boomStick.x*20}px,${-boomStick.y*20}px)`}}/>
  </div>
- </div></div>}<div className={'recovery equipment-compact all-controls '+(s?.type.id==='rotator'?'heavy-compact single-line-menu ':'')+(s?.tools.includes('winch')?'winch-equipped ':'')+(recoveryOpen?'is-open':'is-collapsed')}>
+ </div></div>}<div className={'recovery equipment-compact all-controls '+(s?.type.id==='rotator'?'heavy-compact single-line-menu ':'')+(s?.tools.includes('winch')?'winch-equipped ':'')+(offroadEquipment?'offroad-equipment ':'')+(recoveryOpen?'is-open':'is-collapsed')}>
  <div className="equipment-header">
   <button type="button" className="recovery-toggle" aria-expanded={recoveryOpen} onClick={()=>{setRecoveryOpen(v=>!v);setMenuOpen(false);setCameraPanelOpen(false);}}>
    {s?.type.id==='light'?'WHEEL LIFT':s?.type.id==='rotator'?'RECOVERY':s?.type.id==='flatbed'?'ROLLBACK':'EQUIPMENT'} {recoveryOpen?'−':'+'}
@@ -1506,6 +1522,7 @@ export default function TowingGame(){
     <button type="button" disabled={!!s?.tandemHelper&&activeRecoveryLine===1} className={'action '+(hud.riggers?'active':'')} onClick={toggleRiggers}>{s?.tandemHelper&&activeRecoveryLine===1?'FIXED BOOM':hud.riggers?'RIGGERS RETRACT':'RIGGERS DEPLOY'}</button>
     <button type="button" className="action heavy-speed-cycle" onClick={()=>selectWinchSpeed(['fine','medium','high'][(['fine','medium','high'].indexOf(winchSpeed)+1)%3])}>SPEED {winchSpeed.toUpperCase()} ↻</button>
    </div>:<button type="button" className={'action brake-button '+(hud.parking?'active':'')} onClick={togglePark}>{hud.parking?'PARK BRAKE ✓':'PARK BRAKE'}</button>}
+  {offroadEquipment&&fieldLift}
   {s?.frontWinch&&<div className="equipment-tabs" role="group" aria-label="Select 8×8 winch">
     <button type="button" aria-pressed={!showFrontWinch} className={!showFrontWinch?'selected':''} onClick={()=>switchOffroadWinch(false)}>REAR WINCH</button>
     <button type="button" aria-pressed={showFrontWinch} className={showFrontWinch?'selected':''} onClick={()=>switchOffroadWinch(true)}>FRONT WINCH</button>
@@ -1549,15 +1566,8 @@ export default function TowingGame(){
     <button className={'action '+(hud.hook?'active':'')} onClick={toggleHook}>{hud.hook?'DISCONNECT HOOK':'CONNECT TO VEHICLE'}</button>
     {hud.hook&&<div className="equipment-row winch-row"><Hold label="WINCH IN" onDown={press('winch',true)} onUp={press('winch',false)}/><Hold label="WINCH OUT" onDown={press('winchOut',true)} onUp={press('winchOut',false)}/></div>}
     </>}
-    <div className="equipment-section-label">WHEEL LIFT</div>
-    <button className={'action '+(s?.liftDeployed?'active':'')} onClick={toggleLift}>{s?.liftDeployed?'FOLD WHEEL LIFT':'LOWER WHEEL LIFT'}</button>
-    {s?.liftDeployed&&<>
-      <div className="equipment-row"><Hold label="LIFT UP" onDown={liftPress('liftControl',1)} onUp={liftPress('liftControl',0)}/><Hold label="LIFT DOWN" onDown={liftPress('liftControl',-1)} onUp={liftPress('liftControl',0)}/></div>
-      <div className="equipment-row"><button className="action" onClick={()=>adjustGrid(-.1)}>GRID −</button><button className="action" onClick={()=>adjustGrid(.1)}>GRID +</button></div>
-      <div className="equipment-row"><button className="action" onClick={toggleArms}>{s?.armsClosed?'OPEN L-ARMS':'CLOSE L-ARMS'}</button><button className={'action '+(hud.strapsOn?'active':'')} disabled={!s.loaded} onClick={strapTires}>{hud.strapsOn?'REMOVE STRAPS':'FIT STRAPS'}</button></div>
-      {!s.loaded&&<div className={'lift-status '+(hud.gridContact?.ok?'aligned':'')}>{hud.gridContact?.ok?'TIRES ALIGNED • PARK':'ALIGN FRONT TIRES • '+(hud.gridContact?.error?.toFixed(1)??'--')+' m'}</div>}
-    </>}
   </>}
+  {s?.type.id==='medium'&&fieldLift}
   {s?.type.id==='rotator'&&(()=>{
     const i=activeRecoveryLine,line=s.recoveryLines[i],letter=i===0?'A':'B',both=s.recoveryLines.every(l=>l.connected);
     return <>

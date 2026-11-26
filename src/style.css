@@ -79,6 +79,7 @@
 .equipment-compact .priority-action{background:#267b50;border:1px solid #a3e5b4}
 .equipment-compact .brake-button{border:1px solid #f3c851}
 .equipment-compact .lift-status{padding:5px;font-size:9px}
+.equipment-compact .wheel-lift-actions{display:flex;flex-direction:column;flex-shrink:0;gap:inherit}
 .equipment-compact .recovery-line-compact{display:flex;flex-direction:column;gap:4px;width:100%}
 .equipment-compact .line-summary{color:#f3c851;font-weight:800;text-align:center;font-size:10px}
 @media(max-width:520px){.bottom-ui .recovery.equipment-compact{width:min(158px,44vw);bottom:73px;padding:4px}.equipment-compact .action,.equipment-compact .control{font-size:9px;min-height:34px}.equipment-compact .equipment-row>.control{min-height:34px}.bottom-ui .boom-float{right:calc(8px + min(158px,44vw) + 7px)}}
@@ -630,4 +631,18 @@
 }
 @media(orientation:landscape) and (max-height:540px){
  .bottom-ui .recovery.single-line-menu.is-open .winch-row>.control{font-size:11px!important}
+}
+
+.offroad-equipment .wheel-lift-actions{
+ position:sticky;top:0;z-index:2;background:#09161d;border-radius:6px;
+}
+.bottom-ui .recovery.offroad-equipment.is-open{overflow-anchor:none}
+@media(orientation:landscape) and (max-height:540px){
+ .bottom-ui .equipment-stack.single-line-stack .recovery.offroad-equipment.is-open{
+  max-height:var(--landscape-recovery-max-height)!important;
+  overflow:var(--landscape-recovery-overflow)!important;
+ }
+ .offroad-equipment .recovery-toggle,
+ .offroad-equipment>.brake-button{min-height:30px}
+ .offroad-equipment .wheel-lift-actions .equipment-row>button{min-height:34px;font-size:10px}
 }
