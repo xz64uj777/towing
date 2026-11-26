@@ -6,13 +6,13 @@ Run your own towing and recovery operation in a mobile-first 3D simulator. Start
 
 Position your truck, operate the hydraulics, rig the recovery, watch cable tension and stability, and finish the dispatch to earn your payout. This is a hands-on equipment simulator: loading, securement, unloading and stowing matter as much as driving.
 
-**Current game: Build .86 — Temporary Anchors.** The browser version includes nine dispatches, five playable trucks, career earnings and upgrades, touch and keyboard controls, and local progress saves. Development is ongoing, with gameplay feedback from the owner's hands-on testing.
+**Current game: Build .86 — Temporary Anchors.** The browser version includes ten dispatches, six playable trucks, career earnings and upgrades, touch and keyboard controls, and local progress saves. Development is ongoing, with gameplay feedback from the owner's hands-on testing.
 
 ## Career and dispatches
 
 Complete a job to earn cash and automatically advance to the next dispatch with its assigned truck. Use **MENU → FLEET / GARAGE** to spend earnings on engine and winch upgrades (three levels each, costing $500, $1,000 and $1,500). The HUD tracks cash, completed dispatches and equipment upgrades.
 
-During development, **all jobs and trucks are available in test mode**. You can choose a dispatch from the MENU job selector or test-drive another truck in the garage without purchasing it. Career progression still records your earnings and completed jobs, and the nine-dispatch sequence repeats after the last rescue.
+During development, **all jobs and trucks are available in test mode**. You can choose a dispatch from the MENU job selector or test-drive another truck in the garage without purchasing it. Career progression still records your earnings and completed jobs, and the ten-dispatch sequence repeats after the last rescue.
 
 | # | Dispatch | Assigned truck | Base payout |
 | --- | --- | --- | ---: |
@@ -25,6 +25,7 @@ During development, **all jobs and trucks are available in test mode**. You can 
 | 7 | [Highway Bridge Rescue](https://xz64uj777.github.io/towing/?level=7) | Heavy Rotator | $5,800 |
 | 8 | [Quarry Tandem Practice](https://xz64uj777.github.io/towing/?level=8) | Heavy Rotator + Medium Wrecker | $4,800 |
 | 9 | [Woodland Recovery](https://xz64uj777.github.io/towing/?level=9) | Trail Recovery 8×8 | $3,800 |
+| 10 | [Military Tank Recovery: Iraq](https://xz64uj777.github.io/towing/?level=10) | M88A2 HERCULES | $6,200 |
 
 Levels 4–7 now take place in a wooded ravine, a muddy lakeshore, a snowy freight terminal with ice, packed snow and cargo obstacles, and an elevated highway bridge over a river. Overturned vehicles now rest on their actual model envelope instead of a fixed height. The bridge has separate recovery bays for both casualties and an edge-failure rule. Old in-progress saves for redesigned dispatches restart the site while retaining career data.
 

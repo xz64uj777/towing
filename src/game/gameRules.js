@@ -1,6 +1,7 @@
 // Testable completion and navigation rules for all seven dispatches.
 export function canCompleteJob(kind,{reached,loaded,strapped,hook,recoveryConnected,delivered}) {
  if(!reached) return false;
+ if(kind==='tracked')return Boolean(loaded&&!hook);
  if(kind==='tow') return Boolean(delivered&&!loaded&&!strapped);
  if(kind==='woodland') return Boolean(delivered&&!loaded&&!strapped&&!hook);
  if(kind==='flatbed') return Boolean(delivered&&!loaded&&!strapped&&!hook);
