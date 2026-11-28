@@ -1,10 +1,17 @@
-// Original procedural simulator audio. No external recordings, downloads or dependencies.
+// Procedural simulator audio with recorded engine and flyover layers for Level 10.
 // Audio is unlocked only by a real user gesture; all sources are cleaned up on unmount.
 const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
 const abs=v=>Math.abs(v||0);
 const delta=(a,b)=>abs((a||0)-(b||0));
 const tau=2*Math.PI;
+const desertClips={
+ engine:new URL('../assets/desert/hercules.mp3',import.meta.url),
+ chinook:new URL('../assets/desert/chinook.mp3',import.meta.url),
+ radioCheck:new URL('../assets/desert/radio-check.mp3',import.meta.url),
+ radioTow:new URL('../assets/desert/radio-tow.mp3',import.meta.url)
+};
 const specs={
+ hercules:{idle:650,max:2400,cylinders:12},
  light:{idle:760,max:3000,cylinders:8},flatbed:{idle:720,max:2800,cylinders:6},
  medium:{idle:680,max:2600,cylinders:6},rotator:{idle:620,max:2350,cylinders:6}
 };
@@ -15,10 +22,11 @@ export function soundState(s,previous,dt,surface){
  const parked=s.parkingBrake||s.riggersDeployed;
  const active=s.recoveryLines.filter(l=>l.connected);
  const heavy=s.type.id==='rotator';
+ const tracked=s.type.id==='hercules';
  const front=s.frontWinch;
  const frontRunning=Boolean(front&&front.anchor>=0&&(front.motor<0||front.motor>0&&!parked));
  const winchOn=frontRunning||(heavy?active.some(l=>l.motor!==0)&&s.boomDeployed&&parked&&speed<.25:
-  s.hook&&(s.winch||s.winchOut)&&s.parkingBrake&&(s.boomDeployed||s.tools.includes('bed')));
+  s.hook&&(s.winch||s.winchOut)&&s.parkingBrake&&(tracked?s.bladeDepth>=.25:s.boomDeployed||s.tools.includes('bed')));
  const load=clamp(frontRunning?front.tension/32000:heavy?Math.max(0,...active.map(l=>l.tension/42000)):s.tension/32000);
  const stalled=winchOn&&(frontRunning?front.stalled:heavy?active.some(l=>l.stalled):!!s.cableStalled);
  const same=previous?.sim===s&&dt>0&&dt<.25;
@@ -26,7 +34,7 @@ export function soundState(s,previous,dt,surface){
   boom:[s.boomAngle,s.boomExtension,s.boomSwing],lift:[s.liftHeight,s.liftExtension],
   spools:s.recoveryLines.map(l=>l.spool),length:s.cableLength,frontLength:front?.spool,frontConnected:front?.anchor>=0,park:!!s.parkingBrake,riggers:!!s.riggersDeployed,
   hook:!!s.hook,connected:s.recoveryLines.map(l=>!!l.connected),arms:!!s.armsClosed,straps:!!s.strapsOn,
-  bed:!!s.bedTilt,deck:[s.bedSlide||0,s.bedProgress||0],liftDeployed:!!s.liftDeployed,loaded:!!s.loaded,stalled,load,jobDone:!!s.jobDone,reverse:s.vel.x*Math.sin(s.yaw)-s.vel.z*Math.cos(s.yaw)<-.25};
+  bed:!!s.bedTilt,deck:[s.bedSlide||0,s.bedProgress||0,s.bladeDepth||0],liftDeployed:!!s.liftDeployed,loaded:!!s.loaded,stalled,load,jobDone:!!s.jobDone,reverse:s.vel.x*Math.sin(s.yaw)-s.vel.z*Math.cos(s.yaw)<-.25};
  const valid=same&&Math.hypot(current.x-previous.x,current.z-previous.z)<5;
  const motion=valid?clamp((current.boom.reduce((n,v,i)=>n+delta(v,previous.boom[i]),0)+
  current.lift.reduce((n,v,i)=>n+delta(v,previous.lift[i]),0)+current.deck.reduce((n,v,i)=>n+delta(v,previous.deck?.[i]),0))/dt,0,2):0;
@@ -34,7 +42,7 @@ export function soundState(s,previous,dt,surface){
  const reelSpeed=valid&&winchOn?clamp((frontRunning?delta(current.frontLength,previous.frontLength):heavy?current.spools.reduce((n,v,i)=>n+(active.includes(s.recoveryLines[i])?delta(v,previous.spools[i]):0),0):
  delta(current.length,previous.length))/dt,0,6):0;
  const throttle=parked?0:abs(s.throttle);
- const rev=clamp(Math.max(speed/17*.60+throttle*.36,hydraulic*.28,winchOn?.22+load*.35:0));
+ const rev=clamp(Math.max(speed/(tracked?7:17)*.60+throttle*.36,hydraulic*.28,winchOn?.22+load*.35:0));
  const rpm=profile.idle+(profile.max-profile.idle)*rev;
  const rough=clamp((surface?.drag||.36)/2.65);
  const events=[];
@@ -66,6 +74,17 @@ export function makeSoundWave(kind,rate,seconds=2){
    const p=(t*36)%1,cycle=Math.floor(t*36)%6;
    const hit=Math.exp(-p*12),weight=[1,.87,.96,.91,1.03,.89][cycle];
    value=weight*(.48*Math.sin(tau*p-.45)+.21*Math.sin(tau*p*2)+.10*Math.sin(tau*p*3)+.12*hit*(white+mid))+.12*low;
+  }else if(kind==='blast'){
+   const shock=Math.sin(tau*(39*t+2*(1-Math.exp(-t*8))));
+   value=(shock*.43+low*.55)*Math.exp(-t*.98)+mid*.30*Math.exp(-t*11);
+  }else if(kind==='gunfire'){
+   for(const beat of [0,.11,.22,.35,.83,.96,1.09]){
+    const age=t-beat;
+    if(age>=0)value+=(mid*.7+low*.7+white*.19)*Math.exp(-age*32);
+   }
+  }else if(kind==='track'){
+   const phase=t*14%1;
+   value=(mid*.72+white*.16+.25*Math.sin(tau*t*147))*Math.exp(-phase*5)+low*.22;
   }else if(kind==='noise'){value=.72*white+.25*mid;}
   else if(kind==='gravel'){value=.42*mid+.26*white+(rand()>.91?.45*rand():0);}
   else if(kind==='metal'){value=(.48*Math.sin(tau*530*t)+.24*Math.sin(tau*1010*t)+.13*Math.sin(tau*1730*t))*Math.exp(-t*22)+.35*white*Math.exp(-t*65);}
@@ -81,6 +100,35 @@ export function makeSoundWave(kind,rate,seconds=2){
 export function createGameAudio(){
  let ctx=null,master=null,compressor=null,nodes=[],loops={},effects={},disposed=false,previous=null,elapsed=0;
  let lastReverse=0,nextReverse=0;
+ let desertLoaded=false;
+ const ambienceSources=new Set();
+ function loadDesert(){
+  if(desertLoaded)return;
+  desertLoaded=true;
+  effects.blast=buffer('blast',3.6);
+  effects.gunfire=buffer('gunfire',1.65);
+  loops.track=loop('track','lowpass',1000,.65);
+  const context=ctx;
+  for(const [kind,url] of Object.entries(desertClips)){
+   fetch(url).then(response=>{
+    if(!response.ok)throw new Error('Desert audio unavailable');
+    return response.arrayBuffer();
+   }).then(data=>context.decodeAudioData(data)).then(decoded=>{
+    if(ctx!==context||disposed)return;
+    if(kind==='engine'){
+     const samples=decoded.getChannelData(0);
+     const overlap=Math.floor(decoded.sampleRate*.14);
+     for(let i=0;i<overlap;i++){
+      const blend=i/overlap;
+      samples[i]=samples[samples.length-overlap+i]*(1-blend)+samples[i]*blend;
+     }
+     const source=ctx.createBufferSource();
+     source.buffer=decoded;source.loop=true;source.loopEnd=(samples.length-overlap)/decoded.sampleRate;
+     loops.armored=filtered(source,'lowpass',1250,.6);
+    }else effects[kind]=decoded;
+   }).catch(()=>{});
+  }
+ }
  const set=(param,value,time=.06)=>{if(param&&ctx)param.setTargetAtTime(value,ctx.currentTime,time);};
  function buffer(kind,duration){
   const data=makeSoundWave(kind,ctx.sampleRate,duration),b=ctx.createBuffer(1,data.length,ctx.sampleRate);
@@ -125,12 +173,40 @@ export function createGameAudio(){
   try{if(!ctx&&!init())return;if(ctx.state!=='running')Promise.resolve(ctx.resume()).catch(()=>{});}
   catch{close();}
  }
- function effect(kind,volume){
+ function effect(kind,volume,{pan=0,cutoff=0,delay=0,ambience=false}={}){
   if(!ctx||ctx.state!=='running'||!effects[kind]||volume<=0)return;
   const src=ctx.createBufferSource(),g=ctx.createGain();src.buffer=effects[kind];
-  g.gain.value=volume;src.connect(g);g.connect(master);
-  src.onended=()=>{try{src.disconnect();g.disconnect();}catch{}};
-  src.start();
+  g.gain.value=volume;src.connect(g);
+  const chain=[src,g];
+  if(cutoff){
+   const filter=ctx.createBiquadFilter();filter.type='lowpass';filter.frequency.value=cutoff;filter.Q.value=.4;
+   g.connect(filter);chain.push(filter);
+  }
+  if(pan&&ctx.createStereoPanner){
+   const stereo=ctx.createStereoPanner();stereo.pan.value=pan;chain.at(-1).connect(stereo);chain.push(stereo);
+  }
+  chain.at(-1).connect(master);
+  if(ambience)ambienceSources.add(src);
+  src.onended=()=>{ambienceSources.delete(src);for(const node of chain)node.disconnect();};
+  src.start(ctx.currentTime+delay);
+ }
+ function desertEvent(kind,x,z,s){
+  if(!ctx||ctx.state!=='running')return;
+  if(kind==='chinook'||kind.startsWith('radio')){
+   effect(kind,kind==='chinook'?.48:.36,{ambience:true});
+   if(kind.startsWith('radio'))effect('air',.055,{cutoff:2300,ambience:true});
+   return;
+  }
+  const dx=x-s.pos.x,dz=z-s.pos.z;
+  const distance=Math.hypot(dx,dz);
+  effect(kind,clamp(115/distance,.45,1.25)*(kind==='blast'?.54:.26),{
+   pan:clamp((dx*Math.cos(s.yaw)+dz*Math.sin(s.yaw))/distance,-.84,.84),
+   cutoff:kind==='blast'?380:780,delay:distance/343,ambience:true
+  });
+ }
+ function stopAmbience(){
+  for(const source of ambienceSources)source.stop();
+  ambienceSources.clear();
  }
  function update(s,dt,surface,volume,muted,hidden){
   if(disposed)return;
@@ -141,12 +217,25 @@ export function createGameAudio(){
   if(!ctx||ctx.state!=='running')return;
   const volumeLevel=muted||hidden?0:clamp(Number.isFinite(volume)?volume:.7);
   set(master.gain,volumeLevel*.65,.045);
+  const tracked=s.type.id==='hercules';
+  if(tracked&&volumeLevel>0)loadDesert();
+  if(!tracked||volumeLevel===0)stopAmbience();
   const gain=(name,v)=>set(loops[name].gain.gain,v,.065);
   const pitch=(name,v)=>set(loops[name].source.frequency,v,.07);
   const filter=(name,v)=>set(loops[name].filter.frequency,v,.08);
   const rev=firingFrequency(state.rpm,state.cylinders);
   set(loops.engine.source.playbackRate,clamp(rev/36,.55,4),.09);
-  gain('engine',.20+state.engineLoad*.11);filter('engine',520+rev*7+state.engineLoad*650);
+  if(loops.armored){
+   gain('armored',tracked?.29+state.engineLoad*.16:0);
+   set(loops.armored.source.playbackRate,.73+state.speed*.063+state.engineLoad*.34,.09);
+   filter('armored',740+state.speed*110+state.engineLoad*640);
+  }
+  if(loops.track){
+   const trackRate=tracked?clamp(state.speed/5+(s.parkingBrake?0:Math.abs(s.steer||0)*.28)):0;
+   gain('track',trackRate*.19);
+   set(loops.track.source.playbackRate,.62+trackRate*1.05,.09);
+  }
+  gain('engine',tracked&&loops.armored?.043:.20+state.engineLoad*.11);filter('engine',520+rev*7+state.engineLoad*650);
   gain('rattle',.038+state.engineLoad*.055);filter('rattle',280+rev*3);
   gain('turbo',state.engineLoad*.025);pitch('turbo',320+rev*8);
   const activeWinch=state.winchOn&&(state.reelSpeed>.04||state.stalled);
@@ -166,11 +255,11 @@ export function createGameAudio(){
   gain('reverse',state.reverse&&ctx.currentTime>=nextReverse-.85&&ctx.currentTime<nextReverse-.56?.065:0);
   if(volumeLevel>0)for(const event of state.events)effect(event,event==='heavy'?.27:event==='metal'?.19:.15);
  }
- function silence(){if(ctx&&master)set(master.gain,0,.025);previous=null;lastReverse=0;nextReverse=0;}
+ function silence(){stopAmbience();if(ctx&&master)set(master.gain,0,.025);previous=null;lastReverse=0;nextReverse=0;}
  function close(){
-  disposed=true;for(const node of nodes){try{node.stop?.();node.disconnect();}catch{}}
+  disposed=true;stopAmbience();for(const node of nodes){try{node.stop?.();node.disconnect();}catch{}}
   try{master?.disconnect();compressor?.disconnect();if(ctx&&ctx.state!=='closed')Promise.resolve(ctx.close()).catch(()=>{});}catch{}
   nodes=[];loops={};effects={};ctx=null;master=null;compressor=null;previous=null;
  }
- return {unlock,update,silence,close};
+ return {unlock,update,desertEvent,silence,close};
 }
