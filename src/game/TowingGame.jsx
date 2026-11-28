@@ -13,6 +13,7 @@ import {createLakeScene,lakeHeight,lakeSlope,lakeDownhillAcceleration,LAKE_SURFA
 import {RECOVERY_SAVE_KEY,captureRecoverySave,parseRecoverySave,restoreRecoverySave} from './progressSave.js';
 import {FRONT_WINCH_CRAWL,makeFrontWinch,frontWinchReach,woodlandBogged,frontWinchStep} from './woodlandRecovery.js';
 import {sampleSurface,recoverySurfaceVelocity} from './terrainPhysics.js';
+import {createDesertAmbience} from './desertAmbience.js';
 import {createGameAudio} from './gameAudio.js';
 import {ROLLBACK_LENGTH,rollbackDeck,rollbackPose,rollbackStop,rollbackTravel,rollbackReady,rollbackCanConnect,rollbackAligned,rollbackGroundLimit,rollbackApproachStep,rollbackCanUnhook,rollbackRampReady,rollbackStowed,rollbackHydraulicStep,rollbackTransportReady,rollbackContactHeight,rollbackTieDownPath,ROLLBACK_CREEP_SPEED,rollbackCreepReady,rollbackBedContact,rollbackBedMotionBlocked,rollbackDamage,rollbackNetPay} from './rollbackPhysics.js';
 import {cableGeometry,cablePathSpeed,cableLoad,cableReelStep,standardWinchStep,cableRenderPoints} from './cablePhysics.js';
@@ -481,6 +482,11 @@ export default function TowingGame(){
   const towBar=type.id==='hercules'?box(scene,'articulated tow bar',[.15,.15,1],[0,0,0],0x666755):null;
   if(towBar)towBar.visible=false;
   const updateDust=towBar?trackedDust(THREE,scene):null;
+  const updateDesertAmbience=site?.kind==='desert'?createDesertAmbience(THREE,scene,(kind,x,z,state)=>{
+   if(!settingsRef.current.soundMuted&&settingsRef.current.soundVolume!==0){
+    audioRef.current?.desertEvent(kind,x,z,state);
+   }
+  }):null;
   sim.current=s;
   if(firstJob.kind==='heavy'){pickup.rotation.order='YXZ';pickup.rotation.z=s.pickRoll;pickup.position.y=s.pickPos.y+rollContactOffset(pickup.userData.rollHull,s.pickRoll);secondaryPickup.rotation.order='YXZ';secondaryPickup.rotation.z=s.secondary.roll;secondaryPickup.position.y=s.secondary.pos.y+rollContactOffset(s.secondary.contactHull,s.secondary.roll);}
   if(levelFour)setCameraMode((site?.kind==='woodland'||site?.kind==='desert')?'chase':'ravine');
@@ -498,7 +504,7 @@ export default function TowingGame(){
   const update=(now)=>{
    // Consume the checkpoint once the restored scene reaches its first frame.
    if(restoring&&pendingRestore.current===checkpoint)pendingRestore.current=null;
-   const dt=Math.min(.033,(now-last)/1000);last=now;if(!document.hidden&&(Math.abs(s.throttle)>.1||s.vel.length()>.6||s.winch||s.winchOut||s.frontWinch?.motor||s.recoveryLines.some(l=>l.motor)||Math.abs(s.boomControl)>.1||Math.abs(s.liftControl)>.1||Math.abs(s.bladeInput)>.1||Math.abs(s.helperState?.throttle??0)>.1))s.autosaveActive+=dt;const steps=Math.max(1,Math.ceil(dt/(1/120)));const h=dt/steps;
+   const frameSeconds=Math.max(0,(now-last)/1000);const dt=Math.min(.033,frameSeconds);last=now;if(!document.hidden&&(Math.abs(s.throttle)>.1||s.vel.length()>.6||s.winch||s.winchOut||s.frontWinch?.motor||s.recoveryLines.some(l=>l.motor)||Math.abs(s.boomControl)>.1||Math.abs(s.liftControl)>.1||Math.abs(s.bladeInput)>.1||Math.abs(s.helperState?.throttle??0)>.1))s.autosaveActive+=dt;const steps=Math.max(1,Math.ceil(dt/(1/120)));const h=dt/steps;
    for(let n=0;n<steps;n++){
     const forward=V(Math.sin(s.yaw),0,-Math.cos(s.yaw));const right=V(Math.cos(s.yaw),0,Math.sin(s.yaw));
     const truckSurface=surfaceAt(s.pos);
@@ -1121,6 +1127,7 @@ export default function TowingGame(){
    else if(s.cameraMode==='orbit'){const focus=s.orbitFocus==='hook'?s.pickPos.clone().add(V(0,1.2,0)):s.orbitFocus==='wide'?active.pos.clone().lerp(s.pickPos,.5).add(V(0,1.2,0)):active.pos.clone().add(V(0,1.2,0));focus.y=Math.max(focus.y,supportGround(focus.x,focus.z)+.75);camera.lookAt(focus);}
    if(now-s.lastHud>120){const sp=active.vel.length()*3.6;setHud({speed:sp,gear:active.throttle<-.1?'R':'D',hook:s.hook,tension:s.tension/1000,winch:s.winch?'REELING':'IDLE',parking:active.parkingBrake,riggers:active.riggersDeployed,boom:active.boomDeployed,lift:s.liftDeployed,range:active.pos.distanceTo(s.pickPos),mapX:active.pos.x,mapZ:active.pos.z,mapYaw:active.yaw,otherTruck:s.helperState?{x:(active===s?s.helperState:s).pos.x,z:(active===s?s.helperState:s).pos.z,yaw:(active===s?s.helperState:s).yaw}:null,roll:s.pickRoll,roll2:s.secondary.roll,secondX:s.secondary.pos.x,secondZ:s.secondary.pos.z,lineTensions:s.recoveryLines.map(l=>l.tension/1000),lineStrains:s.recoveryLines.map(l=>l.strain??0),lineStalls:s.recoveryLines.map(l=>!!l.stalled),cableStrain:s.cableStrain??0,cableStalled:!!s.cableStalled,carX:s.pickPos.x,carZ:s.pickPos.z,carYaw:s.pickYaw,loaded:s.loaded,liftHeight:s.liftHeight,armsClosed:s.armsClosed,strapsOn:s.strapsOn,gridContact:tireGridContact(s),recoverySurface:surfaceAt(s.pickPos).name,secondarySurface:s.secondary.active?surfaceAt(s.secondary.pos).name:null,truckSurface:surfaceAt(active.pos).name,supportRatio:active.supportRatio??0,padCount:s.support?.count??0,stabilityRatio:s.support?.ratio??0,padLoads:s.support?.loads.map(v=>Math.round(v/1000))??[]});s.lastHud=now;}
    audioRef.current?.update(s,dt,surfaceAt(s.pos),settingsRef.current.soundVolume,settingsRef.current.soundMuted,document.hidden||!document.hasFocus());
+   if(!document.hidden&&document.hasFocus())updateDesertAmbience?.(s,Math.min(.25,frameSeconds));
    const shadowFocus=s.pos.clone().lerp(s.pickPos,s.heavyRecovery?.30:.12);sun.target.position.copy(shadowFocus);sun.position.copy(shadowFocus).add(V(-25,38,20));
    if(terrainScene?.waterNormal){terrainScene.waterNormal.offset.x=(now*.000009)%1;terrainScene.waterNormal.offset.y=(now*.000006)%1;}
    renderer.render(scene,camera);raf=requestAnimationFrame(update);
@@ -1594,7 +1601,7 @@ export default function TowingGame(){
  </>;
  return <main className={'game-shell'+(menuOpen?' menu-active':'')+(cameraPanelOpen?' camera-active':'')}><div className={'scene'+(placingAnchor?' anchor-placement-scene':'')} ref={mount}/>
    {placingAnchor&&<div className="anchor-placement-hint" role="status"><b>{s?.customHookPlacement!==null?'SELECT CUSTOM HOOK':'PLACE GROUND ANCHOR'}</b><span>{s?.customHookPlacement!==null?'Tap a frame edge or bumper on the recovery vehicle.':'Tap a tree trunk or a clear spot to rig a temporary anchor.'}</span><button type="button" onClick={s?.customHookPlacement!==null?cancelCustomHook:cancelAnchorPlacement}>CANCEL PLACEMENT</button></div>}
-  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>{s?.tandemHelper?'TRUCK '+(activeRecoveryLine===0?'A • ROTATOR':'B • MEDIUM')+' • '+(controlledTruck(s).parkingBrake?'PARKED':'DRIVE READY'):'CAREER MODE • '+career.selected.toUpperCase()+' TRUCK'}</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .92 • SMART SAVE</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
+  <header className="topbar"><div><strong>TOWING & RECOVERY</strong><small>{s?.tandemHelper?'TRUCK '+(activeRecoveryLine===0?'A • ROTATOR':'B • MEDIUM')+' • '+(controlledTruck(s).parkingBrake?'PARKED':'DRIVE READY'):'CAREER MODE • '+career.selected.toUpperCase()+' TRUCK'}</small><small style={{display:"block",fontWeight:800,color:"#ffe07a",letterSpacing:".04em"}}>BUILD .93 • DESERT AMBIENCE</small></div><div className="speed"><b>{hud.speed.toFixed(0)}</b><span>KM/H</span></div></header>
   <div className={'game-minimap '+(mapOpen?'map-expanded':'map-collapsed')} style={{position:'absolute',left:12,bottom:195,zIndex:9,width:mapOpen?146:106,height:mapOpen?166:36,pointerEvents:'auto',border:'2px solid #f3c851',borderRadius:12,background:'rgba(9,20,30,.88)',color:'#fff',boxShadow:'0 3px 14px #0008',padding:6,boxSizing:'border-box'}}>
    <button type="button" aria-expanded={mapOpen} onClick={()=>setMapOpen(v=>!v)} style={{fontSize:11,fontWeight:800,width:'100%',background:'transparent',border:0,color:'white'}}>{mapOpen?'MAP −':'MAP +'}</button>
    {mapOpen&&<svg viewBox="0 0 140 140" width="132" height="132" aria-label="Map of recovery vehicles and destination">
